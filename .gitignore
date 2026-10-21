@@ -1,0 +1,8 @@
+# API KEYS — kabhi commit/share mat karna
+config/connectors.json
+.env
+# Asal business data
+data/
+*.csv
+!tests/fixtures/*.csv
+__pycache__/

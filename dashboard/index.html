@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Growth OS — DryFruit Ecommerce Command Center</title>
+<style>
+:root{--bg:#0b0f14;--side:#10161d;--card:#161e27;--card2:#1d2733;--line:#26313d;--txt:#e8eef4;--mut:#8fa3b5;--grn:#2ecc71;--amb:#f5a623;--red:#e74c3c;--blu:#3aa7ff;--pur:#9b7bff;--org:#ff8c42}
+*{box-sizing:border-box;margin:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
+aside{width:230px;background:var(--side);position:fixed;top:0;bottom:0;left:0;padding:16px 10px;overflow-y:auto;border-right:1px solid var(--line)}
+.logo{font-size:17px;font-weight:800;padding:6px 10px 14px}.logo span{color:var(--org)}
+.nav a{display:flex;gap:9px;align-items:center;color:var(--mut);text-decoration:none;padding:9px 10px;border-radius:9px;font-size:14px;cursor:pointer;margin-bottom:2px}
+.nav a:hover{background:var(--card2);color:var(--txt)} .nav a.act{background:#1d2f42;color:#fff;border-left:3px solid var(--blu)}
+.nav .grp{font-size:10px;letter-spacing:1px;color:#5c6f80;padding:12px 10px 5px}
+main{margin-left:230px;flex:1;padding:18px;max-width:calc(100vw - 230px)}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.top input,.top select{background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 12px;font-size:14px}
+.demo{background:#5a4413;color:#ffd76a;padding:7px 12px;border-radius:9px;font-weight:700;font-size:12px}
+.kill{margin-left:auto;background:var(--red);color:#fff;border:none;padding:10px 16px;border-radius:9px;font-weight:800;cursor:pointer}
+.kill.off{background:#39434e}
+.page{display:none}.page.act{display:block}
+h2{font-size:20px;margin-bottom:4px}.sub{color:var(--mut);font-size:13px;margin-bottom:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--card);border-radius:14px;padding:15px;cursor:pointer}.kpi:hover{background:var(--card2)}
+.kpi .v{font-size:25px;font-weight:800}.kpi .l{color:var(--mut);font-size:12px}.kpi .d{font-size:12px;margin-top:5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
+.card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px}.card h3{font-size:15px;margin-bottom:11px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{color:var(--mut);text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);cursor:pointer}
+td{padding:8px 6px;border-bottom:1px solid #1f2933}tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
+.bar{height:7px;background:#2c3947;border-radius:6px;overflow:hidden;min-width:70px}.bar i{display:block;height:100%}
+.badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.b-grn{background:#123d24;color:var(--grn)}.b-amb{background:#4a3510;color:var(--amb)}.b-red{background:#471b16;color:var(--red)}.b-blu{background:#14324e;color:var(--blu)}.b-pur{background:#2b2150;color:var(--pur)}
+.btn{border:none;border-radius:8px;padding:7px 13px;font-weight:700;cursor:pointer;font-size:13px}
+.ok{background:var(--grn);color:#06280f}.no{background:#39434e;color:#dfe7ee}.sm{padding:4px 9px;font-size:12px}
+.sw{position:relative;width:42px;height:22px;appearance:none;background:#39434e;border-radius:20px;cursor:pointer;vertical-align:middle}
+.sw:checked{background:var(--grn)} .sw:before{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s}.sw:checked:before{left:23px}
+#drawer{position:fixed;top:0;right:-460px;width:440px;max-width:92vw;height:100vh;background:var(--side);border-left:1px solid var(--line);padding:20px;overflow-y:auto;transition:.25s;z-index:50}
+#drawer.open{right:0}#drawer h3{margin-bottom:8px}
+canvas{width:100%;height:150px}
+input[type=range]{width:100%} .ctl{margin-bottom:16px}.ctl label{font-size:13px;color:var(--mut)}
+.feed div{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#123d24;color:#c8f5da;padding:11px 18px;border-radius:10px;font-size:14px;display:none;z-index:99}
+@media(max-width:760px){aside{display:none}main{margin-left:0;max-width:100vw}}
+</style></head><body>
+<aside>
+<div class="logo">🌰 Growth<span>OS</span></div>
+<nav class="nav">
+<div class="grp">COMMAND</div>
+<a class="act" data-p="overview">🏠 War Room Overview</a>
+<a data-p="approvals">📥 Approvals <span class="badge b-red" id="apprCount">3</span></a>
+<a data-p="control">🎛️ Control Center</a>
+<div class="grp">GROWTH</div>
+<a data-p="listings">📝 Listings</a>
+<a data-p="keywords">🔑 Keywords</a>
+<a data-p="ads">📣 Ads Manager</a>
+<a data-p="competitors">🥊 Competitors</a>
+<div class="grp">OPERATIONS</div>
+<a data-p="inventory">🏭 Inventory / FBA</a>
+<a data-p="profit">💰 Profit Center</a>
+<div class="grp">INTELLIGENCE</div>
+<a data-p="agents">🤖 Agents & Learning</a>
+<a data-p="algorithm">🧠 Algorithm Watch</a>
+</nav>
+<p style="font-size:11px;color:#5c6f80;padding:14px 10px">Agents: 9 • Flows: 10<br>Engines: 20 • Tests: 23 pass<br>v6.0 — Helium10-level UI</p>
+</aside>
+<main>
+<div class="top">
+<span class="demo" id="liveBanner">🔌 LIVE DATA ke liye backend se jud raha hai... (backend band ho to: python3 backend/app.py chalao)</span>
+<input id="globalSearch" placeholder="🔍 SKU, keyword, campaign khojo..." style="flex:1;min-width:200px">
+<select id="platformSel"><option>Saare Platform</option><option>Amazon IN</option><option>Flipkart</option></select>
+<button class="kill" id="killBtn" onclick="toggleKill()">🛑 KILL SWITCH — Saare Ads Band</button>
+</div>
+
+<!-- OVERVIEW -->
+<section class="page act" id="p-overview">
+<h2>War Room — aaj ki tasveer</h2><p class="sub">Amazon IN + Flipkart • Subah 8 baje ki report • F9 Algorithm Watch: koi bada badlav nahi</p>
+<div class="kpis">
+<div class="kpi" onclick="go('profit')"><div class="v">₹2,00,000</div><div class="l">Total Sales (Oct)</div><div class="d" style="color:var(--grn)">▲ 34% pichle mahine se</div></div>
+<div class="kpi" onclick="go('ads')"><div class="v" style="color:var(--grn)">8.0</div><div class="l">Blended ROAS</div><div class="d">Paid 4.0 • TACOS 12.5%</div></div>
+<div class="kpi" onclick="go('ads')"><div class="v">₹25,000</div><div class="l">Ad Spend</div><div class="d" style="color:var(--grn)">▼ Waste -18% band hua</div></div>
+<div class="kpi" onclick="go('inventory')"><div class="v">4 SKU</div><div class="l">Stock Dhyaan Chahiye</div><div class="d" style="color:var(--amb)">Kaju FBA cover 11 din</div></div>
+<div class="kpi" onclick="go('listings')"><div class="v">74<span style="font-size:13px">/100</span></div><div class="l">Avg Listing Score</div><div class="d" style="color:var(--amb)">2 listing &lt;70 = ads scale band</div></div>
+<div class="kpi"><div class="v" style="color:var(--grn)">Safe</div><div class="l">Account Health</div><div class="d">ODR 0.4% • Cancel 2.1% ⚠️ paas hai</div></div>
+</div>
+<div class="grid">
+<div class="card"><h3>📈 Sales + Blended ROAS — Flywheel chal raha hai</h3><canvas id="chSales"></canvas><p class="sub">Organic share 25% → 50%: yahi ROAS 4 → 8 ki wajah hai. Bar = sales, Line = Blended ROAS</p></div>
+<div class="card"><h3>📥 Aaj ke Approvals (saransh)</h3><div id="apprMini"></div><button class="btn ok" onclick="go('approvals')">Saare Approvals Dekho →</button></div>
+<div class="card"><h3>⚡ Aaj ke sabse bade mauke / khatre</h3><div class="feed">
+<div>🟢 <b>Mauka:</b> 'anjeer 1kg' keyword rank 14 → page-1 paas hai. Rank-Push chal raha hai.</div>
+<div>🔴 <b>Khatra:</b> Competitor 'FarmVedha' ne Kaju par 8% price giraya — A07 ka jawab kal ke approval me hai.</div>
+<div>🟠 <b>Dhyaan:</b> Diwali me 38 din bache — gift hamper listings F5 flow me taiyaar, FBA stock plan pending approval.</div>
+<div>🧠 <b>Seekh:</b> Nayi main image ka test 62% aage — 500 views me faisla pakka hoga.</div></div></div>
+</div></section>
+
+<!-- LISTINGS -->
+<section class="page" id="p-listings"><h2>📝 Listings — har SKU ka score, click karke poori detail</h2><p class="sub">Score &lt;70 wali listing par ads scale apne aap band hai (guardrail). Row par click = detail + sudhaar ki yojna.</p>
+<div class="card"><table id="tblListings"><tr><th>Product</th><th>Platform</th><th>Price (per-kg)</th><th>Rating</th><th>Score</th><th>Halat</th></tr></table></div></section>
+
+<!-- KEYWORDS -->
+<section class="page" id="p-keywords"><h2>🔑 Keyword Domination — Helium10 Cerebro ka desi jawab</h2><p class="sub">Opportunity = Volume × Relevance ÷ Competition. HERO keywords par Rank-Push chalta hai.</p>
+<div class="card"><table id="tblKeywords"><tr><th>Keyword</th><th>Monthly Search</th><th>Hamara Rank</th><th>CPC (₹)</th><th>Opportunity</th><th>Tier</th></tr></table></div></section>
+
+<!-- ADS -->
+<section class="page" id="p-ads"><h2>📣 Ads Manager — campaign chaloo/band, waste pakdo</h2><p class="sub">Switch se campaign band/chaloo (demo) • Waste terms ko ek click me negative lagao</p>
+<div class="card"><h3>Campaigns</h3><table id="tblAds"><tr><th>Campaign</th><th>Mode</th><th>Spend</th><th>Sales</th><th>ROAS</th><th>Chaloo</th></tr></table></div>
+<div class="card"><h3>🗑️ Waste Search Terms — paisa yahan jal raha tha</h3><div id="wasteList"></div></div></section>
+
+<!-- COMPETITORS -->
+<section class="page" id="p-competitors"><h2>🥊 Competitor Intelligence — roz ka milaan</h2><p class="sub">Price, rating, reviews — kahan haar rahe ho, saaf dikhta hai</p>
+<div class="card"><table id="tblComp"><tr><th>Competitor</th><th>Product</th><th>Unka Price/kg</th><th>Rating</th><th>Reviews</th><th>Hamara Gap</th></tr></table></div></section>
+
+<!-- INVENTORY -->
+<section class="page" id="p-inventory"><h2>🏭 Inventory / FBA / Flipkart Warehouse</h2><p class="sub">Unicommerce 3-way milaan: <span class="badge b-grn">✔ Aaj match — oversell risk nahi</span></p>
+<div class="card"><table id="tblStock"><tr><th>SKU</th><th>Jagah</th><th>Stock</th><th>Roz Bikri</th><th>Cover</th><th>Action</th></tr></table></div></section>
+
+<!-- PROFIT -->
+<section class="page" id="p-profit"><h2>💰 Profit Center — asal margin, jhootha ROAS nahi</h2><p class="sub">Apne numbers daalo — calculator turant margin, break-even ROAS aur max CPC bata dega (Python engine jaisa hi hisaab)</p>
+<div class="grid"><div class="card"><h3>🧮 Live Calculator</h3>
+<div class="ctl"><label>Selling Price (₹)</label><input type="number" id="cPrice" value="649" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--line);color:#fff;border-radius:8px"></div>
+<div class="ctl"><label>Product Cost (₹)</label><input type="number" id="cCost" value="340" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--line);color:#fff;border-radius:8px"></div>
+<div class="ctl"><label>Platform</label><select id="cPlat" style="width:100%;padding:9px;background:var(--card2);border:1px solid var(--line);color:#fff;border-radius:8px"><option>Amazon</option><option>Flipkart</option></select></div>
+<button class="btn ok" onclick="calcProfit()">Hisaab Karo</button><div id="calcOut" style="margin-top:12px;font-size:14px;line-height:1.7"></div></div>
+<div class="card"><h3>SKU-wise Margin</h3><table id="tblProfit"><tr><th>SKU</th><th>Price</th><th>Margin %</th><th>Break-even ROAS</th></tr></table></div></div></section>
+
+<!-- APPROVALS -->
+<section class="page" id="p-approvals"><h2>📥 Approval Queue — tum sirf faisla karo, system kaam karega</h2><p class="sub">Tier-0 kaam khud ho jata hai • Tier-1 yahan aata hai • Tier-2 bade paise par do baar poochta hai</p>
+<div id="apprFull"></div></section>
+
+<!-- AGENTS -->
+<section class="page" id="p-agents"><h2>🤖 Agents & Learning — kaun kitna strong, kaun band hai</h2><p class="sub">Switch se agent band/chaloo — faisla Control Center ke rules se lagu hota hai</p>
+<div class="grid" id="agentCards"></div>
+<div class="card"><h3>📚 Aaj ki seekh (Learning Feed)</h3><div class="feed">
+<div>🎓 <b>Amazon Seller University:</b> A+ comparison chart → conversion upar. A04 ne 2 listing par test lagaya.</div>
+<div>🧪 <b>Apne data se:</b> 'BID_UP_20' Cashew par kaam, Almonds par 3 baar fail → rule khud band ho gaya.</div>
+<div>📰 <b>Helium10 Blog:</b> Rufus-AI ke liye use-case wali bhasha — A04 ke title niyam update hue.</div></div></div></section>
+
+<!-- ALGORITHM -->
+<section class="page" id="p-algorithm"><h2>🧠 Algorithm Watch — platform badle, system dhaal le</h2><p class="sub">Exact algorithm secret hai — ye official signals + apne Rank Probe data ka model hai</p>
+<div class="grid"><div class="card"><h3>Amazon Rank Factors (wazan)</h3><div id="algoAmz"></div></div>
+<div class="card"><h3>Flipkart Rank Factors (wazan)</h3><div id="algoFk"></div></div></div>
+<div class="card"><h3>📡 Badlav ki khabrein (F9 Watch)</h3><div class="feed">
+<div>✅ Is hafte: koi HIGH-impact badlav nahi. Playbook: <b>Amazon v2026.10 / Flipkart v2026.10</b> current hai.</div>
+<div>🧪 Rank Probe ki seekh: is category me <b>CTR badhne se rank upar</b> jata hai (correlation -0.93) — main image par zor isi liye hai.</div></div></div></section>
+
+<!-- CONTROL -->
+<section class="page" id="p-control"><h2>🎛️ Control Center — system tumhare kabze me</h2><p class="sub">Ye settings isi pal se lagu hoti hain (is demo me browser me save hoti hain)</p>
+<div class="grid"><div class="card"><h3>Guardrails</h3>
+<div class="ctl"><label>Roz ka Ad Spend Cap: ₹<b id="capVal">2000</b></label><input type="range" id="capRange" min="500" max="10000" step="100" value="2000"></div>
+<div class="ctl"><label>Minimum Margin Floor: <b id="marVal">15</b>% (isse kam margin = ads nahi)</label><input type="range" id="marRange" min="0" max="40" value="15"></div>
+<div class="ctl"><label><input type="checkbox" id="autoPause" checked> Stock khatm ho to ads auto-pause</label></div>
+<div class="ctl"><label><input type="checkbox" id="autoNeg" checked> Waste terms apne aap negative (Tier-0)</label></div>
+<button class="btn ok" onclick="saveControls()">✔ Settings Save Karo</button></div>
+<div class="card"><h3>Flow Status (F1–F10)</h3><div id="flowList"></div></div></div></section>
+</main>
+
+<div id="drawer"><button class="btn no" onclick="closeDrawer()">✖ Band</button><div id="drawerBody" style="margin-top:14px"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const PRODUCTS=[
+{n:"California Almonds (Badam) 500g",p:"Amazon",price:649,perkg:1298,rating:4.3,rev:132,score:84,cost:340,stock:820,where:"FBA Delhi",daily:26},
+{n:"Kaju W240 Cashew 500g",p:"Amazon",price:799,perkg:1598,rating:4.1,rev:86,score:68,cost:470,stock:290,where:"FBA Delhi",daily:26},
+{n:"Kishmish Golden Raisins 1kg",p:"Flipkart",price:449,perkg:449,rating:4.4,rev:412,score:88,cost:210,stock:640,where:"Apna Godown",daily:13},
+{n:"Anjeer Premium Figs 500g",p:"Amazon",price:699,perkg:1398,rating:4.5,rev:64,score:79,cost:390,stock:210,where:"FBA Mumbai",daily:9},
+{n:"Mamra Almonds 500g",p:"Amazon",price:1099,perkg:2198,rating:4.6,rev:48,score:91,cost:640,stock:150,where:"FBA Delhi",daily:5},
+{n:"Mixed Dry Fruits Gift Hamper 1kg",p:"Flipkart",price:1299,perkg:1299,rating:4.2,rev:29,score:61,cost:720,stock:95,where:"Flipkart WH",daily:3},
+{n:"Pista Salted Pistachios 500g",p:"Flipkart",price:749,perkg:1498,rating:4.3,rev:57,score:73,cost:430,stock:380,where:"Flipkart WH",daily:11},
+{n:"Walnut Kernels Akhrot 500g",p:"Amazon",price:599,perkg:1198,rating:4.0,rev:38,score:66,cost:330,stock:420,where:"FBA Mumbai",daily:8}];
+const KEYWORDS=[
+{k:"california almonds 500g",v:49500,rank:9,cpc:14,tier:"HERO"},{k:"badam",v:201000,rank:22,cpc:11,tier:"GROWTH"},
+{k:"kaju 500g w240",v:33100,rank:16,cpc:16,tier:"HERO"},{k:"mamra almonds",v:22200,rank:7,cpc:19,tier:"HERO"},
+{k:"anjeer dry fruit",v:27100,rank:14,cpc:12,tier:"GROWTH"},{k:"dry fruits gift hamper diwali",v:74000,rank:31,cpc:15,tier:"GROWTH"},
+{k:"kishmish 1kg",v:40500,rank:5,cpc:8,tier:"HERO"},{k:"pista 500g",v:18300,rank:19,cpc:13,tier:"LONGTAIL"}];
+const CAMPAIGNS=[
+{n:"AMZ — Badam Exact (Hero)",m:"HARVEST",sp:8200,sa:36100,on:true},{n:"AMZ — Mamra Rank-Push",m:"RANK_PUSH",sp:6100,sa:18900,on:true},
+{n:"AMZ — Kaju Product Targeting",m:"NORMAL",sp:4400,sa:13200,on:true},{n:"AMZ — Auto Discovery",m:"DISCOVERY",sp:2100,sa:4900,on:true},
+{n:"FK — Kishmish PLA",m:"HARVEST",sp:2600,sa:11800,on:true},{n:"FK — Hamper Broad (ghata!)",m:"NORMAL",sp:1600,sa:2100,on:false}];
+const COMPS=[
+{n:"Happilo",pr:"Badam 500g",ppk:1420,r:4.4,rev:52100},{n:"Tata Sampann",pr:"Badam 500g",ppk:1380,r:4.3,rev:38900},
+{n:"FarmVedha",pr:"Kaju 500g (-8% aaj!)",ppk:1470,r:4.2,rev:1240},{n:"Nutraj",pr:"Anjeer 500g",ppk:1440,r:4.4,rev:8600},
+{n:"Tulsi",pr:"Kishmish 1kg",ppk:470,r:4.3,rev:15200}];
+const APPROVALS=[
+{id:1,ag:"A04 Listing",tier:"TIER-1",t:"Badam 500g ka naya title — Rufus-AI readable",imp:"Score 68 → 84 expected"},
+{id:2,ag:"A06 Ads",tier:"TIER-1",t:"'mamra almonds' bid +20% (Rank-Push)",imp:"Rank 18 → Top-10 ka prayas"},
+{id:3,ag:"F3 Inventory",tier:"TIER-1",t:"FBA: Kaju 500g × 400 units bhejna hai",imp:"Cover 11 din — stockout rokna"},
+{id:4,ag:"A07 Pricing",tier:"TIER-2",t:"FarmVedha ke jawab me Kaju par 5% coupon (7 din)",imp:"Buy Box bachana — double confirm chahiye"}];
+const AGENTS=[["A01 Market Research",66],["A02 Competitor Intel",72],["A03 Keyword",74],["A04 Listing",68],["A05 Creative",59],["A06 Ads Manager",71],["A07 Pricing",64],["A08 Review Voice",69],["A09 Governance",81]];
+const FLOWS=["F1 Data Sync","F2 Unicommerce Ops","F3 Inventory/FBA","F4 Profit Calc","F5 Festival Offers","F6 Retention","F7 Guardrails","F8 War-Room Report","F9 Algorithm Watch","F10 Seller Health"];
+let approvals=[...APPROVALS];
+function badge(s){return s>=80?'<span class="badge b-grn">SCALE OK</span>':s>=70?'<span class="badge b-amb">DHYAAN DO</span>':'<span class="badge b-red">ADS SCALE BAND</span>'}
+function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('act'));document.getElementById('p-'+p).classList.add('act');document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('act',a.dataset.p===p));window.scrollTo(0,0)}
+document.querySelectorAll('.nav a').forEach(a=>a.onclick=()=>go(a.dataset.p));
+function toast(m){let t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2600)}
+// Listings
+document.getElementById('tblListings').innerHTML+=PRODUCTS.map((x,i)=>`<tr class="click" onclick="openProduct(${i})"><td><b>${x.n}</b></td><td>${x.p}</td><td>₹${x.price} (₹${x.perkg}/kg)</td><td>⭐${x.rating} (${x.rev})</td><td><div class="bar"><i style="width:${x.score}%;background:${x.score>=80?'var(--grn)':x.score>=70?'var(--amb)':'var(--red)'}"></i></div>${x.score}/100</td><td>${badge(x.score)}</td></tr>`).join('');
+function openProduct(i){let x=PRODUCTS[i];let d=document.getElementById('drawer');document.getElementById('drawerBody').innerHTML=
+`<h3>${x.n}</h3><p class="sub">${x.p} • ₹${x.price} • Rating ⭐${x.rating} (${x.rev} reviews)</p>
+<h3 style="margin-top:14px">Score Breakdown</h3>
+${[['Title + Keywords',Math.min(20,x.score*.22)],['Images + Video',Math.min(20,x.score*.2)],['Bullets',Math.min(15,x.score*.16)],['A+ Content',Math.min(10,x.score*.11)],['Reviews/Trust',Math.min(15,x.score*.15)],['Price vs Top-3',Math.min(10,x.score*.09)],['Backend Terms',Math.min(10,x.score*.1)]].map(r=>`<div style="font-size:13px">${r[0]} — ${r[1].toFixed(0)}</div><div class="bar"><i style="width:${r[1]*5}%;background:var(--blu)"></i></div>`).join('')}
+<h3 style="margin-top:14px">A04 ki sudhaar yojna</h3><div class="feed">
+<div>✍️ Naya title taiyaar hai — Approval Queue me hai (use-case + grade ke saath)</div>
+<div>🖼️ Main image test: naya version 62% aage chal raha hai</div>
+<div>💬 Reviews se seekh: 'size chhota laga' — pack par grade (W240/Californian Jumbo) bada likho</div></div>
+<button class="btn ok" onclick="toast('Sudhaar yojna Approval Queue me bhej di gayi ✔');closeDrawer()">Sudhaar Approval me Bhejo</button>`;
+d.classList.add('open')}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open')}
+// Keywords
+document.getElementById('tblKeywords').innerHTML+=KEYWORDS.map(x=>{let opp=Math.round(x.v/(x.cpc*10));return `<tr><td><b>${x.k}</b></td><td>${x.v.toLocaleString('en-IN')}</td><td>${x.rank<=10?'<span class="badge b-grn">#'+x.rank+'</span>':'#'+x.rank}</td><td>₹${x.cpc}</td><td>${opp.toLocaleString('en-IN')}</td><td><span class="badge ${x.tier=='HERO'?'b-pur':x.tier=='GROWTH'?'b-blu':'b-amb'}">${x.tier}</span></td></tr>`}).join('');
+// Ads
+function renderAds(){document.getElementById('tblAds').innerHTML='<tr><th>Campaign</th><th>Mode</th><th>Spend</th><th>Sales</th><th>ROAS</th><th>Chaloo</th></tr>'+CAMPAIGNS.map((x,i)=>`<tr><td><b>${x.n}</b></td><td><span class="badge ${x.m=='RANK_PUSH'?'b-pur':'b-blu'}">${x.m}</span></td><td>₹${x.sp.toLocaleString('en-IN')}</td><td>₹${x.sa.toLocaleString('en-IN')}</td><td><b style="color:${x.sa/x.sp>=3?'var(--grn)':'var(--red)'}">${(x.sa/x.sp).toFixed(1)}</b></td><td><input type="checkbox" class="sw" ${x.on?'checked':''} onchange="CAMPAIGNS[${i}].on=this.checked;toast(this.checked?'Campaign chaloo ✔':'Campaign band — paisa ruk gaya')"></td></tr>`).join('')}
+renderAds();
+document.getElementById('wasteList').innerHTML=[["sasta dry fruit combo",920],["free dry fruits",610],["dry fruit wholesale market delhi",540]].map(w=>`<div class="row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px"><span>"${w[0]}" — ₹${w[1]} spend, <b style="color:var(--red)">0 sale</b></span><button class="btn no sm" onclick="this.textContent='✔ Negative lag gaya';this.disabled=true;toast('Search term negative me gaya — aage ka ghata band')">🗑️ Negative Lagao</button></div>`).join('');
+// Competitors
+document.getElementById('tblComp').innerHTML+=COMPS.map(x=>`<tr><td><b>${x.n}</b></td><td>${x.pr}</td><td>₹${x.ppk}/kg</td><td>⭐${x.r}</td><td>${x.rev.toLocaleString('en-IN')}</td><td>${x.rev>20000?'<span class="badge b-red">Trust gap bada</span>':x.ppk<1300?'<span class="badge b-amb">Price hamla</span>':'<span class="badge b-grn">Jeet sakte ho</span>'}</td></tr>`).join('');
+// Inventory
+document.getElementById('tblStock').innerHTML+=PRODUCTS.map(x=>{let cov=Math.round(x.stock/x.daily);return `<tr><td><b>${x.n}</b></td><td>${x.where}</td><td>${x.stock}</td><td>${x.daily}/din</td><td><b style="color:${cov<15?'var(--red)':cov<25?'var(--amb)':'var(--grn)'}">${cov} din</b></td><td>${cov<15?'<span class="badge b-red">REPLENISH — Approval #3</span>':cov<25?'<span class="badge b-amb">Nazar rakho</span>':'<span class="badge b-grn">Theek hai</span>'}</td></tr>`}).join('');
+// Profit table
+document.getElementById('tblProfit').innerHTML+=PRODUCTS.map(x=>{let fees=x.price*.09+25+65;let m=(x.price-x.cost-25-fees-x.price*.02)/x.price*100;return `<tr><td><b>${x.n}</b></td><td>₹${x.price}</td><td><b style="color:${m>=20?'var(--grn)':m>=12?'var(--amb)':'var(--red)'}">${m.toFixed(1)}%</b></td><td>${m>0?(100/m).toFixed(1):'—'}</td></tr>`}).join('');
+function calcProfit(){let p=+document.getElementById('cPrice').value,c=+document.getElementById('cCost').value,plat=document.getElementById('cPlat').value;
+let fees=plat=='Amazon'? p*.09+25+65 : p*(p<=300?.14:p<=700?.11:.09)+(p<=500?25:40)+45+p*.02;
+let profit=p-c-25-fees-p*.02,m=profit/p*100;
+document.getElementById('calcOut').innerHTML=`Marketplace fees: <b>₹${fees.toFixed(0)}</b><br>Ads se pehle profit: <b style="color:${profit>0?'var(--grn)':'var(--red)'}">₹${profit.toFixed(0)} (${m.toFixed(1)}% margin)</b><br>Break-even ROAS: <b>${m>0?(100/m).toFixed(2):'— (ghata hai, ads mat chalao)'}</b><br>Profit bachakar target ROAS: <b>${m>0?(100/(m*.6)).toFixed(2):'—'}</b>`}
+calcProfit();
+// Approvals
+function renderApprovals(){let h=approvals.map(a=>`<div class="card" id="ap${a.id}"><span class="badge ${a.tier=='TIER-2'?'b-red':'b-pur'}">${a.tier} • ${a.ag}</span><p style="margin:8px 0"><b>${a.t}</b></p><p class="sub">${a.imp}</p><button class="btn ok" onclick="decide(${a.id},1)">✔ Approve — Lagu Karo</button> <button class="btn no" onclick="decide(${a.id},0)">✖ Reject</button></div>`).join('');
+document.getElementById('apprFull').innerHTML=h||'<div class="card">🎉 Koi pending approval nahi — saare faisle ho gaye. Tier-0 kaam system khud karta rahega.</div>';
+document.getElementById('apprMini').innerHTML=approvals.slice(0,3).map(a=>`<div style="padding:7px 0;border-bottom:1px solid var(--line);font-size:13px"><b>${a.ag}:</b> ${a.t}</div>`).join('')||'<p class="sub">Sab clear ✔</p>';
+document.getElementById('apprCount').textContent=approvals.length}
+function decide(id,ok){approvals=approvals.filter(a=>a.id!==id);renderApprovals();toast(ok?'✔ APPROVED — execution queue me gaya, 7/14 din me result maapa jayega':'✖ REJECTED — agent ko wajah ke saath seekh mili')}
+renderApprovals();
+// Agents
+document.getElementById('agentCards').innerHTML=AGENTS.map(a=>`<div class="card"><h3>${a[0]} <input type="checkbox" class="sw" checked style="float:right" onchange="toast(this.checked?'${a[0]} chaloo ✔':'${a[0]} band — uske kaam ruk gaye')"></h3><div class="bar"><i style="width:${a[1]}%;background:${a[1]>=75?'var(--grn)':'var(--blu)'}"></i></div><p class="sub">Strength: ${a[1]}/100 • ${a[1]>=75?'STRONG':'IMPROVING — roz seekh raha hai'}</p></div>`).join('');
+// Algorithm bars
+function algoBars(el,obj){document.getElementById(el).innerHTML=Object.entries(obj).map(([k,v])=>`<div style="font-size:13px">${k} — ${v}%</div><div class="bar"><i style="width:${v*4}%;background:var(--org)"></i></div>`).join('')}
+algoBars('algoAmz',{'Sales Velocity':20,'Conversion Rate':18,'Relevance/Indexing':20,'CTR':12,'Price':10,'Prime/FBA':8,'Stock':6,'Rating':6});
+algoBars('algoFk',{'Relevance':20,'Price':16,'Flipkart Assured':14,'Rating':14,'Sales Velocity':14,'Seller Rating':10,'Dispatch':7,'Kam Returns':5});
+// Flows
+document.getElementById('flowList').innerHTML=FLOWS.map(f=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px"><span>${f}</span><span class="badge b-grn">● CHAALU</span></div>`).join('');
+// Controls + Kill switch
+let killed=false;
+function toggleKill(){killed=!killed;let b=document.getElementById('killBtn');b.classList.toggle('off',killed);b.textContent=killed?'▶️ SYSTEM BAND HAI — Phir Chaloo Karo':'🛑 KILL SWITCH — Saare Ads Band';toast(killed?'🛑 KILL SWITCH ON — saara ad spend ruk gaya. Koi approval nahi manga — pehle suraksha.':'▶️ System phir chaalu — guardrails ke andar kaam karega')}
+const capR=document.getElementById('capRange'),marR=document.getElementById('marRange');
+function syncCtl(){document.getElementById('capVal').textContent=capR.value;document.getElementById('marVal').textContent=marR.value}
+capR.oninput=syncCtl;marR.oninput=syncCtl;
+try{let s=JSON.parse(localStorage.getItem('gos_ctl')||'null');if(s){capR.value=s.cap;marR.value=s.mar;document.getElementById('autoPause').checked=s.ap;document.getElementById('autoNeg').checked=s.an;syncCtl()}}catch(e){}
+function saveControls(){try{localStorage.setItem('gos_ctl',JSON.stringify({cap:capR.value,mar:marR.value,ap:document.getElementById('autoPause').checked,an:document.getElementById('autoNeg').checked}))}catch(e){}
+toast('✔ Settings save — Spend Cap ₹'+capR.value+', Margin Floor '+marR.value+'% isi pal se lagu')}
+// Search filter (listings)
+document.getElementById('globalSearch').addEventListener('input',function(){let q=this.value.toLowerCase();document.querySelectorAll('#tblListings tr.click').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?'':'none')});
+// Chart: sales bars + ROAS line
+(function(){let c=document.getElementById('chSales'),x=c.getContext('2d');let W=c.offsetWidth||600;c.width=W*2;c.height=300;x.scale(2,2);let W2=W,H=150;
+let sales=[70,85,95,120,150,200],roas=[3.2,3.8,4.4,5.6,6.8,8.0];let bw=(W2-60)/sales.length*.55;
+sales.forEach((s,i)=>{let bx=35+i*(W2-60)/sales.length,bh=s/200*(H-45);x.fillStyle='#2b4a68';x.fillRect(bx,H-25-bh,bw,bh);x.fillStyle='#8fa3b5';x.font='10px sans-serif';x.fillText('₹'+s+'k',bx,H-10)});
+x.strokeStyle='#2ecc71';x.lineWidth=2;x.beginPath();roas.forEach((r,i)=>{let px=35+i*(W2-60)/sales.length+bw/2,py=H-25-(r/9)*(H-45);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
+x.fillStyle='#2ecc71';x.fillText('— Blended ROAS 3.2 → 8.0',35,14)})();
+</script>
+<script>
+/* ASAL DATA LOADER — koi data nahi to nakli number NAHI dikhega.
+   Backend (python3 backend/app.py, port 8765) se /api/warroom mangta hai.
+   Data hai to KPI asal numbers se bhar jayenge; nahi hai to saaf khaali halat. */
+(function(){
+  var banner=document.getElementById('liveBanner');
+  function emptyState(msg){
+    banner.textContent='🔴 '+msg; banner.style.background='#571d16'; banner.style.color='#ffb3a7';
+    document.querySelectorAll('.kpi .v').forEach(function(v){v.textContent='—'});
+    document.querySelectorAll('table tr:not(:first-child)').forEach(function(r){r.style.display='none'});
+    ['apprFull','apprMini','agentCards','wasteList'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='<p class="sub">Asal data aane par yahan asal jankari aayegi — abhi khaali hai.</p>'});
+    var ac=document.getElementById('apprCount'); if(ac)ac.textContent='0';
+    var note=document.createElement('div'); note.className='card'; note.style.margin='14px 0';
+    note.innerHTML='<h3>📭 Abhi asal data nahi hai — ye jaan-bujh kar khaali hai, nakli demo band ho gaya hai</h3><p class="sub">Do raste hain: (1) config/connectors.json me apni API keys bharo (tareeka: CONNECTORS_SETUP.md) aur sync chalao, ya (2) Seller Central/Ads Console se CSV report download karke import karo:<br><code>python3 src/sync_service.py --csv-search-terms report.csv</code><br>Data aate hi yehi dashboard khud asal numbers dikhayega — kuch badalna nahi padega.</p>';
+    document.getElementById('p-overview').prepend(note);
+  }
+  fetch('http://localhost:8765/api/warroom').then(function(r){return r.json()}).then(function(d){
+    if(!d.connected){ emptyState('Backend chal raha hai lekin DB me asal data nahi hai — connector jodo ya CSV import karo (CONNECTORS_SETUP.md)'); return; }
+    banner.textContent='🟢 LIVE — ye numbers tumhare asal DB records se hain'; banner.style.background='#123d24'; banner.style.color='#8ff0b3';
+    var k=d.kpis||{};
+    var vs=document.querySelectorAll('.kpi .v');
+    if(vs[0])vs[0].textContent='₹'+Math.round(k.total_sales||0).toLocaleString('en-IN');
+    if(vs[1])vs[1].textContent=(k.blended_roas||0);
+    if(vs[2])vs[2].textContent='₹'+Math.round(k.ad_spend||0).toLocaleString('en-IN');
+  }).catch(function(){ emptyState('Backend se sampark nahi hua — pehle terminal me: python3 backend/app.py chalao, phir page refresh karo'); });
+})();
+</script></body></html>

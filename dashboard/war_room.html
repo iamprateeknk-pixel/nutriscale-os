@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DryFruit Growth OS — War Room</title>
+<style>
+:root{--bg:#0f1419;--card:#1a222c;--card2:#212c38;--txt:#e8eef4;--mut:#8fa3b5;--grn:#2ecc71;--amb:#f5a623;--red:#e74c3c;--blu:#3aa7ff;--pur:#9b7bff}
+*{box-sizing:border-box;margin:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--txt);padding:16px}
+.demo{background:#5a4413;color:#ffd76a;text-align:center;padding:8px;border-radius:8px;font-weight:600;margin-bottom:14px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+h1{font-size:22px} .sub{color:var(--mut);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--card);border-radius:14px;padding:16px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--mut);font-size:12px;margin-top:2px}.kpi .d{font-size:12px;margin-top:6px}
+.card{background:var(--card);border-radius:14px;padding:16px}
+.card h3{font-size:15px;margin-bottom:12px;color:#fff}
+.up{color:var(--grn)}.down{color:var(--red)}.warn{color:var(--amb)}
+.bar{height:8px;background:#2c3947;border-radius:6px;overflow:hidden;margin:4px 0 10px}
+.bar i{display:block;height:100%;border-radius:6px}
+.row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid #26313d}
+.row:last-child{border-bottom:none}
+.appr{background:var(--card2);border-radius:10px;padding:12px;margin-bottom:10px}
+.appr p{font-size:13px;margin:4px 0}.tag{font-size:10px;background:var(--pur);color:#fff;padding:2px 7px;border-radius:8px}
+.btn{border:none;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;margin-right:6px}
+.ok{background:var(--grn);color:#06280f}.no{background:#39434e;color:#dfe7ee}
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.gauge{font-size:40px;font-weight:800}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 4px;border-bottom:1px solid #26313d;text-align:left}
+.feed{font-size:13px;line-height:1.5}.feed div{padding:8px 0;border-bottom:1px solid #26313d}
+canvas{width:100%;height:140px}
+footer{color:var(--mut);font-size:12px;text-align:center;margin-top:16px}
+</style></head><body>
+<div class="demo">⚠️ DEMO DATA — Connectors (Amazon/Flipkart/Unicommerce) live hote hi yahan tumhara asal data dikhega</div>
+<header><div><h1>🌰 DryFruit Growth OS — War Room</h1><div class="sub">Amazon IN + Flipkart • Roz subah 8 baje ki report • A09 Governance chaalu</div></div>
+<span class="pill" style="background:#123d24;color:var(--grn)">● System Healthy</span></header>
+
+<!-- 1-6: KPI CARDS -->
+<div class="kpis">
+<div class="kpi"><div class="v">₹2,00,000</div><div class="l">Total Sales (is mahina)</div><div class="d up">▲ Organic share 50%</div></div>
+<div class="kpi"><div class="v" style="color:var(--grn)">8.0</div><div class="l">Blended ROAS (asli number)</div><div class="d">Paid ROAS 4.0 • TACOS 12.5%</div></div>
+<div class="kpi"><div class="v">₹25,000</div><div class="l">Ad Spend</div><div class="d up">▼ Waste band karke -18%</div></div>
+<div class="kpi"><div class="v">62.3</div><div class="l">Amazon Rank Readiness</div><div class="d warn">Kamzor: Conversion Rate</div></div>
+<div class="kpi"><div class="v">84<span style="font-size:14px">/100</div></div><div class="l">Hero Listing Score</div><div class="d up">▲ Title upgrade ke baad</div></div>
+<div class="kpi"><div class="v" style="color:var(--grn)">Safe</div><div class="l">Seller Account Health</div><div class="d">ODR 0.4% • Cancel 2.1% ⚠️</div></div>
+</div>
+
+<div class="grid">
+<!-- 7: APPROVAL QUEUE -->
+<div class="card"><h3>📥 Approval Queue — tumhe sirf faisla karna hai (3)</h3>
+<div class="appr" id="a1"><span class="tag">TIER-1 • A04 LISTING</span><p><b>Badam 500g ka naya title</b> — Rufus-AI readable, use-case ke saath</p><p class="sub">Expected: Listing score 68 → 84</p><button class="btn ok" onclick="decide('a1',true)">✔ Approve</button><button class="btn no" onclick="decide('a1',false)">✖ Reject</button></div>
+<div class="appr" id="a2"><span class="tag">TIER-1 • A06 ADS</span><p><b>'mamra almonds' bid +20%</b> — Rank-Push mode</p><p class="sub">Expected: Rank 18 → Top-10 ka prayas</p><button class="btn ok" onclick="decide('a2',true)">✔ Approve</button><button class="btn no" onclick="decide('a2',false)">✖ Reject</button></div>
+<div class="appr" id="a3"><span class="tag">TIER-1 • F3 INVENTORY</span><p><b>FBA Replenishment: Kaju 500g × 400 units</b> — cover sirf 11 din bacha</p><p class="sub">Na bheja to stockout = rank khatm</p><button class="btn ok" onclick="decide('a3',true)">✔ Approve</button><button class="btn no" onclick="decide('a3',false)">✖ Reject</button></div></div>
+
+<!-- 8: AGENT STRENGTH -->
+<div class="card"><h3>🤖 Agent Strength — roz strong ho rahe hain</h3>
+<div class="row"><span>A06 Ads Manager</span><b>71 • IMPROVING</b></div><div class="bar"><i style="width:71%;background:var(--blu)"></i></div>
+<div class="row"><span>A04 Listing</span><b>68 • IMPROVING</b></div><div class="bar"><i style="width:68%;background:var(--pur)"></i></div>
+<div class="row"><span>A03 Keyword</span><b>74 • IMPROVING</b></div><div class="bar"><i style="width:74%;background:var(--grn)"></i></div>
+<p class="sub">Seekh: 'BID_UP_20' Cashew par chalta hai, Almonds par band kar diya — khud seekha.</p></div>
+
+<!-- 9: RANK PROBE CHART -->
+<div class="card"><h3>📈 Rank Probe — 'california almonds' (chhota rank = behtar)</h3><canvas id="rankChart"></canvas>
+<p class="sub">Saboot: CTR 0.3→0.6% hone par rank 22→9 aaya. Is category me CTR hi chaabi hai — system ne khud seekha.</p></div>
+
+<!-- 10: FBA STOCK -->
+<div class="card"><h3>🏭 FBA + Flipkart Warehouse Stock</h3><table>
+<tr><th>SKU</th><th>Cover</th><th>Halat</th></tr>
+<tr><td>Badam 500g (FBA)</td><td>32 din</td><td><span class="up">✔ Theek</span></td></tr>
+<tr><td>Kaju 500g (FBA)</td><td>11 din</td><td><span class="warn">⚠ Replenish (Approval #3)</span></td></tr>
+<tr><td>Kishmish 1kg (Apna Godown)</td><td>48 din</td><td><span class="up">✔ Theek</span></td></tr>
+<tr><td>Anjeer 500g (Flipkart Assured)</td><td>19 din</td><td><span class="up">✔ Theek</span></td></tr></table>
+<p class="sub">Unicommerce milaan: <span class="up">✔ 3-way stock match — koi oversell risk nahi</span></p></div>
+
+<!-- 11: ALGO + LEARNING -->
+<div class="card"><h3>🧠 Algorithm Watch + Aaj ki Seekh</h3><div class="feed">
+<div>🔍 <b>Algorithm:</b> Is hafte koi bada badlav nahi mila — F9 Watch chaalu hai (Seller Central News + Flipkart Hub roz check).</div>
+<div>📚 <b>Seekh (Seller University):</b> A+ comparison chart se conversion upar — A04 ne 2 listings par test lagaya.</div>
+<div>🧪 <b>Experiment:</b> Nayi main image vs purani — naya 62% aage chal raha hai, 500 views aur chahiye faisle ke liye.</div>
+<div>🎯 <b>Flywheel:</b> Organic share 25% → 50% ho gaya. Yahi Blended ROAS 8 ki asli wajah hai.</div></div></div>
+
+<!-- 12: NEXT ACTIONS -->
+<div class="card"><h3>🚀 System ke agle kadam</h3><div class="feed">
+<div>1. Diwali war-plan: 45 din pehle FBA stock full + gift hamper listings (F5 Flow)</div>
+<div>2. Anjeer 1kg — price per-kg top-3 se 8% upar hai, A07 pricing proposal kal aayega</div>
+<div>3. Reviews: Kaju 500g rating 4.1 — A08 review-mining se wajah: 'size chhota laga' — packing par 'W240 bada size' saaf likhna hoga</div></div></div>
+</div>
+<footer>DryFruit Ecommerce Growth OS v5 • Agents: 9 • Flows: 10 • Engines: 14 • Seekhna chaalu hai — har din kal se strong</footer>
+<script>
+function decide(id, ok){var el=document.getElementById(id);el.style.opacity=.55;el.querySelectorAll('button').forEach(b=>b.remove());
+el.insertAdjacentHTML('beforeend','<p style="font-weight:700;color:'+(ok?'var(--grn)':'var(--red)')+'">'+(ok?'✔ APPROVED — execution queue me gaya':'✖ REJECTED — agent ko wajah ke saath seekh mili')+'</p>');}
+var c=document.getElementById('rankChart'),x=c.getContext('2d');c.width=c.offsetWidth*2;c.height=280;x.scale(2,2);
+var pts=[22,20,18,17,14,12,10,9],w=c.offsetWidth,h=140;x.strokeStyle='#3aa7ff';x.lineWidth=2;x.beginPath();
+pts.forEach(function(r,i){var px=20+i*(w-40)/(pts.length-1),py=15+(r-5)*(h-40)/20;i?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();
+x.fillStyle='#8fa3b5';x.font='11px sans-serif';x.fillText('Rank 22 se 9 — 30 din me',20,14);
+</script></body></html>
