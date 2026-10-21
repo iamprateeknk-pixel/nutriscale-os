@@ -7,8 +7,14 @@ import json, sys, os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from warroom_service import warroom_data
+from db_store import Store
 
-STATE = {"decisions": {}}   # approval ke faisle (DB layer se jud sakta hai)
+def _waiting_approvals():
+    s = Store()
+    try:
+        rows = s.db.execute("SELECT id, agent, action_type, description, tier, status, predicted FROM actions WHERE status LIKE 'WAITING%' ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+    finally: s.close()
 
 class H(BaseHTTPRequestHandler):
     def _send(self, code, obj):
@@ -23,16 +29,27 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"connectors": status_all(),
                                     "setup_guide": "CONNECTORS_SETUP.md"})
         if self.path == "/api/approvals":
-            # Approvals asal actions table se aayenge jab agents live data par kaam karenge;
-            # khaali hai to khaali hi dikhega — nakli approval nahi banega.
-            return self._send(200, {"approvals": [], "note": "Agents ke live hone par yahan asal proposals aayenge"})
+            # Approvals DB ki actions table se — agents ne jo asal proposals file kiye, wahi.
+            return self._send(200, {"approvals": _waiting_approvals()})
         return self._send(404, {"error": "not found"})
     def do_POST(self):
         parts = self.path.strip("/").split("/")
         if len(parts) == 4 and parts[:2] == ["api", "approvals"] and parts[3] in ("approve", "reject"):
-            aid = int(parts[2]); STATE["decisions"][aid] = "APPROVED" if parts[3] == "approve" else "REJECTED"
-            return self._send(200, {"id": aid, "decision": STATE["decisions"][aid],
-                                    "note": "Faisla record ho gaya — execution queue me gaya (connector live hote hi API se lagu hoga)"})
+            aid = int(parts[2]); new_status = "APPROVED_EXECUTING" if parts[3] == "approve" else "REJECTED"
+            s = Store()
+            try:
+                cur = s.db.execute("UPDATE actions SET status=? WHERE id=? AND status LIKE 'WAITING%'", (new_status, aid))
+                s.db.commit()
+                if cur.rowcount == 0: return self._send(404, {"error": "approval nahi mila ya pehle faisla ho chuka"})
+            finally: s.close()
+            return self._send(200, {"id": aid, "status": new_status,
+                                    "note": "Faisla DB me record — execution connectors ke through hoga, result 7/14 din me maapa jayega"})
+        if self.path == "/api/cycle/run":
+            from agents.governance import GovernanceAgent
+            s = Store()
+            try: report = GovernanceAgent(s).daily_cycle()
+            finally: s.close()
+            return self._send(200, report)
         return self._send(404, {"error": "not found"})
     def log_message(self, *a): pass
 

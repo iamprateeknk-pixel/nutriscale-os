@@ -44,6 +44,10 @@ API keys kaise bharni hain: **[CONNECTORS_SETUP.md](CONNECTORS_SETUP.md)** — k
 for t in tests/test_*.py; do python3 $t; done   # 7 suites, 28 tests
 ```
 
+## Halat (Status)
+
+Kya ban gaya, kya baki hai — imaandar diary: **[STATUS.md](STATUS.md)**
+
 ## Design ke kagaz (repo me hi hain)
 
 | File | Kya hai |
