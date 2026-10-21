@@ -38,18 +38,21 @@ def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon") -
     return n
 
 def import_campaign_report(path: str, store: Store, platform: str = "Amazon") -> int:
-    """Ads Console Campaign Report CSV -> campaigns table."""
-    n = 0
+    """Ads Console Campaign Report CSV -> campaigns table.
+    Ek hi campaign ki kai rows ho sakti hain (alag-alag date ranges) — pehle jodkar phir bharo,
+    warna aakhiri row pichli saari ko mita degi."""
+    agg, n = {}, 0
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
             name = _find(row, "Campaign Name", "Campaign")
             if not name: continue
-            store.upsert_campaign(str(name).strip(), platform,
-                                  _num(_find(row, "Spend", "Cost")),
-                                  _num(_find(row, "Sales", "Total Sales", "Sales14d")),
-                                  int(_num(_find(row, "Clicks"))),
-                                  int(_num(_find(row, "Impressions"))),
-                                  source=f"{platform} Ads CSV"); n += 1
+            a = agg.setdefault(str(name).strip(), [0.0, 0.0, 0, 0])
+            a[0] += _num(_find(row, "Spend", "Total cost", "Cost"))
+            a[1] += _num(_find(row, "Sales", "Total Sales", "Sales14d"))
+            a[2] += int(_num(_find(row, "Clicks")))
+            a[3] += int(_num(_find(row, "Impressions"))); n += 1
+    for name, (spend, sales, clicks, impr) in agg.items():
+        store.upsert_campaign(name, platform, spend, sales, clicks, impr, source=f"{platform} Ads CSV")
     return n
 
 def import_sales_orders(path: str, store: Store, platform: str = "Amazon") -> int:
@@ -59,7 +62,7 @@ def import_sales_orders(path: str, store: Store, platform: str = "Amazon") -> in
         sample = f.read(2048); f.seek(0)
         delim = "\t" if "\t" in sample.split("\n")[0] else ","
         for row in csv.DictReader(f, delimiter=delim):
-            oid = _find(row, "amazon-order-id", "Order Id", "Order ID", "order_id")
+            oid = _find(row, "order-id", "amazon-order-id", "Order Id", "Order ID", "order_id")
             sku = _find(row, "sku", "SKU", "Seller SKU")
             amt = _num(_find(row, "item-price", "Item Price", "Selling Price", "Amount", "price"))
             if not oid: continue

@@ -19,7 +19,10 @@ def intent_of(term: str) -> str:
 class KeywordAgent(BaseAgent):
     id = "A03"; name = "Keyword Domination"
     def build_bank(self) -> dict:
-        rows = [dict(r) for r in self.store.db.execute("SELECT * FROM search_terms")]
+        # Report ki har row ek din ki hoti hai — pehle term-wise JODO, warna HERO kabhi nahi milega
+        rows = [dict(r) for r in self.store.db.execute(
+            "SELECT term, SUM(clicks) clicks, SUM(purchases) purchases, SUM(spend) spend, SUM(sales) sales "
+            "FROM search_terms GROUP BY term")]
         if not rows: return {"bank": [], "note": "Search-term data nahi — bank khaali hai, pehle data import karo"}
         bank = []
         for r in rows:

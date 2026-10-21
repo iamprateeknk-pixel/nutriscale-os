@@ -16,11 +16,23 @@ _Updated: 21 Oct 2026_
 | Dashboard (11 sections, controls, kill switch, live-data loader) | ✅ |
 | Control Center + Approval Engine (Tier 0/1/2 + guardrails) | ✅ |
 
+## Data LIVE hai — Phase-0 Audit ho gaya (21 Oct 2026) 🟢
+| Cheez | Halat |
+|---|---|
+| User ki 3 reports import (224 campaign rows, 253 search-term rows, 104 orders) | ✅ Brand: **Dry Fruit Farm** (Amazon) |
+| **Phase-0 Audit** `docs/PHASE0_AUDIT_2026-10-21.md` | ✅ TACOS ≈61%, ROAS 1.48, 14/23 campaigns zero-sale, bikri ka 87% Brazil Nuts + Cranberry par, CVR sirf 3.6% |
+| CI workflow file (user ne web se lagayi) | ✅ GitHub par verify |
+| Ads Agent ke asal proposals | ✅ 15 bid-down proposals (approval ke intezaar me) |
+| Importer ke 2 asal bug fix (order-id column, campaign aggregation) + Keyword Agent ka term-aggregation fix | ✅ asal data ne pakde |
+
 ## Baki hai (kis ka intezaar hai)
 | Kaam | Kis par atka hai |
 |---|---|
-| Live sync ka pehla asal test | **User ka data** — API keys (config/connectors.json) ya CSV reports |
-| Phase-0 Audit (asal ASIN/ads par) | User: ASIN links + cost sheet + Search Term Report |
+| Margin/break-even hisaab | User: **hero SKU cost sheet** (Brazil Nuts + Cranberry pehle) |
+| Kaju/Badam listing jaanch (ads chal rahe, bikri ~0) | User: unki **listing links** |
+| Flipkart ki halat | User: Flipkart data |
+| Auto-sync (roz ka data bina bheje) | User: API keys (config/connectors.json) — CSV rasta ab chal raha hai |
+| FBA status + agency fee ki jankari | User |
 | LLM Agents ka dimaag (copy/strategy LLM se) | LLM API key (env: GOS_LLM_API_KEY) — interface taiyaar hai, key aate hi plug |
 | Asal fee tables (Amazon/Flipkart category-wise) | Live Seller Central/Hub se milegi |
 | Deployment (server par 24×7 chalana) | Server/hosting ka faisla (Phase-2 ke baad) |
