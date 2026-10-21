@@ -31,6 +31,16 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/approvals":
             # Approvals DB ki actions table se — agents ne jo asal proposals file kiye, wahi.
             return self._send(200, {"approvals": _waiting_approvals()})
+        if self.path == "/api/action-plan":
+            from action_planner import build_plan
+            s = Store()
+            try: return self._send(200, {"plan": build_plan(s)})
+            finally: s.close()
+        if self.path == "/api/season-pack":
+            from season_planner import build_season_pack
+            s = Store()
+            try: return self._send(200, build_season_pack(s))
+            finally: s.close()
         return self._send(404, {"error": "not found"})
     def do_POST(self):
         parts = self.path.strip("/").split("/")

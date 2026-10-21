@@ -1,0 +1,13 @@
+# NutriScale OS — ek command me backend:  docker compose up -d
+services:
+  nutriscale:
+    build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      - nutriscale-data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+volumes:
+  nutriscale-data:
