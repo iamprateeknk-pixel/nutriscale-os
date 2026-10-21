@@ -24,7 +24,7 @@ class Store:
 
     # ---------- Sync data (connectors/CSV se aaya asal data) ----------
     def upsert_product(self, sku, name, platform, price, cost=0, rating=0, reviews=0, source=""):
-        self.db.execute("INSERT OR REPLACE INTO products VALUES (?,?,?,?,?,?,?,?,?)",
+        self.db.execute("INSERT OR REPLACE INTO products VALUES (?,?,?,?,?,?,?,?)",
                         (sku, name, platform, price, cost, rating, reviews, source)); self.db.commit()
     def add_order(self, oid, platform, sku, amount, qty=1, ts=None):
         self.db.execute("INSERT OR REPLACE INTO orders VALUES (?,?,?,?,?,?)",

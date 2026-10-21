@@ -5,7 +5,8 @@ _Updated: 21 Oct 2026_
 | Hissa | Halat |
 |---|---|
 | Engines (profit/listing/ads/keyword/competitor/flywheel/FBA/claim-check) | ✅ 20+ modules, tested |
-| Agent Layer (Base + Listing Agent asal title/bullets banata hai, Ads Agent DB se proposals, Governance daily cycle) | ✅ V8 |
+| Agent Layer — **saare 9 agents asal kaam ke saath**: A01 Market (season calendar), A02 Competitor (price-hamla pakadna), A03 Keyword (bank + HERO chunav), A04 Listing (title/bullets generation), A05 Creative (7-shot brief + video script), A06 Ads (DB se proposals), A07 Pricing (margin parakh + price proposals), A08 Review (shikayat mining), A09 Governance (daily cycle) | ✅ V9 |
+| Chalane ke sadhan: `src/run_cycle.py` (ek command daily report), `run_tests.py`, Dockerfile | ✅ V9 |
 | Flows design F1–F10 + Scheduler (9 daily + 2 weekly jobs) | ✅ |
 | Self-Learning (knowledge store, outcome learner, A/B engine, source registry) | ✅ design+core tested |
 | Algorithm Intelligence (Amazon/Flipkart rank models, Buy Box, change impact, Rank Probe) | ✅ |
