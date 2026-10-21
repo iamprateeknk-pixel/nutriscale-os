@@ -23,6 +23,7 @@ _Updated: 21 Oct 2026_
 | **Phase-0 Audit** `docs/PHASE0_AUDIT_2026-10-21.md` | ✅ TACOS ≈61%, ROAS 1.48, 14/23 campaigns zero-sale, bikri ka 87% Brazil Nuts + Cranberry par, CVR sirf 3.6% |
 | CI workflow file (user ne web se lagayi) | ✅ GitHub par verify |
 | Ads Agent ke asal proposals | ✅ 15 bid-down proposals (approval ke intezaar me) |
+| **Action Planner (V10)** — pause/scale/watch/negative lists asal data se | ✅ `docs/ACTION_PLAN_2026-10-21.md`: 16 tay kaam, pause se ₹3,808/cycle bachat; dono hero listings ke sudhar packs (score 35→65) |
 | Importer ke 2 asal bug fix (order-id column, campaign aggregation) + Keyword Agent ka term-aggregation fix | ✅ asal data ne pakde |
 
 ## Baki hai (kis ka intezaar hai)
