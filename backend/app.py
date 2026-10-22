@@ -220,9 +220,9 @@ class H(BaseHTTPRequestHandler):
                 return self._env(200, {k: r[k] for k in ("id", "state", "duplicate") if k in r})
             finally: s.close()
         if p in ("/api/v1/competitors/peers", "/api/v1/competitors/snapshots", "/api/v1/costs",
-                 "/api/v1/listings/draft", "/api/v1/listings/approve", "/api/v1/imports/preview",
+                 "/api/v1/listings/draft", "/api/v1/listings/approve", "/api/v1/listings/publish", "/api/v1/imports/preview",
                  "/api/v1/imports/commit", "/api/v1/experiments"):
-            perm = "import" if "imports" in p else ("costs" if p.endswith("costs") else "propose")
+            perm = "import" if "imports" in p else ("costs" if p.endswith("costs") else ("execute" if p.endswith("publish") else "propose"))
             s, user, err = self._auth(perm)
             if err: s.close(); return
             try:
@@ -252,6 +252,10 @@ class H(BaseHTTPRequestHandler):
                 if p == "/api/v1/listings/approve":
                     import listing_v2 as L2
                     return self._env(200, L2.approve_version(s.db, int(b["id"]), user["username"]))
+                if p == "/api/v1/listings/publish":
+                    import listing_v2 as L2
+                    return self._env(200, L2.publish(s.db, int(b["id"]), b.get("product_type", "FOOD"),
+                                                     live=bool(b.get("live"))))
                 if p == "/api/v1/imports/preview":
                     from import_wizard import preview_import
                     return self._env(200, preview_import(s.db, b["path"], b.get("platform", "Amazon")))

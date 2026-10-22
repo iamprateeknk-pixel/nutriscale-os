@@ -21,6 +21,25 @@ class Store:
         CREATE TABLE IF NOT EXISTS search_terms (term TEXT, campaign TEXT, spend REAL, sales REAL, clicks INT, purchases INT, source TEXT, batch_id TEXT, period_start TEXT, period_end TEXT);
         CREATE TABLE IF NOT EXISTS inventory (sku TEXT, location TEXT, qty INT, source TEXT, PRIMARY KEY(sku, location));
         """); self.db.commit()
+        self._migrate_platform_identity()
+
+    def _migrate_platform_identity(self):
+        """V14: ek hi SKU/campaign dono bazaaro par ho sakta hai — pehchan (sku, platform) / (name, platform) hogi.
+        Purani single-key tables ko bina data khove naye roop me badlo."""
+        for table, cols, keys in (
+            ("products", "sku TEXT, name TEXT, platform TEXT, price REAL, cost REAL, rating REAL, reviews INT, source TEXT", ("sku", "platform")),
+            ("campaigns", "name TEXT, platform TEXT, spend REAL, sales REAL, clicks INT, impressions INT, source TEXT", ("name", "platform")),
+        ):
+            info = self.db.execute(f"PRAGMA table_info({table})").fetchall()
+            pk = tuple(r[1] for r in sorted([r for r in info if r[5]], key=lambda r: r[5]))
+            if pk == keys: continue
+            colnames = ", ".join(r[1] for r in info)
+            self.db.executescript(f"""
+            CREATE TABLE {table}_new ({cols}, PRIMARY KEY({', '.join(keys)}));
+            INSERT OR REPLACE INTO {table}_new ({colnames})
+              SELECT {', '.join(('COALESCE(platform,\'Amazon\')' if c == 'platform' else c) for c in colnames.split(', '))} FROM {table};
+            DROP TABLE {table}; ALTER TABLE {table}_new RENAME TO {table};
+            """); self.db.commit()
 
     # ---------- Sync data (connectors/CSV se aaya asal data) ----------
     def upsert_product(self, sku, name, platform, price, cost=0, rating=0, reviews=0, source=""):

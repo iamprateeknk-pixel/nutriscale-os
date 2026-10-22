@@ -36,6 +36,22 @@ def sync_amazon_orders(store, since: str, sp=None) -> dict:
     db.commit()
     return {"orders": len(orders), "items": n_items, "note": "Canonical line-level sync ho gaya"}
 
+def sync_order_fees(store, days: int = 3, sp=None) -> dict:
+    """SP Finances: taaza orders ki per-order fees order_fees me (SKU-exact dar ke liye, V14 scheduled)."""
+    import datetime
+    from connectors.amazon_sp import AmazonSP
+    import finance as F
+    sp = sp or AmazonSP()
+    db = store.db; ensure_v12(db)
+    cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    ids = [r["external_order_id"] for r in db.execute(
+        "SELECT external_order_id FROM order_headers WHERE platform='Amazon' AND order_date>=?", (cutoff,))]
+    total = 0
+    for oid in ids:
+        total += F.import_order_fees(db, sp.get_order_financials(oid))["imported"]
+    return {"orders_checked": len(ids), "fee_rows": total,
+            "note": "Fees SP Finances se aayi — SKU-exact dar ab in par banega"}
+
 def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:
     """Flipkart orders (canonical) + listings (catalog). Ads Flipkart par report-only hai (capability registry)."""
     from connectors.flipkart import Flipkart
@@ -93,6 +109,8 @@ def main():
             print(commit_import(store, a.csv_inventory, kind="inventory", platform=a.platform))
         if a.connector == "amazon_sp":
             print(sync_amazon_orders(store, a.orders_since))
+        elif a.connector == "amazon_fees":
+            print(sync_order_fees(store))
         elif a.connector == "amazon_ads_terms":
             from connectors.amazon_ads import AmazonAds
             print(AmazonAds().sync_search_terms(store, a.start, a.end))

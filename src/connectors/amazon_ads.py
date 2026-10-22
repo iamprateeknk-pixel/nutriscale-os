@@ -101,10 +101,8 @@ class AmazonAds:
         from platform_core import ensure_v12, now_utc
         rid = self.request_search_term_report(start_date, end_date)
         rows = self.wait_and_download(rid, raw_transport=raw_transport, sleep=sleep)
-        # V12.2: wahi period dobara sync ho to purani rows pehle hatengi — totals double nahi honge (idempotent sync)
+        # V12.2 idempotent + V14 overlap-niyam: barabar/supersede/contained/partial — periods.py se
         ensure_v12(store.db)
-        store.db.execute("DELETE FROM search_terms WHERE source='Amazon Ads API (Reporting v3)' AND period_start=? AND period_end=?",
-                         (start_date, end_date)); store.db.commit()
         agg = {}
         for r in rows:
             term = r.get("searchTerm")
@@ -112,13 +110,18 @@ class AmazonAds:
             a = agg.setdefault((str(term), str(r.get("campaignName", ""))), [0.0, 0.0, 0, 0])
             a[0] += float(r.get("cost", 0) or 0); a[1] += float(r.get("sales14d", 0) or 0)
             a[2] += int(r.get("clicks", 0) or 0); a[3] += int(r.get("purchases14d", 0) or 0)
-        n = 0
-        for (term, camp), (sp, sa, cl, pu) in agg.items():
-            store.add_search_term(term, camp, sp, sa, cl, pu, source="Amazon Ads API (Reporting v3)",
-                                  batch_id=f"api:{rid}", period_start=start_date, period_end=end_date)
-            n += 1
+        def _insert():
+            n = 0
+            for (term, camp), (sp, sa, cl, pu) in agg.items():
+                store.add_search_term(term, camp, sp, sa, cl, pu, source="Amazon Ads API (Reporting v3)",
+                                      batch_id=f"api:{rid}", period_start=start_date, period_end=end_date)
+                n += 1
+            return n
+        from connectors.periods import apply_period_rows
+        res = apply_period_rows(store.db, "Amazon Ads API (Reporting v3)", start_date, end_date, _insert)
+        n = res.get("inserted", 0)
         ensure_v12(store.db)
         store.db.execute("INSERT INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES ('Amazon','default','ads_search_terms',?,?,?, ?,0,'ads-api',?,?)",
                          (start_date, end_date, f"api:{rid}", n, now_utc(), f"Ads API report {rid}: {n} terms"))
         store.db.commit()
-        return {"report_id": rid, "imported": n, "period": (start_date, end_date)}
+        return {"report_id": rid, "imported": n, "period": (start_date, end_date), "overlap_status": res["status"]}

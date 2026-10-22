@@ -13,17 +13,28 @@ def _data_sync(store):
     if not ready:
         return "SKIP: koi connector configured nahi — aaj data CSV import se aayega (ye nakli sync nahi chalega)"
     out = []
+    import datetime
+    today = datetime.date.today()
     if "amazon_ads" in ready:
-        import datetime
         from connectors.amazon_ads import AmazonAds
-        end = datetime.date.today(); start = end - datetime.timedelta(days=2)
-        r = AmazonAds().sync_search_terms(store, start.isoformat(), end.isoformat())
-        out.append(f"ads terms {r['imported']}")
+        yday = (today - datetime.timedelta(days=1)).isoformat()
+        # V14: ek-din ki khidki — roz wahi din ek hi baar, overlap ka sawal hi nahi
+        r = AmazonAds().sync_search_terms(store, yday, yday)
+        out.append(f"ads terms {r['imported']} ({r.get('overlap_status', '')})")
     if "amazon_sp" in ready:
-        import sync_service, datetime
+        import sync_service
         since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)).isoformat()
         r = sync_service.sync_amazon_orders(store, since)
         out.append(f"sp orders {r['orders']}")
+        try:
+            f = sync_service.sync_order_fees(store, days=3)
+            out.append(f"order fees {f['fee_rows']}")
+        except Exception as e:
+            out.append(f"fees skip: {type(e).__name__}")
+    if "flipkart" in ready:
+        import sync_service
+        r = sync_service.sync_flipkart(store, (today - datetime.timedelta(days=2)).isoformat(), today.isoformat())
+        out.append(f"flipkart items {r['orders_items']}")
     return "Sync hua: " + ", ".join(out) if out else "SKIP: configured connector ka sync function is job me nahi joda"
 
 def _measure_results(store):
@@ -32,7 +43,7 @@ def _measure_results(store):
     conf = OE.rule_confidence(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM outcomes").fetchone()["c"]
     s = "; ".join(f"{c['kind']}: jeet-dar {c['win_rate']} ({c['measured']} maap)" for c in conf) or "abhi koi maapa nateeja nahi"
-    return f"Is chakra me {r['measured']} naye nateeje maape (baseline-bina skip: {r['skipped_no_baseline']}); kul {n}. Seekh: {s}"
+    return f"Is chakra me {r['measured']} naye nateeje khidki-maap se bane (data-aparyapt: {r['insufficient_data']}); kul {n}. Seekh: {s}"
 
 def _seller_health(store):
     ensure_v12(store.db)

@@ -37,14 +37,16 @@ def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
             a[2] += int(_num(_find(row, "Clicks")))
             a[3] += int(_num(_find(row, "Purchases", "7 Day Total Orders", "Conversions")))
     src = f"{platform} Ads CSV"
+    def _insert():
+        for (term, camp), (sp, sa, cl, pu) in agg.items():
+            store.add_search_term(term, camp, sp, sa, cl, pu, source=src,
+                                  batch_id=batch_id, period_start=period_start, period_end=period_end)
+        return len(agg)
     if period_start:
-        from platform_core import ensure_v12; ensure_v12(store.db)
-        store.db.execute("DELETE FROM search_terms WHERE source=? AND period_start=? AND period_end=?",
-                         (src, period_start, period_end)); store.db.commit()
-    for (term, camp), (sp, sa, cl, pu) in agg.items():
-        store.add_search_term(term, camp, sp, sa, cl, pu, source=src,
-                              batch_id=batch_id, period_start=period_start, period_end=period_end)
-    return len(agg)
+        from connectors.periods import apply_period_rows
+        res = apply_period_rows(store.db, src, period_start, period_end, _insert)
+        return res.get("inserted", 0)
+    return _insert()
 
 def import_campaign_report(path: str, store: Store, platform: str = "Amazon") -> int:
     """Ads Console Campaign Report CSV -> campaigns table.

@@ -1,5 +1,18 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V13 — code-side 100% band)_
+_Updated: 22 Oct 2026 (V14 — audit-3 correctness)_
+
+## 🎯 V14 — Teesre audit ki correctness kamiyaan (22 Oct 2026)
+Audit is baar aur gehrai me gaya — aur phir sahi nikla. Fixes (saboot: test_v14_audit3.py, kul 20 suites pass):
+| Issue | Fix |
+|---|---|
+| Outcome maap jama-kul totals se hota tha, asal 7/14-din khidkiyon se nahi | **Windowed measurement**: lagne se pehle ke w din banam baad ke w din — campaign ke liye period-tagged terms, SKU ke liye dated canonical orders; data na mile to jhootha nateeja nahi, `INSUFFICIENT_DATA` |
+| Overlapping Ads periods dohra gin sakte the | **Period Overlap Engine** (connectors/periods.py): contained=skip, supersede=replace, partial=BLOCK with wajah; roz ka sync ab 1-din ki khidki par |
+| Production HTTPS bypass (base compose 8765 public) | Base compose ab `127.0.0.1:8765` — bahar ka rasta sirf Caddy/HTTPS |
+| Listing publish ka backend endpoint nahi tha | `POST /api/v1/listings/publish` (execute perm) + dashboard par Preview-parkh/Live buttons |
+| SKU fees scheduled sync se judi nahi thi | data_sync ab SP orders ke saath **order fees** bhi laata hai; Flipkart branch bhi scheduled sync me jud gaya |
+| Ek SKU dono bazaaro par mix ho sakta tha | products/campaigns ki pehchan ab **(sku, platform)** — bina data khove migration |
+| Days-of-cover ki raftaar zyada dikhti thi (sirf bikri-din ginna) | Denominator ab poori observation-window (pehli→aakhri bikri ka antar) |
+| War Room organic/TACOS ka aadhaar chhupa tha | KPIs me `organic_basis`/`tacos_basis` saaf shabdon me — organic ek ANDAAZ hai, ye ab screen par bhi likha aayega |
 
 ## 🏁 V13 — Code-side jo kuch bhi bacha tha, sab band (22 Oct 2026)
 | Bacha hua kaam | Hal |

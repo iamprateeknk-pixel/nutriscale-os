@@ -4,28 +4,35 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
 
 def test_outcome_engine_loop():
+    """V14 ke baad: maap asal dated khidkiyon se hota hai (jama-kul totals se nahi — woh galat tha)."""
     import outcome_engine as OE
     from actions import create_proposal, approve, queue_action, execute
     import auth as A
-    st = Store(":memory:")
+    from platform_core import ensure_v12
+    st = Store(":memory:"); ensure_v12(st.db)
     A.create_user(st.db, "own", "pass1234", "Owner"); owner = {"username": "own", "role": "Owner"}
-    st.upsert_campaign("Brazil", "Amazon", 1000, 1500)
-    p = create_proposal(st.db, "BID_DOWN", "Amazon", "acc", {"campaign": "Brazil"}, "ONE_TAP", "t", "oc-1")
+    today = datetime.date.today()
+    def order(oid, days_ago, gross):
+        d = (today - datetime.timedelta(days=days_ago)).isoformat()
+        st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',?,'INR')", (oid, d, gross))
+        st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-BR','B0',1,?,0)", (oid, oid + "L", gross))
+    order("PB1", 10, 1500)   # pehle ki khidki
+    order("PA1", 3, 2600)    # baad ki khidki — behtar
+    st.db.commit()
+    p = create_proposal(st.db, "BID_DOWN", "Amazon", "acc", {"sku": "SKU-BR"}, "ONE_TAP", "t", "oc-1")
     approve(st.db, p["id"], owner); queue_action(st.db, p["id"], owner)
     class OK:
         def execute(self, payload, action): return {"vendor_ref": "manual:ok"}
     r = execute(st.db, p["id"], owner, OK())
     assert r["state"] == "APPLIED_VERIFIED"
     base = st.db.execute("SELECT baseline FROM action_v12 WHERE id=?", (p["id"],)).fetchone()["baseline"]
-    assert base and "1500" in base, "execute par baseline tasveer banni chahiye"
-    # 8 din beet gaye jaisa karo: event ka samay peeche karo, campaign behtar karo
+    assert base is not None, "execute par baseline tasveer banni chahiye"
     past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8)).isoformat()
-    st.db.execute("UPDATE action_events SET at=? WHERE action_id=?", (past, p["id"])); st.db.commit()
-    st.upsert_campaign("Brazil", "Amazon", 1000, 2600)   # ROAS 1.5 -> 2.6
-    out = OE.measure_due(st.db)
+    st.db.execute("UPDATE action_events SET at=? WHERE action_id=? AND to_state='APPLIED_VERIFIED'", (past, p["id"])); st.db.commit()
+    out = OE.measure_due(st.db, windows=(7,))
     assert out["measured"] >= 1
     row = st.db.execute("SELECT * FROM outcomes WHERE action_id=?", (p["id"],)).fetchone()
-    assert row["success"] == 1 and row["metric"] == "campaign_roas"
+    assert row["success"] == 1 and row["metric"] == "sku_revenue_window"
     conf = OE.rule_confidence(st.db)
     assert conf and conf[0]["kind"] == "BID_DOWN"
     st.close()

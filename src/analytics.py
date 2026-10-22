@@ -25,15 +25,20 @@ def sku_sales(db) -> list:
         "SELECT sku, COUNT(*) units, SUM(amount) revenue FROM orders GROUP BY sku ORDER BY revenue DESC")]
 
 def sku_velocity_per_day(db, sku: str, window_days: int = 30) -> float:
-    """Pichle window me roz ki asal bikri (canonical pehle). Dinankh na mile to kul/window ka surakshit andaaz nahi —
-    sirf wahi data jo hai: order_headers ki taaza-taarin taareekh se window gin lo."""
+    """Roz ki asal bikri — denominator poori observation-window (pehli se aakhri bikri-taareekh ka antar),
+    sirf bikri-wale din nahi (V14 fix: sirf selling-days ginne se raftaar zyada dikhti thi, cover kam)."""
     ensure_v12(db)
-    r = db.execute("""SELECT COALESCE(SUM(oi.qty),0) q, COUNT(DISTINCT oh.order_date) days
+    import datetime as _dt
+    r = db.execute("""SELECT COALESCE(SUM(oi.qty),0) q, MIN(oh.order_date) d0, MAX(oh.order_date) d1
                       FROM order_items oi JOIN order_headers oh
                         ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
                       WHERE oi.sku=?""", (sku,)).fetchone()
-    if r and r["q"]:
-        days = max(r["days"] or 1, 1)
+    if r and r["q"] and r["d0"] and r["d1"]:
+        try:
+            span = (_dt.date.fromisoformat(str(r["d1"])[:10]) - _dt.date.fromisoformat(str(r["d0"])[:10])).days + 1
+        except Exception:
+            span = 1
+        days = max(1, min(window_days, span))
         return r["q"] / days
     lo = db.execute("SELECT COUNT(*) c FROM orders WHERE sku=?", (sku,)).fetchone()
     return (lo["c"] / window_days) if lo and lo["c"] else 0.0

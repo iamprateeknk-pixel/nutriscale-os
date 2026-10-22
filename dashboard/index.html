@@ -95,7 +95,7 @@ async warroom(m){
   const w=await api('/api/warroom'+(pf?'?platform='+pf:'')); const h=await api('/api/v1/system/health');
   if(!w.connected){m.innerHTML='<h2>War Room</h2><div class="empty">Database me abhi asal data nahi hai.<br>Integrations screen se CSV import karo ya API keys jodo — tab yahan asal numbers aayenge.</div>'+ev('warroom service');return;}
   const k=w.kpis||{};
-  m.innerHTML='<h2>War Room — aaj ki tasveer</h2><p>Platform: <select onchange="document.getElementById(\'main\').dataset.pf=this.value;show(\'warroom\')"><option value=""'+(pf===''?' selected':'')+'>Sab</option><option'+(pf==='Amazon'?' selected':'')+'>Amazon</option><option'+(pf==='Flipkart'?' selected':'')+'>Flipkart</option></select> <span class="evidence">Source: '+esc(k.sales_source||'')+'</span></p>'+cards([['Revenue',inr(k.revenue),'orders: '+(k.orders??'—')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—',''],['TACOS',k.tacos_pct?k.tacos_pct+'%':'—','matched period par hi']])+
+  m.innerHTML='<h2>War Room — aaj ki tasveer</h2><p>Platform: <select onchange="document.getElementById(\'main\').dataset.pf=this.value;show(\'warroom\')"><option value=""'+(pf===''?' selected':'')+'>Sab</option><option'+(pf==='Amazon'?' selected':'')+'>Amazon</option><option'+(pf==='Flipkart'?' selected':'')+'>Flipkart</option></select> <span class="evidence">Source: '+esc(k.sales_source||'')+'</span></p>'+cards([['Revenue',inr(k.revenue),'orders: '+(k.orders??'—')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—',''],['TACOS',k.tacos_pct?k.tacos_pct+'%':'—','organic = andaaz (kul − ads-attributed)']])+
   (h.alerts&&h.alerts.length?'<h3>⚠️ Alerts</h3>'+h.alerts.map(a=>'<p>'+badge('ALERT','warn')+' '+a+'</p>').join(''):'<p>'+badge('Sab theek','ok')+'</p>')+ev('apne imported data se — OBSERVED');
 },
 async products(m){
@@ -131,7 +131,7 @@ async ads(m){
 },
 async listings(m){
   const d=await api('/api/v1/listings/versions');
-  m.innerHTML='<h2>Listing Lab — Versions</h2>'+table([{t:'SKU',k:'sku'},{t:'Ver',k:'version',n:1},{t:'Title',k:'title'},{t:'Status',f:r=>badge(r.status,r.status==='APPROVED'?'ok':'info')},{t:'Banaya',k:'created_by'}],d.versions,'Abhi koi draft nahi')+
+  m.innerHTML='<h2>Listing Lab — Versions</h2>'+table([{t:'SKU',k:'sku'},{t:'Ver',k:'version',n:1},{t:'Title',k:'title'},{t:'Status',f:r=>badge(r.status,r.status==='APPROVED'?'ok':'info')},{t:'Banaya',k:'created_by'},{t:'Publish',f:r=>r.status==='APPROVED'?'<button class="btn" onclick="pubListing('+r.id+',false)">Preview-parkh</button> <button class="btn sec" onclick="pubListing('+r.id+',true)">Live publish</button>':''}],d.versions,'Abhi koi draft nahi')+
   '<h3>Naya draft</h3><form class="row" onsubmit="return addDraft(event)"><input name="sku" placeholder="SKU" required><input name="title" placeholder="Naya title" size="50" required><button class="btn">Draft banao</button></form><p style="font-size:12.5px;color:#5b7181">Approve karte samay har dawa fact-registry se parkha jayega — saboot na ho to NEEDS_EVIDENCE (POL-01).</p>'+ev('listing versions — itihaas kabhi mit-ta nahi');
 },
 async creative(m){
@@ -189,6 +189,7 @@ async function addDraft(e){e.preventDefault();const f=new FormData(e.target);awa
 async function loadBrief(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/creative/brief?product='+encodeURIComponent(f.product)+'&grade='+encodeURIComponent(f.grade||'')+'&weight='+encodeURIComponent(f.weight||''));document.getElementById('brief').innerHTML=table([{t:'#',k:'shot'},{t:'Prakar',k:'type'},{t:'Brief',k:'brief'}],d.shots);return false;}
 async function addCost(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));await api('/api/v1/costs','POST',{sku:f.sku,cogs:Number(f.cogs),packaging:Number(f.packaging||0)});show('profit');return false;}
 async function loadGate(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/inventory/gate?sku='+encodeURIComponent(f.sku));document.getElementById('gate').innerHTML='<div class="card"><b>'+d.sku+'</b> — stock: '+d.qty+' · '+badge(d.status,d.status==='OK'?'ok':d.status==='LOW'?'warn':'bad')+' '+(d.note||'')+'</div>';return false;}
+async function pubListing(id,live){if(live&&!confirm('LIVE publish — Amazon par asal badlav jayega (sirf certified capability par chalega). Pakka?'))return;try{const r=await api('/api/v1/listings/publish','POST',{id:id,product_type:'FOOD',live:live});alert(r.ok?('Mode: '+r.mode+' · vendor: '+(r.vendor_status||'')+(r.issues&&r.issues.length?' · issues: '+JSON.stringify(r.issues):'')):('Nahi hua: '+(r.error||'')));}catch(e){alert(e.message);}show('listings');}
 async function load360(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/products/'+encodeURIComponent(f.sku)+'/360');const el=document.getElementById('p360');
   if(!d.found){el.innerHTML='<div class="empty">'+esc(d.error||'SKU nahi mila')+'</div>';return false;}
   const fin=d.finance||{};
