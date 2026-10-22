@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS peer_snapshots(
   id INTEGER PRIMARY KEY AUTOINCREMENT, peer_id INT, captured_at TEXT, price REAL, mrp REAL,
   coupon REAL, rating REAL, reviews INT, image_count INT, in_stock INT, delivery_days INT,
   title TEXT, source TEXT, capture_id TEXT UNIQUE);
+CREATE TABLE IF NOT EXISTS login_attempts(
+  username TEXT, at TEXT, success INT);
 CREATE TABLE IF NOT EXISTS experiments(
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, sku TEXT, platform TEXT, hypothesis TEXT,
   primary_metric TEXT, intervention TEXT, baseline_note TEXT, start_date TEXT, end_date TEXT,
@@ -71,6 +73,15 @@ CREATE TABLE IF NOT EXISTS experiments(
 
 def ensure_v12(db) -> None:
     db.executescript(V12_SCHEMA); db.commit()
+    # V12.2: search_terms par dedup ke liye batch/period columns (purani tables par bhi)
+    try:
+        cols = [c[1] for c in db.execute("PRAGMA table_info(search_terms)")]
+        for col in ("batch_id", "period_start", "period_end"):
+            if col not in cols:
+                db.execute(f"ALTER TABLE search_terms ADD COLUMN {col} TEXT")
+        db.commit()
+    except Exception:
+        pass
 
 def now_utc() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")

@@ -47,19 +47,31 @@ def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spe
     from profit_calculator import SKU as PricedSKU, contribution
     from flipkart_calculator import flipkart_profit
     rf = realized_fee_rate(db, platform)
+    est_fees = flipkart_profit(price, 0)["total_fees"] if platform == "Flipkart" else contribution(PricedSKU(sku, price, 0))["marketplace_fees"]
     if rf["rate"] is not None:
-        fees = round(price * rf["rate"], 2)
-        fee_source = f"REALIZED — settlements ke ₹{rf['gross_basis']:,.0f} gross par asal fee-dar {rf['rate']*100:.1f}%"
-    elif platform == "Flipkart":
-        fees = flipkart_profit(price, 0)["total_fees"]
-        fee_source = "ESTIMATE — Flipkart fee-table andaaz (settlement data paryapt nahi)"
+        # V12.2 fee precision: settlements kul bikri ka kitna hissa dhakte hain, usi hisaab se bharosa
+        import analytics as AN
+        gmv = AN.sales_totals(db)["revenue"] or 0
+        # Orders ka koi record hi na ho to settlement hi bikri ka ekmatra saboot hai — coverage poori mano
+        coverage = 1.0 if not gmv else min(1.0, rf["gross_basis"] / gmv)
+        realized_fees = price * rf["rate"]
+        if coverage >= 0.8:
+            fees, fee_precision = realized_fees, "HIGH"
+            fee_source = f"REALIZED — settlements bikri ka {coverage*100:.0f}% dhakte hain; fee-dar {rf['rate']*100:.1f}% (SKU-wise vibhajan settlement detail bina sambhav nahi)"
+        elif coverage >= 0.3:
+            fees, fee_precision = realized_fees * coverage + est_fees * (1 - coverage), "MEDIUM"
+            fee_source = f"BLENDED — settlement coverage {coverage*100:.0f}%: asal dar aur fee-table andaaz ka bojh-daar mishran"
+        else:
+            fees, fee_precision = est_fees, "LOW"
+            fee_source = f"ESTIMATE — settlement coverage sirf {coverage*100:.0f}%; fee-table andaaz hi bacha"
+        fees = round(fees, 2)
     else:
-        fees = contribution(PricedSKU(sku, price, 0))["marketplace_fees"]
-        fee_source = "ESTIMATE — Amazon fee-table andaaz (settlement data paryapt nahi)"
+        fees, fee_precision = est_fees, "LOW"
+        fee_source = "ESTIMATE — fee-table andaaz (settlement data paryapt nahi)"
     net = price - fees - c["unit_cost"] - ad_spend_per_unit
     margin_pct = round(net / price * 100, 1) if price else 0.0
     scale_allowed = (not c["stale"]) and margin_pct > 0
-    return {"sku": sku, "known": True, "price": price, "platform_fees": round(fees, 2), "fee_source": fee_source,
+    return {"sku": sku, "known": True, "price": price, "platform_fees": round(fees, 2), "fee_source": fee_source, "fee_precision": fee_precision,
             "unit_cost": c["unit_cost"], "ad_per_unit": ad_spend_per_unit,
             "contribution": round(net, 2), "margin_pct": margin_pct,
             "break_even_roas": round(price / net, 2) if net > 0 else None,

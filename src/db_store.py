@@ -18,7 +18,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS products (sku TEXT PRIMARY KEY, name TEXT, platform TEXT, price REAL, cost REAL, rating REAL, reviews INT, source TEXT);
         CREATE TABLE IF NOT EXISTS orders (id TEXT, platform TEXT, sku TEXT, amount REAL, qty INT, ts REAL, PRIMARY KEY(id, platform));
         CREATE TABLE IF NOT EXISTS campaigns (name TEXT PRIMARY KEY, platform TEXT, spend REAL, sales REAL, clicks INT, impressions INT, source TEXT);
-        CREATE TABLE IF NOT EXISTS search_terms (term TEXT, campaign TEXT, spend REAL, sales REAL, clicks INT, purchases INT, source TEXT);
+        CREATE TABLE IF NOT EXISTS search_terms (term TEXT, campaign TEXT, spend REAL, sales REAL, clicks INT, purchases INT, source TEXT, batch_id TEXT, period_start TEXT, period_end TEXT);
         CREATE TABLE IF NOT EXISTS inventory (sku TEXT, location TEXT, qty INT, source TEXT, PRIMARY KEY(sku, location));
         """); self.db.commit()
 
@@ -32,9 +32,17 @@ class Store:
     def upsert_campaign(self, name, platform, spend, sales, clicks=0, impressions=0, source=""):
         self.db.execute("INSERT OR REPLACE INTO campaigns VALUES (?,?,?,?,?,?,?)",
                         (name, platform, spend, sales, clicks, impressions, source)); self.db.commit()
-    def add_search_term(self, term, campaign, spend, sales, clicks=0, purchases=0, source=""):
-        self.db.execute("INSERT INTO search_terms VALUES (?,?,?,?,?,?,?)",
-                        (term, campaign, spend, sales, clicks, purchases, source)); self.db.commit()
+    def add_search_term(self, term, campaign, spend, sales, clicks=0, purchases=0, source="",
+                        batch_id="", period_start="", period_end=""):
+        try:
+            from platform_core import ensure_v12; ensure_v12(self.db)
+            self.db.execute("""INSERT INTO search_terms(term,campaign,spend,sales,clicks,purchases,source,batch_id,period_start,period_end)
+                               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                            (term, campaign, spend, sales, clicks, purchases, source, batch_id, period_start, period_end))
+        except Exception:
+            self.db.execute("INSERT INTO search_terms(term,campaign,spend,sales,clicks,purchases,source) VALUES (?,?,?,?,?,?,?)",
+                            (term, campaign, spend, sales, clicks, purchases, source))
+        self.db.commit()
     def set_inventory(self, sku, location, qty, source=""):
         self.db.execute("INSERT OR REPLACE INTO inventory VALUES (?,?,?,?)",
                         (sku, location, qty, source)); self.db.commit()
@@ -42,7 +50,11 @@ class Store:
         n = self.db.execute("SELECT COUNT(*) c FROM products").fetchone()["c"]
         o = self.db.execute("SELECT COUNT(*) c FROM orders").fetchone()["c"]
         c = self.db.execute("SELECT COUNT(*) c FROM campaigns").fetchone()["c"]
-        return (n + o + c) > 0
+        try:
+            from platform_core import ensure_v12; ensure_v12(self.db)
+            ci = self.db.execute("SELECT COUNT(*) c FROM order_items").fetchone()["c"]
+        except Exception: ci = 0
+        return (n + o + c + ci) > 0
     def totals(self) -> dict:
         o = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM orders").fetchone()["s"]
         camp = self.db.execute("SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa FROM campaigns").fetchone()

@@ -17,15 +17,20 @@ def warroom_data(store: Store = None) -> dict:
                     "message": "Abhi koi asal data nahi hai. Connector configure karo ya CSV report import karo — tareeka CONNECTORS_SETUP.md me hai.",
                     "connectors_status": cfg.status_all(),
                     "kpis": None, "products": [], "campaigns": [], "inventory": [], "waste_terms": []}
-        t = store.totals()
+        import analytics as AN
+        st = AN.sales_totals(store.db)          # V12.2: canonical-first unified analytics
+        camp = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa FROM campaigns").fetchone()
+        ad_spend, paid_sales = round(camp["sp"], 2), round(camp["sa"], 2)
         # Organic = kul order sales - paid sales (flywheel ka asal hisaab)
-        organic = max(0.0, t["order_sales"] - t["paid_sales"])
-        fw = flywheel(t["ad_spend"], t["paid_sales"], organic) if t["ad_spend"] else {
+        organic = max(0.0, st["revenue"] - paid_sales)
+        fw = flywheel(ad_spend, paid_sales, organic) if ad_spend else {
             "blended_roas": 0, "paid_roas": 0, "tacos_pct": 0, "organic_share_pct": 0}
         return {"connected": True, "demo_data": False,
                 "connectors_status": cfg.status_all(),
-                "kpis": {**fw, "total_sales": t["order_sales"], "ad_spend": t["ad_spend"],
-                         "paid_sales": t["paid_sales"], "organic_sales": round(organic, 2)},
+                "kpis": {**fw, "revenue": st["revenue"], "total_sales": st["revenue"],
+                         "orders": st["orders"], "sales_source": st["source"],
+                         "ad_spend": ad_spend, "paid_sales": paid_sales,
+                         "organic_sales": round(organic, 2)},
                 "products": store.all_products(),
                 "campaigns": store.all_campaigns(),
                 "inventory": store.all_inventory(),

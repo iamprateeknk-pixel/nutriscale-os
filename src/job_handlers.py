@@ -57,10 +57,23 @@ def _war_room(store):
     return "War Room report taiyaar — dashboard par taaza hai"
 
 def _fba_cover(store):
+    """V12.2: asal days-of-cover — roz ki bikri (canonical) se kitne din chalega stock.
+    Purana '<50 units' andaaz hata diya: 40 units agar 1/din bikte hain to 40 din surakshit hai."""
     inv = store.db.execute("SELECT COUNT(*) c FROM inventory").fetchone()["c"]
     if not inv: return "SKIP: inventory nahi — cover ka hisaab nahi banega"
-    low = store.db.execute("SELECT sku, SUM(qty) q FROM inventory GROUP BY sku HAVING q<50").fetchall()
-    return f"FBA cover parakh: {len(low)} SKU 50 units se neeche — replenishment proposal Ads/Listing se pehle dekho" if low else "FBA cover theek hai"
+    import analytics as AN
+    from fba_planner import days_of_cover
+    alerts, ok = [], 0
+    for r in store.db.execute("SELECT sku, SUM(qty) q FROM inventory GROUP BY sku"):
+        vel = AN.sku_velocity_per_day(store.db, r["sku"])
+        if vel <= 0:
+            continue  # bikri ka data nahi — cover ka dawa nahi karenge
+        cover = days_of_cover(int(r["q"]), vel)
+        if cover < 21: alerts.append(f"{r['sku']}: {cover:.0f} din (stock {int(r['q'])}, bikri {vel:.1f}/din)")
+        else: ok += 1
+    if alerts:
+        return "FBA cover CHETAVNI (21 din se kam): " + "; ".join(alerts[:5]) + " — replenishment ka samay hai"
+    return f"FBA cover theek hai ({ok} SKU 21+ din par hain)"
 
 def _rank_probe(store):
     ensure_v12(store.db)

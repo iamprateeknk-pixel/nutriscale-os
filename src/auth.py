@@ -61,15 +61,34 @@ def enable_totp(db, username: str) -> dict:
     return {"secret": secret, "uri": f"otpauth://totp/NutriScale:{username}?secret={secret}&issuer=NutriScaleOS",
             "note": "Is secret ko authenticator app me daalo — iske baad login par 6-ank ka code bhi lagega"}
 
+def _failed_logins(db, username: str) -> int:
+    """Pichli safal login ke baad, pichle 10 minute me kitni galat koshishein (rate-limit, V12.2)."""
+    import datetime as _dt
+    ensure_v12(db)
+    cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(minutes=10)).isoformat(timespec="seconds")
+    ls = db.execute("SELECT MAX(at) m FROM login_attempts WHERE username=? AND success=1", (username,)).fetchone()["m"] or ""
+    r = db.execute("SELECT COUNT(*) c FROM login_attempts WHERE username=? AND success=0 AND at>? AND at>?",
+                   (username, cutoff, ls)).fetchone()
+    return r["c"]
+
+def _record_attempt(db, username: str, success: bool):
+    from platform_core import now_utc
+    db.execute("INSERT INTO login_attempts VALUES (?,?,?)", (username, now_utc(), 1 if success else 0)); db.commit()
+
 def verify_login(db, username: str, password: str, totp_code: str = None):
     ensure_v12(db); _ensure_totp_col(db)
+    if _failed_logins(db, username) >= 5:
+        return {"locked": True, "username": username,
+                "message": "Bohot galat koshishein — khaata 10 minute ke liye band hai (rate limit)"}
     r = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
-    if not r or _hash(password, bytes.fromhex(r["salt"])) != r["pass_hash"]: return None
+    if not r or _hash(password, bytes.fromhex(r["salt"])) != r["pass_hash"]:
+        _record_attempt(db, username, False); return None
     secret = r["totp_secret"] if "totp_secret" in r.keys() else None
     if secret:
         if not totp_code or str(totp_code) not in _totp_codes(secret):
             return {"mfa_required": True, "username": username,
                     "message": "Is khaate par MFA chalu hai — authenticator ka 6-ank code bhi do"}
+    _record_attempt(db, username, True)
     token = secrets.token_urlsafe(32)
     exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)).isoformat()
     db.execute("INSERT INTO sessions VALUES (?,?,?,?)",

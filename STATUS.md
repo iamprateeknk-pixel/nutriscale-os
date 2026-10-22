@@ -1,5 +1,17 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V12.1 audit-fix)_
+_Updated: 22 Oct 2026 (V12.2 audit-fix-2)_
+
+## 🔧 V12.2 — Dusre audit ke 6 asal source-mismatch fix (22 Oct 2026)
+| Issue | Fix |
+|---|---|
+| War Room revenue mismatch (naya sync canonical, warroom legacy padhta tha) | `analytics.py` — canonical-first unified totals; warroom ab wahi se padhta hai, source label ke saath |
+| Dashboard revenue field bug (`k.revenue` vs `total_sales`) | KPIs me ab revenue + total_sales + orders teeno; mapping pakka |
+| Docker me dashboard missing | Dockerfile me `COPY dashboard/` — container se bhi dashboard serve hoga (smoke-verified pattern) |
+| Ads sync duplication | search_terms me batch/period columns; file ke andar (term+campaign) aggregation; period-wise delete-then-insert — re-sync/re-import par totals double NAHI |
+| FBA coverage adhoora (sirf <50 units andaaz) | Asal **days-of-cover**: canonical bikri-raftaar se; <21 din par SKU-ke-naam ke saath chetavni |
+| Fee accuracy (platform average) | Coverage-weighted precision: ≥80% settlement coverage = REALIZED/HIGH, 30–80% BLENDED/MEDIUM, neeche ESTIMATE/LOW — har number par `fee_precision` label |
+| Security (audit §5.2) | Login **rate-limit** (5 galat = 10-min lock) + MFA enrolment endpoint `/api/v1/auth/mfa/enable`; HTTPS deployment ki zimmedari (RUNBOOK: reverse proxy) |
+Saboot: `tests/test_v12_2_fixes.py` — kul **18 suites SAB PASS**.
 
 ## 🔧 V12.1 — Bahari audit ka jawab (22 Oct 2026)
 Ek bahari review ki zyadaatar baatein sahi nikli — jo code se fix ho sakti thi, sab ho gayi (17 suites sab pass, test_v12_hardening.py saboot):

@@ -20,22 +20,31 @@ def _find(row: dict, *names):
             if n.lower() in k: return v
     return None
 
-def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon") -> int:
-    """Amazon Ads Console -> Reports -> Search Term Report CSV."""
-    n = 0
+def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
+                            period_start: str = "", period_end: str = "", batch_id: str = "") -> int:
+    """Amazon Ads Console -> Reports -> Search Term Report CSV.
+    V12.2 dedup: (1) file ke ANDAR ek hi term+campaign ki kai rows jod kar ek banti hai;
+    (2) period diya ho to usi source+period ki purani rows pehle hat ti hain — dobara import par totals double NAHI honge."""
+    agg = {}
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
             term = _find(row, "Customer Search Term", "Search Term", "customer search term")
             if not term: continue
-            store.add_search_term(str(term).strip(),
-                                  str(_find(row, "Campaign Name", "Campaign") or ""),
-                                  _num(_find(row, "Spend", "Cost")),
-                                  _num(_find(row, "Sales", "7 Day Total Sales", "Sales14d", "Total Sales")),
-                                  int(_num(_find(row, "Clicks"))),
-                                  int(_num(_find(row, "Purchases", "7 Day Total Orders", "Conversions"))),
-                                  source=f"{platform} Ads CSV")
-            n += 1
-    return n
+            key = (str(term).strip(), str(_find(row, "Campaign Name", "Campaign") or ""))
+            a = agg.setdefault(key, [0.0, 0.0, 0, 0])
+            a[0] += _num(_find(row, "Spend", "Cost"))
+            a[1] += _num(_find(row, "Sales", "7 Day Total Sales", "Sales14d", "Total Sales"))
+            a[2] += int(_num(_find(row, "Clicks")))
+            a[3] += int(_num(_find(row, "Purchases", "7 Day Total Orders", "Conversions")))
+    src = f"{platform} Ads CSV"
+    if period_start:
+        from platform_core import ensure_v12; ensure_v12(store.db)
+        store.db.execute("DELETE FROM search_terms WHERE source=? AND period_start=? AND period_end=?",
+                         (src, period_start, period_end)); store.db.commit()
+    for (term, camp), (sp, sa, cl, pu) in agg.items():
+        store.add_search_term(term, camp, sp, sa, cl, pu, source=src,
+                              batch_id=batch_id, period_start=period_start, period_end=period_end)
+    return len(agg)
 
 def import_campaign_report(path: str, store: Store, platform: str = "Amazon") -> int:
     """Ads Console Campaign Report CSV -> campaigns table.

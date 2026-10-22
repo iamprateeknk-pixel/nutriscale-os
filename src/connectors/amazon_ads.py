@@ -101,14 +101,21 @@ class AmazonAds:
         from platform_core import ensure_v12, now_utc
         rid = self.request_search_term_report(start_date, end_date)
         rows = self.wait_and_download(rid, raw_transport=raw_transport, sleep=sleep)
-        n = 0
+        # V12.2: wahi period dobara sync ho to purani rows pehle hatengi — totals double nahi honge (idempotent sync)
+        ensure_v12(store.db)
+        store.db.execute("DELETE FROM search_terms WHERE source='Amazon Ads API (Reporting v3)' AND period_start=? AND period_end=?",
+                         (start_date, end_date)); store.db.commit()
+        agg = {}
         for r in rows:
             term = r.get("searchTerm")
             if not term: continue
-            store.add_search_term(str(term), str(r.get("campaignName", "")),
-                                  float(r.get("cost", 0) or 0), float(r.get("sales14d", 0) or 0),
-                                  int(r.get("clicks", 0) or 0), int(r.get("purchases14d", 0) or 0),
-                                  source="Amazon Ads API (Reporting v3)")
+            a = agg.setdefault((str(term), str(r.get("campaignName", ""))), [0.0, 0.0, 0, 0])
+            a[0] += float(r.get("cost", 0) or 0); a[1] += float(r.get("sales14d", 0) or 0)
+            a[2] += int(r.get("clicks", 0) or 0); a[3] += int(r.get("purchases14d", 0) or 0)
+        n = 0
+        for (term, camp), (sp, sa, cl, pu) in agg.items():
+            store.add_search_term(term, camp, sp, sa, cl, pu, source="Amazon Ads API (Reporting v3)",
+                                  batch_id=f"api:{rid}", period_start=start_date, period_end=end_date)
             n += 1
         ensure_v12(store.db)
         store.db.execute("INSERT INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES ('Amazon','default','ads_search_terms',?,?,?, ?,0,'ads-api',?,?)",

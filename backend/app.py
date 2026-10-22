@@ -170,6 +170,7 @@ class H(BaseHTTPRequestHandler):
             try:
                 r = auth_mod.verify_login(s.db, b.get("username", ""), b.get("password", ""), b.get("totp"))
                 if not r: return self._send(401, {"error": "LOGIN_FAIL", "message": "Username/password galat hai"})
+                if r.get("locked"): return self._send(429, {"error": "RATE_LIMITED", "message": r["message"]})
                 if r.get("mfa_required"): return self._send(401, {"error": "MFA_REQUIRED", "message": r["message"]})
                 return self._env(200, r)
             finally: s.close()
@@ -189,6 +190,11 @@ class H(BaseHTTPRequestHandler):
             try:
                 from agents.governance import GovernanceAgent
                 return self._env(200, GovernanceAgent(s).daily_cycle())
+            finally: s.close()
+        if p == "/api/v1/auth/mfa/enable":
+            s, user, err = self._auth("read")
+            if err: s.close(); return
+            try: return self._env(200, auth_mod.enable_totp(s.db, user["username"]))
             finally: s.close()
         if p == "/api/v1/control/kill":
             s, user, err = self._auth("kill")
