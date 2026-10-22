@@ -71,6 +71,43 @@ def import_sales_orders(path: str, store: Store, platform: str = "Amazon") -> in
             n += 1
     return n
 
+def import_orders_canonical(path: str, store, platform: str = "Amazon", account: str = "default",
+                            period: tuple = ("", ""), imported_by: str = "system") -> dict:
+    """DAT-01: line-level canonical import + batch hash. Wahi file dobara = duplicate receipt,
+    numbers nahi badlenge (QA-02). Do-item order = do line rows."""
+    import sys as _s
+    _s.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from platform_core import ensure_v12, sha256_file, now_utc
+    db = store.db; ensure_v12(db)
+    h = sha256_file(path)
+    dup = db.execute("""SELECT * FROM import_batches WHERE platform=? AND seller_account=? AND file_sha256=?
+                        AND report_type='orders'""", (platform, account, h)).fetchone()
+    if dup: return {"duplicate": True, "batch_id": dup["id"], "rows_ok": dup["rows_ok"],
+                    "note": "Ye file pehle import ho chuki hai — duplicate roka gaya, numbers wahi rahenge"}
+    n = bad = 0
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        sample = f.read(2048); f.seek(0)
+        delim = "\t" if "\t" in sample.split("\n")[0] else ","
+        for row in csv.DictReader(f, delimiter=delim):
+            oid = _find(row, "order-id", "amazon-order-id", "Order Id", "Order ID", "order_id")
+            line = _find(row, "order-item-id", "Item Id", "line_id") or str(n + 1)
+            sku = _find(row, "sku", "SKU", "Seller SKU")
+            amt = _num(_find(row, "item-price", "Item Price", "Selling Price", "Amount", "price"))
+            qty = _num(_find(row, "quantity-purchased", "Quantity", "Qty")) or 1
+            if not oid or not sku: bad += 1; continue
+            db.execute("INSERT OR IGNORE INTO order_headers VALUES (?,?,?,?,?,?,?)",
+                       (platform, account, str(oid).strip(), str(_find(row, "purchase-date", "Order Date") or "")[:10], "imported", amt, "INR"))
+            db.execute("INSERT OR IGNORE INTO order_items VALUES (?,?,?,?,?,?,?,?,?)",
+                       (platform, account, str(oid).strip(), str(line).strip(), str(sku).strip(),
+                        str(_find(row, "asin", "ASIN") or ""), qty, amt, 0))
+            n += 1
+    db.execute("INSERT INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES (?,?, 'orders',?,?,?,?,?,?,?,?)",
+               (platform, account, period[0], period[1], h, n, bad, imported_by, now_utc(), f"canonical orders import: {n} lines"))
+    db.commit()
+    return {"duplicate": False, "rows_ok": n, "rows_bad": bad, "sha256": h[:12],
+            "note": "Line-level canonical import ho gaya (order_items me har line alag)"}
+
+
 def import_inventory_csv(path: str, store: Store, location: str = "Own Warehouse") -> int:
     """Simple stock sheet: sku, quantity columns (Unicommerce export se bhi chalega)."""
     n = 0
