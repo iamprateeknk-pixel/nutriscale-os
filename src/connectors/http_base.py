@@ -22,6 +22,28 @@ def _urllib_transport(req: dict):
         except Exception: body = {"raw": raw}
         return e.code, body
 
+def _urllib_raw_transport(req: dict):
+    r = urllib.request.Request(req["url"], method=req["method"],
+                               data=req.get("body_bytes"), headers=req.get("headers", {}))
+    try:
+        with urllib.request.urlopen(r, timeout=60) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+def request_raw(method: str, url: str, headers: dict = None, transport=None,
+                retries: int = 3, sleep=time.sleep) -> bytes:
+    """Bytes wala download (report ki gzip file ke liye). 429/5xx par backoff retry (INT-02)."""
+    req = {"method": method, "url": url, "headers": dict(headers or {}), "body_bytes": None}
+    transport = transport or _urllib_raw_transport
+    for attempt in range(retries + 1):
+        status, body = transport(req)
+        if 200 <= status < 300: return body
+        if status in (429, 500, 502, 503, 504) and attempt < retries:
+            sleep(min(2 ** attempt, 8)); continue
+        raise APIError(status, str(body)[:200], url)
+    raise APIError(0, {}, url)
+
 def request_json(method: str, url: str, headers: dict = None, json_body: dict = None,
                  form_body: dict = None, transport=None, retries: int = 3, sleep=time.sleep) -> dict:
     body_bytes, hdrs = None, dict(headers or {})

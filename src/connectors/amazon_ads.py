@@ -61,3 +61,47 @@ class AmazonAds:
     def report_status(self, report_id: str) -> dict:
         return request_json("GET", f"{ENDPOINT}/reporting/reports/{report_id}",
                             headers=self._headers("application/json"), transport=self.transport)
+
+    def wait_and_download(self, report_id: str, raw_transport=None, max_polls: int = 30,
+                          sleep=lambda s: None) -> list:
+        """INT-02: status poll -> COMPLETED par download URL -> gzip kholo -> rows.
+        FAILURE/429 par saaf error — adhoori report ko data nahi mana jayega."""
+        import gzip, json as _json
+        from .http_base import request_raw
+        for _ in range(max_polls):
+            st = self.report_status(report_id)
+            status = st.get("status")
+            if status == "COMPLETED":
+                raw = request_raw("GET", st["url"], transport=raw_transport)
+                if isinstance(raw, (bytes, bytearray)):
+                    try: rows = _json.loads(gzip.decompress(bytes(raw)).decode())
+                    except Exception: rows = _json.loads(bytes(raw).decode())
+                else: rows = raw
+                return rows if isinstance(rows, list) else rows.get("rows", [])
+            if status in ("FAILURE", "CANCELLED"):
+                raise RuntimeError(f"Ads report fail ho gayi: {st.get('failureReason', status)}")
+            sleep(5)
+        raise RuntimeError("Ads report samay par taiyaar nahi hui — baad me dobara koshish hogi (job retry)")
+
+    def sync_search_terms(self, store, start_date: str, end_date: str, raw_transport=None,
+                          sleep=lambda s: None) -> dict:
+        """Poora pipeline: request -> poll -> download -> DB (search_terms) + batch record."""
+        import sys as _s, os as _os
+        _s.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+        from platform_core import ensure_v12, now_utc
+        rid = self.request_search_term_report(start_date, end_date)
+        rows = self.wait_and_download(rid, raw_transport=raw_transport, sleep=sleep)
+        n = 0
+        for r in rows:
+            term = r.get("searchTerm")
+            if not term: continue
+            store.add_search_term(str(term), str(r.get("campaignName", "")),
+                                  float(r.get("cost", 0) or 0), float(r.get("sales14d", 0) or 0),
+                                  int(r.get("clicks", 0) or 0), int(r.get("purchases14d", 0) or 0),
+                                  source="Amazon Ads API (Reporting v3)")
+            n += 1
+        ensure_v12(store.db)
+        store.db.execute("INSERT INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES ('Amazon','default','ads_search_terms',?,?,?, ?,0,'ads-api',?,?)",
+                         (start_date, end_date, f"api:{rid}", n, now_utc(), f"Ads API report {rid}: {n} terms"))
+        store.db.commit()
+        return {"report_id": rid, "imported": n, "period": (start_date, end_date)}

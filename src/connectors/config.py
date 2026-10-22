@@ -8,7 +8,9 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONFIG_PATH = os.path.join(ROOT, "config", "connectors.json")
 
 REQUIRED = {
-    "amazon_sp":  ["client_id", "client_secret", "refresh_token", "aws_access_key", "aws_secret_key", "marketplace_id"],
+    # V12/INT-01: Amazon ke naye niyam (2023 ke baad bane apps) — SP-API ke liye AWS keys NAHI chahiye,
+    # sirf LWA (client_id/secret/refresh_token) kaafi hai. Purani aws keys config me hon to ignore hongi.
+    "amazon_sp":  ["client_id", "client_secret", "refresh_token", "marketplace_id"],
     "amazon_ads": ["client_id", "client_secret", "refresh_token", "profile_id"],
     "flipkart":   ["app_id", "app_secret"],
     "unicommerce": ["tenant_url", "username", "password"],
