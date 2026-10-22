@@ -29,7 +29,9 @@ class KeywordAgent(BaseAgent):
             intent = intent_of(r["term"])
             cvr = (r["purchases"] / r["clicks"]) if r["clicks"] else 0
             relevance = 0.9 if intent in ("BUY_INTENT", "PRODUCT") else 0.4
-            opp = keyword_opportunity(max(int(r["clicks"] * 20), 100), relevance, 0.6)
+            # V12/KWD-01: purana clicks*20 wala 'search volume' andaaz HATA diya — woh Amazon ka
+            # asal volume kabhi tha hi nahi. Ab demand signal = apne asal observed clicks.
+            opp = keyword_opportunity(int(r["clicks"]), relevance, 0.6)
             tier = "HERO" if (r["purchases"] >= 5 and cvr >= 0.1) else opp["tier"]
             bank.append({"term": r["term"], "intent": intent, "purchases": r["purchases"],
                          "cvr_pct": round(cvr * 100, 1), "opportunity": opp["opportunity_score"], "tier": tier})
