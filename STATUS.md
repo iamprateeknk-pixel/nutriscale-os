@@ -1,5 +1,12 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V15 — audit-4 data accuracy)_
+_Updated: 22 Oct 2026 (V16 — Acceptance Gates Kit)_
+
+## 🚪 V16 — Acceptance Gates Kit (22 Oct 2026)
+Audit ke 5 live gates ko "salah" se "chalane yogya astra" me badla — keys aate hi ek command:
+- **`src/pilot.py` + `scripts/preflight.py`** — preflight report: har connector ki taiyaari, capability halat, Owner khata, kill switch, backup, HTTPS pack — jo nahi hai woh ✘ ke saath saaf dikhega, ready ka jhootha dawa kabhi nahi
+- **Reconciliation report** — orders ↔ settlements ↔ ads ka milaan ek jagah (farq EXCEPTION ke roop me dikhega, chhupega nahi)
+- **Controlled drill** — gate #3 poora: proposal → Owner approve → queue → adapter execute (vendor refetch-pushti) → rollback (purani halat ki pushti), har kadam ka saboot steps me. Taale teen: kill-switch ON = BLOCKED; live=False = sirf yojana; write_ads certified na ho = BLOCKED. Test me nakli vendor ke saath poora drill PASS aur campaign purani halat par wapas verified.
+- Kul **22 test suites SAB PASS**.
 
 ## 🎯 V15 — Chauthe audit ke data-accuracy mudde (22 Oct 2026)
 | Issue | Fix |
