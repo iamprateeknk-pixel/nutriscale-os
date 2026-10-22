@@ -35,10 +35,41 @@ def create_user(db, username: str, password: str, role: str) -> dict:
                (username, _hash(password, salt), salt.hex(), role, now_utc())); db.commit()
     return {"ok": True, "username": username, "role": role}
 
-def verify_login(db, username: str, password: str):
-    ensure_v12(db)
+# ---------------- TOTP MFA (SEC-01 ka baki hissa, V12.1) ----------------
+import base64, hmac, struct, time as _time
+
+def _ensure_totp_col(db):
+    cols = [c[1] for c in db.execute("PRAGMA table_info(users)")]
+    if "totp_secret" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT"); db.commit()
+
+def _totp_codes(secret_b32: str) -> set:
+    key = base64.b32decode(secret_b32.upper() + "=" * (-len(secret_b32) % 8))
+    out = set()
+    for w in (-1, 0, 1):
+        counter = int(_time.time()) // 30 + w
+        h = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+        o = h[-1] & 0x0F
+        out.add(f"{(struct.unpack('>I', h[o:o+4])[0] & 0x7FFFFFFF) % 1000000:06d}")
+    return out
+
+def enable_totp(db, username: str) -> dict:
+    """Authenticator app (Google/Microsoft Authenticator) ke liye secret — ek baar dikhega, sambhal kar rakho."""
+    ensure_v12(db); _ensure_totp_col(db)
+    secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+    db.execute("UPDATE users SET totp_secret=? WHERE username=?", (secret, username)); db.commit()
+    return {"secret": secret, "uri": f"otpauth://totp/NutriScale:{username}?secret={secret}&issuer=NutriScaleOS",
+            "note": "Is secret ko authenticator app me daalo — iske baad login par 6-ank ka code bhi lagega"}
+
+def verify_login(db, username: str, password: str, totp_code: str = None):
+    ensure_v12(db); _ensure_totp_col(db)
     r = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not r or _hash(password, bytes.fromhex(r["salt"])) != r["pass_hash"]: return None
+    secret = r["totp_secret"] if "totp_secret" in r.keys() else None
+    if secret:
+        if not totp_code or str(totp_code) not in _totp_codes(secret):
+            return {"mfa_required": True, "username": username,
+                    "message": "Is khaate par MFA chalu hai — authenticator ka 6-ank code bhi do"}
     token = secrets.token_urlsafe(32)
     exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)).isoformat()
     db.execute("INSERT INTO sessions VALUES (?,?,?,?)",

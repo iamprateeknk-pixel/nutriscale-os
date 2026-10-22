@@ -1,5 +1,18 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V12)_
+_Updated: 22 Oct 2026 (V12.1 audit-fix)_
+
+## 🔧 V12.1 — Bahari audit ka jawab (22 Oct 2026)
+Ek bahari review ki zyadaatar baatein sahi nikli — jo code se fix ho sakti thi, sab ho gayi (17 suites sab pass, test_v12_hardening.py saboot):
+
+| Audit point | Fix |
+|---|---|
+| Repo PUBLIC (hamari "private" jaankari galat thi — signed-out verify) | Private karna malik ka GitHub Settings kaam (1 min); repo me secret/raw PII kabhi nahi gaya (scan ✔); README ki galat line sudhar gayi |
+| sync_service legacy; Flipkart sync adhoora | V2: SP orders+items canonical, Ads terms sync CLI, Flipkart orders+listings, CSV wizard-based |
+| Daemon sab jobs ek hi daily_cycle se | `job_handlers.py` dedicated handlers + compose `worker` service; bina-connector data_sync imaandaar SKIP |
+| ManualAdapter par vendor pushti nahi | `AmazonAdsWriteAdapter`: asal write + refetch-pushti + rollback; `write_ads=certified` gate bina nahi chalega |
+| Fees assumptions | Settlements se realized fee-rate contribution/bids me; estimate par `fee_source` label |
+| Dashboard :8765/CORS/token | Same-origin serving, XSS escaping, rank chart + spend bars, **TOTP MFA** |
+| Helium10 data / live certification / pilot | Code se aage: licensed contract + API keys + hosting (neeche wali table) |
 
 ## 🚀 V12 — Master Blueprint ke hisaab se poora development (22 Oct 2026)
 User ke bheje **V12 Blueprint + Developer Backlog** (docs/V12_BACKLOG.md) ke har requirement ID par kaam hua.

@@ -29,22 +29,37 @@ def get_cost(db, sku: str, on_date: str = None) -> dict:
             "stale": age > STALE_DAYS, "age_days": age,
             "reason": "Cost 90 din se purani hai — nayi cost daalo, scale roka gaya" if age > STALE_DAYS else "Cost taaza hai"}
 
+def realized_fee_rate(db, platform: str = "Amazon") -> dict:
+    """Settlements se asal fee-dar — andaaz ki jagah asal, jab paryapt settlement data ho (V12.1)."""
+    ensure_v12(db)
+    r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f, COALESCE(SUM(taxes),0) t FROM settlements WHERE platform=?",
+                   (platform,)).fetchone()
+    if r and r["g"] and r["g"] >= 10000:
+        return {"rate": (r["f"] + r["t"]) / r["g"], "gross_basis": r["g"], "source": "REALIZED"}
+    return {"rate": None, "gross_basis": r["g"] if r else 0, "source": "ESTIMATE_ONLY"}
+
 def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spend_per_unit: float = 0.0) -> dict:
-    """Versioned cost + maujuda fee calculators se asal contribution."""
+    """Versioned cost + fees (settlements se asal mile to wahi, warna labelled estimate)."""
     c = get_cost(db, sku)
     if not c["known"]:
         return {"sku": sku, "known": False, "scale_allowed": False, "reason": c["reason"],
                 "note": "Cost bina margin ka andaaz jhooth hoga — isiliye number nahi diya gaya"}
     from profit_calculator import SKU as PricedSKU, contribution
     from flipkart_calculator import flipkart_profit
-    if platform == "Flipkart":
+    rf = realized_fee_rate(db, platform)
+    if rf["rate"] is not None:
+        fees = round(price * rf["rate"], 2)
+        fee_source = f"REALIZED — settlements ke ₹{rf['gross_basis']:,.0f} gross par asal fee-dar {rf['rate']*100:.1f}%"
+    elif platform == "Flipkart":
         fees = flipkart_profit(price, 0)["total_fees"]
+        fee_source = "ESTIMATE — Flipkart fee-table andaaz (settlement data paryapt nahi)"
     else:
         fees = contribution(PricedSKU(sku, price, 0))["marketplace_fees"]
+        fee_source = "ESTIMATE — Amazon fee-table andaaz (settlement data paryapt nahi)"
     net = price - fees - c["unit_cost"] - ad_spend_per_unit
     margin_pct = round(net / price * 100, 1) if price else 0.0
     scale_allowed = (not c["stale"]) and margin_pct > 0
-    return {"sku": sku, "known": True, "price": price, "platform_fees": round(fees, 2),
+    return {"sku": sku, "known": True, "price": price, "platform_fees": round(fees, 2), "fee_source": fee_source,
             "unit_cost": c["unit_cost"], "ad_per_unit": ad_spend_per_unit,
             "contribution": round(net, 2), "margin_pct": margin_pct,
             "break_even_roas": round(price / net, 2) if net > 0 else None,

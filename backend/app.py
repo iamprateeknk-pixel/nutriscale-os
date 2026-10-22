@@ -47,9 +47,22 @@ class H(BaseHTTPRequestHandler):
         if err: self._send(err[0], err[1])
         return s, user, err
 
+    def _serve_dashboard(self, rel: str):
+        base = os.path.join(os.path.dirname(__file__), "..", "dashboard")
+        path = os.path.normpath(os.path.join(base, rel))
+        if not path.startswith(os.path.normpath(base)) or not os.path.isfile(path):
+            return self._send(404, {"error": "file nahi mili"})
+        body = open(path, "rb").read()
+        ct = "text/html; charset=utf-8" if path.endswith(".html") else "text/plain; charset=utf-8"
+        self.send_response(200); self.send_header("Content-Type", ct)
+        self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+
     def do_GET(self):
         p = self.path.split("?")[0]
-        if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V12"})
+        if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V12.1"})
+        # Same-origin serving (V12.1): dashboard isi backend se — CORS ki zaroorat hi nahi, token bhi ek hi origin par
+        if p in ("/", "/dashboard", "/dashboard/"): return self._serve_dashboard("index.html")
+        if p.startswith("/dashboard/"): return self._serve_dashboard(p[len("/dashboard/"):])
         s, user, err = self._auth("read")
         if err: s.close(); return
         try:
@@ -155,8 +168,9 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/v1/auth/login":
             b = self._body(); s = Store()
             try:
-                r = auth_mod.verify_login(s.db, b.get("username", ""), b.get("password", ""))
+                r = auth_mod.verify_login(s.db, b.get("username", ""), b.get("password", ""), b.get("totp"))
                 if not r: return self._send(401, {"error": "LOGIN_FAIL", "message": "Username/password galat hai"})
+                if r.get("mfa_required"): return self._send(401, {"error": "MFA_REQUIRED", "message": r["message"]})
                 return self._env(200, r)
             finally: s.close()
         # legacy approvals (purane agents ki table) — execute perm chahiye
@@ -242,7 +256,7 @@ class H(BaseHTTPRequestHandler):
             finally: s.close()
         if len(parts) == 5 and parts[:3] == ["api", "v1", "proposals"]:
             aid, op = int(parts[3]), parts[4]
-            perm = {"approve": None, "dry-run": "propose", "queue": "execute", "execute": "execute"}[op]
+            perm = {"approve": None, "dry-run": "propose", "queue": "execute", "execute": "execute", "rollback": "execute"}[op]
             s, user, err = self._auth(perm or "approve_tier1")
             if err: s.close(); return
             try:
@@ -251,9 +265,18 @@ class H(BaseHTTPRequestHandler):
                 if op == "queue": return self._env(200, act.queue_action(s.db, aid, user))
                 if op == "execute":
                     b = self._body()
-                    row = s.db.execute("SELECT idempotency_key FROM action_v12 WHERE id=?", (aid,)).fetchone()
+                    row = s.db.execute("SELECT * FROM action_v12 WHERE id=?", (aid,)).fetchone()
+                    payload = {}
+                    try: payload = json.loads(row["payload"] or "{}") if row else {}
+                    except Exception: pass
+                    if payload.get("adapter") == "amazon_ads":
+                        from vendor_adapters import AmazonAdsWriteAdapter
+                        return self._env(200, act.execute(s.db, aid, user, AmazonAdsWriteAdapter(s)))
                     conf = {row["idempotency_key"]: b["manual_ref"]} if row and b.get("manual_ref") else {}
                     return self._env(200, act.execute(s.db, aid, user, act.ManualAdapter(conf)))
+                if op == "rollback":
+                    from vendor_adapters import AmazonAdsWriteAdapter
+                    return self._env(200, act.rollback(s.db, aid, user, AmazonAdsWriteAdapter(s)))
             finally: s.close()
         return self._send(404, {"error": "not found"})
     def log_message(self, *a): pass

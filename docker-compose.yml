@@ -1,4 +1,4 @@
-# NutriScale OS — ek command me backend:  docker compose up -d
+# NutriScale OS — backend + worker (24x7 scheduler):  docker compose up -d
 services:
   nutriscale:
     build: .
@@ -9,5 +9,15 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+  worker:
+    build: .
+    command: python3 src/jobrunner.py --daemon
+    volumes:
+      - nutriscale-data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - nutriscale
 volumes:
   nutriscale-data:

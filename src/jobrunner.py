@@ -40,7 +40,9 @@ def run_due_jobs(db, handlers: dict, now: datetime.datetime = None) -> list:
         if fn is None:
             status, detail = "SKIPPED", "handler registered nahi"
         else:
-            try: status, detail = "DONE", str(fn())[:300]
+            try:
+                out = str(fn())
+                status, detail = ("SKIPPED", out[:300]) if out.startswith("SKIP") else ("DONE", out[:300])
             except Exception as e: status, detail = "FAILED", f"{type(e).__name__}: {e}"[:300]
         attempts = (st["attempts"] or 0) + (1 if status == "FAILED" else 0)
         nxt = _next_run(next(j["time"] for j in DAILY_JOBS if j["job"] == job), now)
@@ -59,14 +61,12 @@ def jobs_status(db) -> list:
 
 def daemon():
     from db_store import Store
-    from agents.governance import GovernanceAgent
-    print("NutriScale Job Runner daemon shuru (IST). Band karne ke liye Ctrl+C.")
+    from job_handlers import build_handlers
+    print("NutriScale Job Runner daemon shuru (IST) — har job ka apna handler. Band: Ctrl+C.")
     while True:
         store = Store()
         try:
-            gov = GovernanceAgent(store)
-            handlers = {j["job"]: (lambda g=gov: g.daily_cycle()) for j in DAILY_JOBS}
-            out = run_due_jobs(store.db, handlers)
+            out = run_due_jobs(store.db, build_handlers(store))
             for r in out: print(r, flush=True)
         finally: store.close()
         time.sleep(60)

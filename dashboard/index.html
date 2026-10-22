@@ -40,6 +40,7 @@ h2{font-size:19px;margin:4px 0 10px}h3{font-size:15px;margin:16px 0 6px}
 <div id="login"><div class="box">
 <h2 style="margin-top:0">🌰 NutriScale OS</h2><p style="color:#5b7181;font-size:13px">Dry Fruit Farm — pehle pehchan, phir data. Bina login ke kuch nahi dikhega (V12 niyam).</p>
 <input id="lu" placeholder="Username"><input id="lp" type="password" placeholder="Password">
+<input id="lt" placeholder="MFA code (sirf MFA wale khaate par)" style="display:none">
 <div class="err" id="lerr"></div><button class="btn" style="width:100%" onclick="doLogin()">Login</button>
 </div></div>
 <header><h1>🌰 NutriScale OS</h1><span class="sub">V12 · Dry Fruit Farm · saara data API se live, saboot ke saath</span>
@@ -47,7 +48,8 @@ h2{font-size:19px;margin:4px 0 10px}h3{font-size:15px;margin:16px 0 6px}
 <button id="killBtn" onclick="toggleKill()">Kill Switch: …</button></header>
 <div class="wrap"><nav id="sidenav"></nav><main id="main"><p>Load ho raha hai…</p></main></div>
 <script>
-const API='http://'+location.hostname+':8765';
+const API=location.protocol.startsWith('http')?location.origin:'http://'+location.hostname+':8765';
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let TOKEN=localStorage.getItem('ns_token')||'', USER=null, KILL=false;
 const SCREENS=[['warroom','🏠 War Room'],['products','📦 Product Intelligence'],['competitors','🔭 Competitor Observatory'],['compare','⚖️ Peer Compare'],['keywords','🔑 Keyword Lab'],['rank','📈 Rank Tracker'],['ads','🎯 Ads Studio'],['listings','📝 Listing Lab'],['creative','🎨 Creative Lab'],['experiments','🧪 Experiments'],['profit','💰 Profit & Settlements'],['inventory','🏭 Inventory & Festival'],['approvals','✅ Approval Inbox'],['integrations','🔌 Integrations'],['agency','🤝 Agency Board'],['ops','🛠️ System Ops']];
 async function api(path,method,body){
@@ -57,10 +59,13 @@ async function api(path,method,body){
 }
 function showLogin(){document.getElementById('login').style.display='flex';}
 async function doLogin(){
-  const u=document.getElementById('lu').value,p=document.getElementById('lp').value;
-  const r=await fetch(API+'/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  const u=document.getElementById('lu').value,p=document.getElementById('lp').value,t=document.getElementById('lt').value;
+  const r=await fetch(API+'/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,totp:t||undefined})});
   const j=await r.json();
-  if(!r.ok){document.getElementById('lerr').textContent='Login fail — username/password parkho';return;}
+  if(!r.ok){
+    if(j.error==='MFA_REQUIRED'){document.getElementById('lt').style.display='block';document.getElementById('lerr').textContent='MFA code daalo (authenticator app se) aur phir Login dabao';}
+    else document.getElementById('lerr').textContent='Login fail — username/password parkho';
+    return;}
   TOKEN=j.data.token; localStorage.setItem('ns_token',TOKEN); USER=j.data;
   document.getElementById('login').style.display='none'; boot();
 }
@@ -70,7 +75,7 @@ const ev=(src)=>'<div class="evidence">Source: '+src+' · '+new Date().toLocaleS
 function table(cols,rows,emptyMsg){
   if(!rows||!rows.length) return '<div class="empty">'+(emptyMsg||'Abhi data nahi hai — pehle import/sync karo. Jhootha number yahan kabhi nahi dikhega.')+'</div>';
   let h='<table><tr>'+cols.map(c=>'<th class="'+(c.n?'num':'')+'">'+c.t+'</th>').join('')+'</tr>';
-  for(const r of rows) h+='<tr>'+cols.map(c=>'<td class="'+(c.n?'num':'')+'">'+(c.f?c.f(r):(r[c.k]??'—'))+'</td>').join('')+'</tr>';
+  for(const r of rows) h+='<tr>'+cols.map(c=>'<td class="'+(c.n?'num':'')+'">'+(c.f?c.f(r):esc(r[c.k]??'—'))+'</td>').join('')+'</tr>';
   return h+'</table>';
 }
 function cards(items){return '<div class="cards">'+items.map(i=>'<div class="card"><div class="k">'+i[0]+'</div><div class="v">'+i[1]+'</div><div class="k">'+(i[2]||'')+'</div></div>').join('')+'</div>';}
@@ -116,7 +121,9 @@ async rank(m){
 },
 async ads(m){
   const d=await api('/api/v1/ads/health');
-  m.innerHTML='<h2>Ads Studio</h2>'+table([{t:'Campaign',k:'name'},{t:'Spend',n:1,f:r=>inr(r.spend)},{t:'Sales',n:1,f:r=>inr(r.sales)},{t:'ROAS',k:'roas',n:1},{t:'ACOS %',k:'acos_pct',n:1}],d.campaigns)+
+  const mx=Math.max(...(d.campaigns||[]).map(c=>c.spend||0),1);
+  const bars=(d.campaigns||[]).slice(0,8).map(c=>'<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="min-width:150px;font-size:12px">'+esc(c.name)+'</span><div style="height:14px;background:#057C81;border-radius:4px;width:'+Math.max(2,(c.spend/mx*55)).toFixed(1)+'%"></div><span style="font-size:12px">'+inr(c.spend)+'</span></div>').join('');
+  m.innerHTML='<h2>Ads Studio</h2><div class="card"><div class="k">Kharch ka bantwara (upar wale 8 campaigns)</div>'+bars+'</div>'+table([{t:'Campaign',k:'name'},{t:'Spend',n:1,f:r=>inr(r.spend)},{t:'Sales',n:1,f:r=>inr(r.sales)},{t:'ROAS',k:'roas',n:1},{t:'ACOS %',k:'acos_pct',n:1}],d.campaigns)+
   '<h3>Harvest candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'from_campaign'},{t:'Orders',k:'orders',n:1}],(d.harvest||{}).harvest,'—')+
   '<h3>Negative candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'campaign'},{t:'Barbaad',n:1,f:r=>inr(r.wasted)}],(d.harvest||{}).negatives,'—')+ev('ADS-01..05 — sifarishen proposals se lagu hongi, seedha kabhi nahi');
 },
@@ -167,7 +174,15 @@ async ops(m){
 async function addPeer(e){e.preventDefault();const f=new FormData(e.target);await api('/api/v1/competitors/peers','POST',Object.fromEntries(f));show('competitors');return false;}
 async function addSnap(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));for(const k of['peer_id','price','rating','reviews','image_count'])if(f[k])f[k]=Number(f[k]);await api('/api/v1/competitors/snapshots','POST',f);show('competitors');return false;}
 async function loadPacket(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/competitors/packet?sku='+encodeURIComponent(f.sku)+'&peer='+f.peer+'&nut='+encodeURIComponent(f.nut)+'&grade='+encodeURIComponent(f.grade)+'&pack_g='+f.pack_g);document.getElementById('packet').innerHTML='<div class="card"><p><b>Match:</b> '+(d.match?d.match.class:'—')+'</p><p><b>Farq:</b> apna '+(d.gap?d.gap.own_per_100g:'—')+'/100g vs peer '+(d.gap?d.gap.peer_per_100g:'—')+'/100g ('+(d.gap?d.gap.gap_pct:'—')+'%)</p><p><b>Playbook:</b> '+(d.playbook||'')+'</p><p><b>Sifarish:</b> '+(d.recommended_action||d.note||'')+'</p><p class="evidence">'+(d.do_not_claim||'')+'</p></div>';return false;}
-async function loadRank(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/rank?term='+encodeURIComponent(f.term)+'&sku='+encodeURIComponent(f.sku));document.getElementById('rankout').innerHTML='<div class="card"><b>'+d.term+'</b> — points: '+d.points+' · '+(d.status==='OK'?('taaza position '+d.latest+', badlav '+d.delta):d.note)+'</div>';return false;}
+function sparkSVG(vals,invert){
+  if(!vals||vals.length<2)return '';
+  const w=560,h=90,mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1;
+  const pts=vals.map((v,i)=>((i/(vals.length-1))*w).toFixed(1)+','+(invert?((v-mn)/rg*(h-16)+8):(h-8-(v-mn)/rg*(h-16))).toFixed(1)).join(' ');
+  return '<svg width="100%" viewBox="0 0 '+w+' '+h+'" style="background:#fff;border-radius:10px;margin-top:8px"><polyline points="'+pts+'" fill="none" stroke="#057C81" stroke-width="2.5"/></svg>';
+}
+async function loadRank(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/rank?term='+encodeURIComponent(f.term)+'&sku='+encodeURIComponent(f.sku));const dg=await api('/api/v1/rank/diagnostic?term='+encodeURIComponent(f.term)+'&sku='+encodeURIComponent(f.sku));let g='';if(d.history&&d.history.length>1)g=sparkSVG(d.history.map(x=>x.position),true);
+  let hy='';if(dg.hypotheses&&dg.hypotheses.length)hy='<h3>Rank parakh (parikalpana — siddh kaaran nahi)</h3>'+dg.hypotheses.map(x=>'<p>'+badge('HYPOTHESIS','warn')+' '+esc(x.hypothesis)+'<br><span class="evidence">Saboot: '+esc(x.evidence)+' · Kaam: '+esc(x.action)+'</span></p>').join('');
+  document.getElementById('rankout').innerHTML='<div class="card"><b>'+esc(d.term)+'</b> — points: '+d.points+' · '+(d.status==='OK'?('taaza position '+d.latest+', badlav '+d.delta):esc(d.note))+'</div>'+g+hy;return false;}
 async function addDraft(e){e.preventDefault();const f=new FormData(e.target);await api('/api/v1/listings/draft','POST',{sku:f.get('sku'),title:f.get('title'),bullets:[]});show('listings');return false;}
 async function loadBrief(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/creative/brief?product='+encodeURIComponent(f.product)+'&grade='+encodeURIComponent(f.grade||'')+'&weight='+encodeURIComponent(f.weight||''));document.getElementById('brief').innerHTML=table([{t:'#',k:'shot'},{t:'Prakar',k:'type'},{t:'Brief',k:'brief'}],d.shots);return false;}
 async function addCost(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));await api('/api/v1/costs','POST',{sku:f.sku,cogs:Number(f.cogs),packaging:Number(f.packaging||0)});show('profit');return false;}

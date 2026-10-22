@@ -47,6 +47,16 @@ class AmazonAds:
                          json_body={"maxResults": 1000}, transport=self.transport)
         return r.get("keywords", [])
 
+    def update_campaigns(self, campaigns: list) -> dict:
+        """Write API: campaign state/budget badlav. Sirf certified capability par chalega (adapter gate)."""
+        return request_json("POST", ENDPOINT + "/sp/campaigns", headers=self._headers(SP_CONTENT_TYPE),
+                            json_body={"campaigns": campaigns}, transport=self.transport)
+
+    def update_keywords(self, keywords: list) -> dict:
+        return request_json("POST", ENDPOINT + "/sp/keywords",
+                            headers=self._headers("application/vnd.spKeyword.v3+json"),
+                            json_body={"keywords": keywords}, transport=self.transport)
+
     def request_search_term_report(self, start_date: str, end_date: str) -> str:
         """Reporting v3 — reportId milega, phir status poll karke download URL (gzip JSON)."""
         body = {"name": "GrowthOS Search Terms", "startDate": start_date, "endDate": end_date,

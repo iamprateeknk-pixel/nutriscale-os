@@ -65,4 +65,4 @@ Kya ban gaya, kya baki hai — imaandar diary: **[STATUS.md](STATUS.md)**
 - Listing score < 70 → ads scale band (pehle listing, phir paisa)
 
 ---
-*Private repository — NutriScale OS, ek dry fruits business ke liye banaya gaya.*
+*Repository visibility GitHub par PUBLIC hai (22 Oct 2026 ko verify) — business data isiliye repo me sirf aggregates me rakha gaya hai; raw orders/customer data kabhi push NAHI hota. Repo ko Private karna hai to GitHub → Settings → Danger Zone → Change visibility (malik ka 1-minute ka kaam).*

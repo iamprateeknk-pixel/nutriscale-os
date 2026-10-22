@@ -119,6 +119,19 @@ def execute(db, aid: int, user: dict, adapter) -> dict:
     return {"ok": False, "id": aid, "state": "FAILED",
             "error": res.get("error", "Vendor/manual pushti nahi mili — action applied nahi mana gaya")}
 
+def rollback(db, aid: int, user: dict, adapter) -> dict:
+    """APPLIED_VERIFIED action ko purani halat par wapas — adapter ki pushti ke saath hi ROLLED_BACK."""
+    r = db.execute("SELECT * FROM action_v12 WHERE id=?", (aid,)).fetchone()
+    if not r: return {"ok": False, "error": "Action mila nahi"}
+    if r["state"] != "APPLIED_VERIFIED": return {"ok": False, "error": f"State {r['state']} hai — rollback sirf applied par"}
+    if not hasattr(adapter, "rollback"):
+        return {"ok": False, "error": "Is adapter me rollback ki suvidha nahi — vendor console se haath se wapas karo aur darj karo"}
+    res = adapter.rollback(dict(r))
+    if res.get("ok"):
+        _move(db, aid, "ROLLED_BACK", user["username"], res.get("note", "rollback hua"))
+        return {"ok": True, "id": aid, "state": "ROLLED_BACK", "note": res.get("note")}
+    return {"ok": False, "error": res.get("error", "Rollback ki pushti nahi mili — state waisi hi rahegi")}
+
 class ManualAdapter:
     """Jab tak live write-API certified nahi: user vendor console me khud badlav karke
     uska saboot (screenshot/ref id) deta hai, TAB pushti milti hai. Jhoothi pushti kabhi nahi."""
