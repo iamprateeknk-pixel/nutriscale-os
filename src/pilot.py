@@ -49,33 +49,35 @@ def finance_grade_matching(db, platform: str = "Amazon", days: int = 30) -> dict
     import datetime as _dt
     ensure_v12(db)
     ws = (_dt.date.today() - _dt.timedelta(days=days - 1)).isoformat()
-    orders = db.execute("""SELECT oh.external_order_id oid, COALESCE(SUM(oi.gross),0) gross,
+    # V20: milaan ki key (seller_account, order_id) hai — sirf order-id par group karna do khaaton
+    # ke ek-jaise order-id ko ek bana deta tha aur fees galat khaate se mil jati thi
+    orders = db.execute("""SELECT oh.seller_account acct, oh.external_order_id oid, COALESCE(SUM(oi.gross),0) gross,
                                   COALESCE(SUM(COALESCE(oi.refund,0)),0) refund
                            FROM order_headers oh JOIN order_items oi
                              ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                            WHERE oh.platform=? AND oh.order_date>=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'
-                           GROUP BY oh.external_order_id""", (platform, ws)).fetchall()
+                           GROUP BY oh.seller_account, oh.external_order_id""", (platform, ws)).fetchall()
     # V19 P0: milaan GROSS-se-GROSS aur REFUND-se-REFUND alag-alag — NET ko GROSS se parkhna galat tha
     matched, missing, mismatch, exceptions = 0, 0, 0, []
     for o in orders:
-        f = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(COALESCE(refund,0)),0) rf, COUNT(*) n FROM order_fees WHERE platform=? AND external_order_id=?",
-                       (platform, o["oid"])).fetchone()
+        f = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(COALESCE(refund,0)),0) rf, COUNT(*) n FROM order_fees WHERE platform=? AND seller_account=? AND external_order_id=?",
+                       (platform, o["acct"], o["oid"])).fetchone()
         if not f["n"]:
-            missing += 1; exceptions.append({"order": o["oid"], "issue": "FEE_DATA_MISSING"}); continue
+            missing += 1; exceptions.append({"order": o["oid"], "account": o["acct"], "issue": "FEE_DATA_MISSING"}); continue
         bad = []
         if abs(f["g"] - o["gross"]) > max(1.0, 0.005 * o["gross"]):
             bad.append(f"GROSS_MISMATCH orders={o['gross']} finances={f['g']}")
         if abs(f["rf"] - o["refund"]) > max(1.0, 0.005 * max(o["refund"], 1)):
             bad.append(f"REFUND_MISMATCH orders={o['refund']} finances={f['rf']}")
         if bad:
-            mismatch += 1; exceptions.append({"order": o["oid"], "issue": "; ".join(bad)})
+            mismatch += 1; exceptions.append({"order": o["oid"], "account": o["acct"], "issue": "; ".join(bad)})
         else:
             matched += 1
     total = len(orders)
     return {"orders_checked": total, "matched": matched, "fee_data_missing": missing,
             "amount_mismatch": mismatch, "exceptions": exceptions[:50],
             "match_rate_pct": round(100.0 * matched / total, 1) if total else None,
-            "basis": "gross-vs-gross + refund-vs-refund (V19)",
+            "basis": "gross-vs-gross + refund-vs-refund, key=(seller_account, order_id) (V20)",
             "verdict": "FINANCE_GRADE_OK" if total and missing == 0 and mismatch == 0 else
                        ("DATA_APARYAPT" if total == 0 else "EXCEPTIONS_HAIN — upar ki suchi parkho")}
 
@@ -94,10 +96,10 @@ def reporting_completeness(db, platform: str = "Amazon", days: int = 30) -> dict
         while d1 <= d2:
             if start <= d1 <= end: covered.add(d1)
             d1 += _dt.timedelta(days=1)
-    fee = db.execute("""SELECT COUNT(DISTINCT oh.external_order_id) tot,
-                               COUNT(DISTINCT of2.external_order_id) with_fees
+    fee = db.execute("""SELECT COUNT(DISTINCT oh.seller_account || '|' || oh.external_order_id) tot,
+                               COUNT(DISTINCT of2.seller_account || '|' || of2.external_order_id) with_fees
                         FROM order_headers oh LEFT JOIN order_fees of2
-                          ON of2.platform=oh.platform AND of2.external_order_id=oh.external_order_id
+                          ON of2.platform=oh.platform AND of2.seller_account=oh.seller_account AND of2.external_order_id=oh.external_order_id
                         WHERE oh.platform=? AND oh.order_date>=?""", (platform, start.isoformat())).fetchone()
     return {"window_days": days,
             "order_days_present": od, "order_days_note": "orders har din hona lazmi nahi — ye sirf maujudgi ki jaankari hai",

@@ -17,6 +17,7 @@ def _sniff(path):
 
 def guess_kind(headers: list) -> str:
     h = " ".join(headers).lower()
+    if "search query" in h: return "brand_analytics"   # V20: Brand Analytics SQP — search-terms se pehle parkho
     if "customer search term" in h or "search term" in h: return "search_terms"
     if "order-id" in h or "amazon-order-id" in h: return "orders"
     if "campaign" in h and ("total cost" in h or "spend" in h): return "campaigns"
@@ -55,6 +56,11 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
         r = csv_import.import_orders_canonical(path, store, platform, account, period, imported_by)
         return {"ok": True, "duplicate": r.get("duplicate", False), "imported": r.get("rows_ok", 0),
                 "exceptions": [], "how": "canonical: order_headers + order_items (line-level)", "receipt": r}
+    elif kind == "brand_analytics":
+        import brand_analytics as BA
+        r = BA.import_brand_analytics(db, path, platform, account, period, imported_by)
+        return {"ok": r.get("ok", False), "duplicate": r.get("duplicate", False), "imported": r.get("imported", 0),
+                "exceptions": [], "how": "brand_analytics table (SQP/SCP — V20)", "receipt": r}
     elif kind == "inventory":
         n = csv_import.import_inventory_csv(path, store); how = "legacy table: inventory"
     else:

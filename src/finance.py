@@ -29,16 +29,43 @@ def get_cost(db, sku: str, on_date: str = None) -> dict:
             "stale": age > STALE_DAYS, "age_days": age,
             "reason": "Cost 90 din se purani hai — nayi cost daalo, scale roka gaya" if age > STALE_DAYS else "Cost taaza hai"}
 
-def import_order_fees(db, rows: list, platform: str = "Amazon") -> dict:
-    """SP Finances se aayi per-order fees order_fees me — SKU-exact dar ka saboot."""
-    ensure_v12(db); n = 0
+def _fee_event_id(platform: str, account: str, r: dict) -> str:
+    """Event ki pakki pehchan — vendor ne transaction-id diya to wahi, warna content-hash
+    (ek hi event dobara sync ho to pehchan takrayegi aur dohari ginati nahi hogi)."""
+    import hashlib
+    if r.get("event_id"): return str(r["event_id"])
+    basis = "|".join([platform, account, str(r.get("order_id")), str(r.get("sku")),
+                      str(r.get("event_type") or "SHIPMENT"), str(r.get("posted_at") or ""),
+                      f"{float(r.get('gross') or 0):.2f}", f"{float(r.get('fees') or 0):.2f}",
+                      f"{float(r.get('refund') or 0):.2f}"])
+    return "h:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
+
+def import_order_fees(db, rows: list, platform: str = "Amazon", seller_account: str = "default") -> dict:
+    """SP Finances fees — V20: pehle har financial EVENT alag darj hota hai (order_fee_events),
+    phir order_fees usi ka YOG banta hai. Purana INSERT OR REPLACE ek hi order+SKU ke dusre
+    shipment-event ko pehle wale se OVERWRITE kar deta tha — ab rakam judti hai, mit-ti nahi.
+    Har row apna seller_account la sakti hai; na laaye to function-wala account lagega."""
+    ensure_v12(db); new_events, touched = 0, set()
     for r in rows:
         if not r.get("sku"): continue
-        db.execute("INSERT OR REPLACE INTO order_fees VALUES (?,?,?,?,?,?)",
-                   (platform, r["order_id"], r["sku"], float(r.get("gross") or 0), float(r.get("fees") or 0),
-                    float(r.get("refund") or 0)))
-        n += 1
-    db.commit(); return {"imported": n}
+        acct = str(r.get("seller_account") or seller_account)
+        eid = _fee_event_id(platform, acct, r)
+        cur = db.execute("""INSERT OR IGNORE INTO order_fee_events
+                            (event_id,platform,seller_account,external_order_id,sku,event_type,gross,fees,refund,posted_at,imported_at)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                         (eid, platform, acct, r["order_id"], r["sku"], str(r.get("event_type") or "SHIPMENT"),
+                          float(r.get("gross") or 0), float(r.get("fees") or 0), float(r.get("refund") or 0),
+                          str(r.get("posted_at") or ""), now_utc()))
+        if cur.rowcount: new_events += 1
+        touched.add((platform, acct, r["order_id"], r["sku"]))
+    for (pf, acct, oid, sku) in touched:
+        agg = db.execute("""SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f, COALESCE(SUM(refund),0) rf
+                            FROM order_fee_events WHERE platform=? AND seller_account=? AND external_order_id=? AND sku=?""",
+                         (pf, acct, oid, sku)).fetchone()
+        db.execute("INSERT OR REPLACE INTO order_fees VALUES (?,?,?,?,?,?,?)",
+                   (pf, acct, oid, sku, agg["g"], agg["f"], agg["rf"]))
+    db.commit()
+    return {"imported": new_events, "events_total_seen": len(rows), "orders_updated": len(touched)}
 
 def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
     """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15).
@@ -69,11 +96,12 @@ def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
             n += 1
     db.commit(); return {"updated_lines": n}
 
-def sku_fee_rate(db, sku: str, platform: str = "Amazon") -> dict:
-    """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT)."""
+def sku_fee_rate(db, sku: str, platform: str = "Amazon", seller_account: str = None) -> dict:
+    """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT).
+    V20: seller_account diya to sirf usi khaate ki dar — khaate mix nahi honge."""
     ensure_v12(db)
-    r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f FROM order_fees WHERE sku=? AND platform=?",
-                   (sku, platform)).fetchone()
+    r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f FROM order_fees WHERE sku=? AND platform=? AND (? IS NULL OR seller_account=?)",
+                   (sku, platform, seller_account, seller_account)).fetchone()
     if r and r["g"] and r["g"] >= 5000:
         return {"rate": r["f"] / r["g"], "gross_basis": r["g"], "precision": "SKU_EXACT"}
     return {"rate": None, "gross_basis": r["g"] if r else 0, "precision": None}

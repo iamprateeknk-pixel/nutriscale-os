@@ -59,11 +59,23 @@ class AmazonSP:
 
     def get_order_financials(self, order_id: str) -> list:
         """Finances API: order ki asal fees SKU tak (V13 — SKU-exact fees ka rasta).
-        Har shipment item se: sku, gross (ItemPrice), fees (ItemFeeList ka yog, rinatmak)."""
+        V20: har financial EVENT apni alag row hai (event_id + type + posted date ke saath) —
+        ek hi order+SKU ke kai shipment events ab ek dusre ko overwrite NAHI karenge;
+        refund bhi shipment row me ghusne ke bajaye apna REFUND event banega.
+        Finances v0 stable event-id nahi deta, isiliye event_id content se nirmit (deterministic)
+        hai — wahi event dobara sync ho to pehchan wahi rahegi, dohari ginati nahi hogi."""
+        import hashlib
         r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
         events = (r.get("payload") or {}).get("FinancialEvents", {})
-        out = []
+        out, seq = [], {}
+        def _eid(etype, posted, sku, gross, fees, refund):
+            key = (etype, sku)
+            seq[key] = seq.get(key, 0) + 1
+            basis = "|".join([order_id, etype, str(posted or ""), sku,
+                              f"{gross:.2f}", f"{fees:.2f}", f"{refund:.2f}", str(seq[key])])
+            return "spfin:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
         for ev in events.get("ShipmentEventList", []):
+            posted = str(ev.get("PostedDate", "") or "")
             for it in ev.get("ShipmentItemList", []):
                 fees = 0.0
                 for f in it.get("ItemFeeList", []):
@@ -72,20 +84,22 @@ class AmazonSP:
                 for c in it.get("ItemChargeList", []):
                     if c.get("ChargeType") == "Principal":
                         gross += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
-                out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
-                            "gross": gross, "fees": abs(fees), "refund": 0.0})
-        # V19: usi order ke refunds bhi SKU-war isi record me — milaan gross/refund alag-alag hoga
+                sku = it.get("SellerSKU", "")
+                out.append({"order_id": order_id, "sku": sku, "event_type": "SHIPMENT",
+                            "posted_at": posted, "gross": gross, "fees": abs(fees), "refund": 0.0,
+                            "event_id": _eid("SHIPMENT", posted, sku, gross, abs(fees), 0.0)})
         for ev in events.get("RefundEventList", []):
+            posted = str(ev.get("PostedDate", "") or "")
             for it in ev.get("ShipmentItemAdjustmentList", []):
                 amt = 0.0
                 for c in it.get("ItemChargeList", []):
                     if c.get("ChargeType") == "Principal":
                         amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
                 if not amt: continue
-                row = next((x for x in out if x["sku"] == it.get("SellerSKU", "")), None)
-                if row: row["refund"] += abs(amt)
-                else: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
-                                  "gross": 0.0, "fees": 0.0, "refund": abs(amt)})
+                sku = it.get("SellerSKU", "")
+                out.append({"order_id": order_id, "sku": sku, "event_type": "REFUND",
+                            "posted_at": posted, "gross": 0.0, "fees": 0.0, "refund": abs(amt),
+                            "event_id": _eid("REFUND", posted, sku, 0.0, 0.0, abs(amt))})
         return out
 
     def get_order_refunds(self, order_id: str) -> list:

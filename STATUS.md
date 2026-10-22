@@ -1,5 +1,15 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 23 Oct 2026 (V19 — financial/stock/account bugs)_
+_Updated: 23 Oct 2026 (V20 — audit-8 closure: stale velocity, fee events, stock mapping, attribution, Brand Analytics)_
+
+## 🔧 V20 — Aathve audit ke saare code-issues band (23 Oct 2026)
+(saboot: test_v20_audit8.py — 9 tests incl. asal HTTP; kul 26 suites pass)
+- **P0 Velocity stale thi**: khidki ab **aaj (reporting date)** se bandhi hai — 60 din purani bikri ab 'taaza' raftaar nahi bana sakti; `sku_velocity_report` me last-sale date, days-since aur **STALE chetaavni**; Product 360 me velocity_report sahit.
+- **P0 Finance seller-account key**: `order_fees` ki PK ab (platform, **seller_account**, order, sku) — purani DBs par data-surakshit rebuild migration ('default' khaate me); matching aur completeness bhi khaate-war key par.
+- **P1 Fee events**: har financial event alag darj (`order_fee_events`, event-id/content-hash pehchan, dohari ginati nahi); `order_fees` ab events ka **yog** hai — ek hi order+SKU ke kai shipment events ab overwrite nahi honge. SP connector per-event rows (SHIPMENT/REFUND ab alag) deta hai.
+- **P1 Stock channel mapping**: naam-andaz ki jagah **explicit `stock_channel_map`** (API: GET/POST `/api/v1/stock/channel-map`); heuristic sirf fallback, basis (EXPLICIT/HEURISTIC/UNCLASSIFIED) har location ke saath saaf. Inventory me **sellable/unsellable** alag — channel cover sirf sellable par.
+- **P1 Attribution imaandaar**: outcome ab attribution ke saath darj — **VERIFIED / CONTAMINATED / LOW_COVERAGE**; dusre channel/action ka takraav (same SKU/campaign, overlapping window) mile to nateeja kisi ke naam nahi lagega; **rule-confidence sirf VERIFIED nateejo se** banti hai. SKU maap ab action ke apne platform tak seemit.
+- **Brand Analytics importer** (`src/brand_analytics.py`): SQP + SCP reports ka dedicated import (SHA dedup, wizard me `brand_analytics` kind), summary API `/api/v1/brand-analytics` — brand purchase-share sahit. **Live report abhi import nahi hui** — Seller Central se file aate hi chalega.
+- **Baki (code se nahi hoga)**: SP-API/Ads/Flipkart live sync + write pilot + asal fees/settlement saboot = credentials par; 24×7 deployment = hosting faisle par; repo Private = user ka GitHub Settings kadam. Preflight asal DB par chalaya — owner/kill-switch/HTTPS-pack ✔, connectors/capabilities/backup ✘ (yahi sach hai).
 
 ## 🔧 V19 — Saatve audit ke bache bugs band (23 Oct 2026)
 (saboot: test_v19_finance_stock.py, kul 25 suites pass)

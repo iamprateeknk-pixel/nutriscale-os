@@ -41,6 +41,15 @@ class Store:
               SELECT {', '.join(('COALESCE(platform,\'Amazon\')' if c == 'platform' else c) for c in colnames.split(', '))} FROM {table};
             DROP TABLE {table}; ALTER TABLE {table}_new RENAME TO {table};
             """); self.db.commit()
+        # V20: inventory par sellable/unsellable columns (purani DBs par bhi)
+        try:
+            icols = [c[1] for c in self.db.execute("PRAGMA table_info(inventory)")]
+            for col in ("sellable_qty", "unsellable_qty"):
+                if icols and col not in icols:
+                    self.db.execute(f"ALTER TABLE inventory ADD COLUMN {col} INT")
+            self.db.commit()
+        except Exception:
+            pass
 
     # ---------- Sync data (connectors/CSV se aaya asal data) ----------
     def upsert_product(self, sku, name, platform, price, cost=0, rating=0, reviews=0, source=""):
@@ -63,9 +72,14 @@ class Store:
             self.db.execute("INSERT INTO search_terms(term,campaign,spend,sales,clicks,purchases,source) VALUES (?,?,?,?,?,?,?)",
                             (term, campaign, spend, sales, clicks, purchases, source))
         self.db.commit()
-    def set_inventory(self, sku, location, qty, source=""):
-        self.db.execute("INSERT OR REPLACE INTO inventory VALUES (?,?,?,?)",
-                        (sku, location, qty, source)); self.db.commit()
+    def set_inventory(self, sku, location, qty, source="", sellable=None, unsellable=None):
+        # V20: sellable/unsellable alag darj ho sakte hain; na diye jayen to sellable=qty mana jayega (NULL = sab bikne-yogya)
+        try:
+            self.db.execute("""INSERT OR REPLACE INTO inventory(sku,location,qty,source,sellable_qty,unsellable_qty)
+                               VALUES (?,?,?,?,?,?)""", (sku, location, qty, source, sellable, unsellable))
+        except Exception:
+            self.db.execute("INSERT OR REPLACE INTO inventory VALUES (?,?,?,?)", (sku, location, qty, source))
+        self.db.commit()
     def has_real_data(self) -> bool:
         n = self.db.execute("SELECT COUNT(*) c FROM products").fetchone()["c"]
         o = self.db.execute("SELECT COUNT(*) c FROM orders").fetchone()["c"]

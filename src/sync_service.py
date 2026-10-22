@@ -65,14 +65,18 @@ def sync_order_fees(store, days: int = 3, sp=None) -> dict:
     sp = sp or AmazonSP()
     db = store.db; ensure_v12(db)
     cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
-    ids = [r["external_order_id"] for r in db.execute(
-        "SELECT external_order_id FROM order_headers WHERE platform='Amazon' AND order_date>=?", (cutoff,))]
+    # V20: fees har order ke APNE seller_account par darj hongi — khaate kabhi mix nahi honge
+    rows = db.execute(
+        "SELECT external_order_id, seller_account FROM order_headers WHERE platform='Amazon' AND order_date>=?",
+        (cutoff,)).fetchall()
     total, refunds = 0, 0
-    for oid in ids:
-        total += F.import_order_fees(db, sp.get_order_financials(oid))["imported"]
+    for row in rows:
+        oid = row["external_order_id"]
+        total += F.import_order_fees(db, sp.get_order_financials(oid),
+                                     seller_account=row["seller_account"] or "default")["imported"]
         if hasattr(sp, "get_order_refunds"):
             refunds += F.record_refunds(db, sp.get_order_refunds(oid))["updated_lines"]
-    return {"orders_checked": len(ids), "fee_rows": total, "refund_lines": refunds,
+    return {"orders_checked": len(rows), "fee_rows": total, "refund_lines": refunds,
             "note": "Fees + refunds SP Finances se aaye — revenue ab NET ginega"}
 
 def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:

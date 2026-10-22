@@ -37,27 +37,43 @@ def sku_sales(db, platform: str = None) -> list:
     return [dict(r) for r in db.execute(
         "SELECT sku, COUNT(*) units, SUM(amount) revenue FROM orders GROUP BY sku ORDER BY revenue DESC")]
 
-def sku_velocity_per_day(db, sku: str, window_days: int = 30, platform: str = None) -> float:
-    """Roz ki asal bikri — denominator poori observation-window (pehli se aakhri bikri-taareekh ka antar),
-    sirf bikri-wale din nahi (V14 fix). V18: platform diya to raftaar sirf usi channel ki (channel-specific stock hisaab)."""
+STALE_WARN_DAYS = 14   # aakhri bikri itne din se purani ho to velocity par 'stale data' ki chetaavni
+
+def sku_velocity_report(db, sku: str, window_days: int = 30, platform: str = None, as_of=None) -> dict:
+    """Velocity report (V20) — khidki ka aakhri din AB 'aaj' (reporting date) hai, aakhri bikri nahi.
+    V19 tak khidki MAX(order_date) se bandhi thi: 60 din purani bikri bhi 'taaza' raftaar dikhati thi.
+    Ab purani bikri khidki se bahar girti hai, raftaar sach dikhati hai, aur stale chetaavni alag se milti hai."""
     ensure_v12(db)
     import datetime as _dt
-    # V19 P0: sirf TRAILING window (taaza-taarin bikri-taareekh se peeche ke window_days din) ginega —
-    # all-time units ko 30 se baantna galat tha; cancelled orders bhi bahar
-    mx = db.execute("""SELECT MAX(oh.order_date) m FROM order_items oi JOIN order_headers oh
-                       ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
-                       WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
-                    (sku, platform, platform)).fetchone()
-    if not mx or not mx["m"]: return 0.0
-    d1 = _dt.date.fromisoformat(str(mx["m"])[:10]); d0 = d1 - _dt.timedelta(days=window_days - 1)
-    r = db.execute("""SELECT COALESCE(SUM(oi.qty),0) q, MIN(oh.order_date) f, MAX(oh.order_date) t
-                      FROM order_items oi JOIN order_headers oh
-                        ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
-                      WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND oh.order_date>=? AND oh.order_date<=?
-                        AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
-                   (sku, platform, platform, d0.isoformat(), d1.isoformat())).fetchone()
-    if r and r["q"]:
+    end = as_of or _dt.date.today()
+    if isinstance(end, str): end = _dt.date.fromisoformat(end[:10])
+    start = end - _dt.timedelta(days=window_days - 1)
+    j = """FROM order_items oi JOIN order_headers oh
+             ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
+           WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'"""
+    mx = db.execute(f"SELECT MAX(oh.order_date) m {j}", (sku, platform, platform)).fetchone()
+    last = str(mx["m"])[:10] if mx and mx["m"] else None
+    r = db.execute(f"""SELECT COALESCE(SUM(oi.qty),0) q, MIN(oh.order_date) f, MAX(oh.order_date) t {j}
+                       AND oh.order_date>=? AND oh.order_date<=?""",
+                   (sku, platform, platform, start.isoformat(), end.isoformat())).fetchone()
+    units = float(r["q"] or 0) if r else 0.0
+    vel = 0.0
+    if units:
         span = (_dt.date.fromisoformat(str(r["t"])[:10]) - _dt.date.fromisoformat(str(r["f"])[:10])).days + 1
-        return r["q"] / max(1, min(window_days, span))
+        vel = units / max(1, min(window_days, span))
+    since = (end - _dt.date.fromisoformat(last)).days if last else None
+    return {"sku": sku, "platform": platform, "velocity_per_day": round(vel, 4),
+            "window_start": start.isoformat(), "window_end": end.isoformat(), "window_days": window_days,
+            "units_in_window": units, "last_sale_date": last, "days_since_last_sale": since,
+            "stale": (since is None or since > STALE_WARN_DAYS),
+            "basis": "CANONICAL trailing window — aaj se peeche (V20)",
+            "warning": ("STALE DATA — is SKU ki aakhri bikri " + (f"{since} din pehle" if since is not None else "kabhi darj hi nahi") +
+                        "; raftaar purane data par bharosa karke mat chalao, pehle taaza sync karo") if (since is None or since > STALE_WARN_DAYS) else None}
+
+def sku_velocity_per_day(db, sku: str, window_days: int = 30, platform: str = None) -> float:
+    """Roz ki asal bikri. V20: khidki aaj se bandhi hai (stale bikri raftaar nahi bana sakti).
+    Canonical data hi na ho to legacy orders par fallback (purane imports ke liye)."""
+    rep = sku_velocity_report(db, sku, window_days, platform)
+    if rep["last_sale_date"] is not None: return rep["velocity_per_day"]
     lo = db.execute("SELECT COUNT(*) c FROM orders WHERE sku=?", (sku,)).fetchone()
     return (lo["c"] / window_days) if lo and lo["c"] else 0.0

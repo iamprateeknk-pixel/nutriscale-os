@@ -65,21 +65,50 @@ def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> d
             while d <= e:
                 if lo <= d <= hi: covered.add(d)
                 d += _dt.timedelta(days=1)
+        if camp:
+            out["_campaign_coverage"] = round(100.0 * len(covered) / window_days, 1)
         if r and r["n"] and len(covered) >= 0.7 * window_days:
             out["campaign"] = {"spend": r["sp"], "sales": r["sa"]}
     sku = payload.get("sku")
+    plat = payload.get("platform")
     if sku:
+        # V20: SKU maap ab usi platform tak seemit — dusre channel ki bikri is action ke naam nahi lagegi
         r = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi JOIN order_headers oh
                           ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
-                          WHERE oi.sku=? AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
-                       (sku, d0, d1)).fetchone()
+                          WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
+                       (sku, plat, plat, d0, d1)).fetchone()
         out["sku_revenue"] = r["g"] if r else 0.0
-    t = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n FROM order_items oi JOIN order_headers oh
+    t = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n, COUNT(DISTINCT oh.order_date) od FROM order_items oi JOIN order_headers oh
                       ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
-                      WHERE oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""", (d0, d1)).fetchone()
+                      WHERE (? IS NULL OR oi.platform=?) AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""", (plat, plat, d0, d1)).fetchone()
     if t and t["n"]: out["total_revenue"] = t["g"]
     out["_lines"] = t["n"] if t else 0
+    out["_order_days"] = t["od"] if t else 0
+    out["_order_day_coverage"] = round(100.0 * (t["od"] if t else 0) / window_days, 1)
     return out
+
+def _contamination(db, action_id: int, payload: dict, applied, window_days: int) -> list:
+    """Cross-channel / same-target contamination (V20): isi SKU ya campaign par koi AUR
+    APPLIED_VERIFIED action is maap-khidki ke aas-paas laga ho to nateeja kisi ek ke naam
+    nahi lag sakta — uplift ka dawa wahin ruk jayega, seekh usse nahi bane gi."""
+    import datetime as _dt
+    sku, camp = payload.get("sku"), payload.get("campaign") or payload.get("campaign_name")
+    cid = payload.get("campaign_id")
+    lo = (applied - _dt.timedelta(days=window_days)).isoformat()
+    hi = (applied + _dt.timedelta(days=window_days)).isoformat()
+    hits = []
+    rows = db.execute("""SELECT a.id, a.kind, a.platform, a.payload FROM action_v12 a
+                         JOIN action_events e ON e.action_id=a.id AND e.to_state='APPLIED_VERIFIED'
+                         WHERE a.id<>? AND e.at>=? AND e.at<?""", (action_id, lo, hi)).fetchall()
+    for o in rows:
+        try: op = json.loads(o["payload"] or "{}")
+        except Exception: op = {}
+        same = (sku and op.get("sku") == sku) or (camp and (op.get("campaign") == camp or op.get("campaign_name") == camp)) \
+               or (cid and str(op.get("campaign_id") or "") == str(cid))
+        if same:
+            hits.append({"action_id": o["id"], "kind": o["kind"], "platform": o["platform"],
+                         "cross_channel": o["platform"] != payload.get("platform")})
+    return hits
 
 def _judge_windows(kind: str, b: dict, a: dict):
     """(metric, before, after, success, guardrail_ok) ya None jab dated data hi na ho."""
@@ -108,6 +137,7 @@ def measure_due(db, windows=(7, 14)) -> dict:
         if not ev or not ev["at"]: continue
         applied = datetime.datetime.fromisoformat(ev["at"])
         payload = json.loads(r["payload"] or "{}")
+        payload.setdefault("platform", r["platform"])
         for w in windows:
             if now < applied + datetime.timedelta(days=w): continue
             if db.execute("SELECT 1 FROM outcomes WHERE action_id=? AND window_days=?", (r["id"], w)).fetchone(): continue
@@ -120,22 +150,45 @@ def measure_due(db, windows=(7, 14)) -> dict:
             judged = _judge_windows(r["kind"], b, a)
             if judged is None:
                 if now >= applied + datetime.timedelta(days=2 * w):
-                    db.execute("INSERT INTO outcomes(action_id,kind,window_days,metric,success,measured_at) VALUES (?,?,?,'INSUFFICIENT_DATA',NULL,?)",
-                               (r["id"], r["kind"], w, now_utc())); db.commit(); insufficient += 1
+                    db.execute("INSERT INTO outcomes(action_id,kind,window_days,metric,success,measured_at,attribution) VALUES (?,?,?,'INSUFFICIENT_DATA',NULL,?,?)",
+                               (r["id"], r["kind"], w, now_utc(), "INSUFFICIENT_DATA")); db.commit(); insufficient += 1
                 continue
             metric, bv, av, success, guard = judged
-            db.execute("INSERT INTO outcomes(action_id,kind,window_days,metric,before_val,after_val,success,guardrail_ok,measured_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                       (r["id"], r["kind"], w, metric, bv, av, 1 if (success and guard) else 0, 1 if guard else 0, now_utc()))
+            # V20 attribution: pehle contamination, phir source-coverage — tabhi VERIFIED
+            contam = _contamination(db, r["id"], payload, applied, w)
+            if metric == "campaign_roas_window":
+                coverage = min(b.get("_campaign_coverage") or 0, a.get("_campaign_coverage") or 0)
+            else:
+                coverage = min(b.get("_order_day_coverage") or 0, a.get("_order_day_coverage") or 0)
+            if contam:
+                attribution, succ_val = "CONTAMINATED", None
+            elif metric == "campaign_roas_window":
+                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # campaign raah 70% coverage gate pehle se lazmi hai
+            elif b["_order_days"] >= 1 and a["_order_days"] >= 1:
+                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # dono khidkiyon me orders-feed zinda tha
+            else:
+                attribution, succ_val = "LOW_COVERAGE", 1 if (success and guard) else 0
+            db.execute("INSERT INTO outcomes(action_id,kind,window_days,metric,before_val,after_val,success,guardrail_ok,measured_at,attribution,coverage_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                       (r["id"], r["kind"], w, metric, bv, av, succ_val, 1 if guard else 0, now_utc(), attribution, coverage))
             db.commit(); done += 1
     return {"measured": done, "insufficient_data": insufficient}
 
 def rule_confidence(db) -> list:
-    """Action-kind ke hisaab se asal jeet-dar — yahi seekh hai, koi dawa nahi."""
+    """Action-kind ke hisaab se asal jeet-dar — V20: seekh SIRF VERIFIED nateejo se banti hai.
+    CONTAMINATED / LOW_COVERAGE / purane bina-attribution wale nateeje ginati me dikhenge
+    par jeet-dar nahi banayenge — jhootha uplift seekh ko zeher deta hai."""
     ensure_v12(db)
     out = []
-    for r in db.execute("""SELECT kind, COUNT(*) n, SUM(success) wins FROM outcomes WHERE success IS NOT NULL GROUP BY kind"""):
-        n, wins = r["n"], r["wins"] or 0
-        out.append({"kind": r["kind"], "measured": n, "wins": wins,
-                    "win_rate": round(wins / n, 2) if n else None,
-                    "verdict": "BHAROSA" if n >= 3 and wins / n >= 0.6 else ("KAMZOR — naye proposals par sakhti" if n >= 3 and wins / n < 0.4 else "DATA JAMA HO RAHA HAI")})
+    for r in db.execute("""SELECT kind, COUNT(*) total,
+                                  SUM(CASE WHEN attribution='VERIFIED' THEN 1 ELSE 0 END) vn,
+                                  SUM(CASE WHEN attribution='VERIFIED' AND success=1 THEN 1 ELSE 0 END) vw,
+                                  SUM(CASE WHEN attribution='CONTAMINATED' THEN 1 ELSE 0 END) cn
+                           FROM outcomes WHERE success IS NOT NULL OR attribution='CONTAMINATED' GROUP BY kind"""):
+        vn, vw = r["vn"] or 0, r["vw"] or 0
+        out.append({"kind": r["kind"], "measured": vn, "wins": vw,
+                    "win_rate": round(vw / vn, 2) if vn else None,
+                    "total_outcomes": r["total"], "contaminated": r["cn"] or 0,
+                    "verdict": "BHAROSA" if vn >= 3 and vw / vn >= 0.6 else (
+                        "KAMZOR — naye proposals par sakhti" if vn >= 3 and vw / vn < 0.4 else
+                        "DATA JAMA HO RAHA HAI (sirf VERIFIED nateeje hi seekh banate hain)")})
     return out

@@ -20,32 +20,43 @@ def product_360(db, sku: str, platform: str = None) -> dict:
     sales = next((r for r in AN.sku_sales(db, platform) if r["sku"] == sku), {"units": 0, "revenue": 0})
     import finance as F
     fin = F.contribution_v2(db, sku, prod["price"], prod["platform"] or "Amazon")
-    inv_rows = db.execute("SELECT location, qty FROM inventory WHERE sku=?", (sku,)).fetchall()
+    inv_rows = db.execute("SELECT location, qty, sellable_qty, unsellable_qty FROM inventory WHERE sku=?", (sku,)).fetchall()
     total_qty = sum(r["qty"] for r in inv_rows)
-    vel = AN.sku_velocity_per_day(db, sku, platform=platform)   # V18: channel view = channel ki raftaar; ALL view = kul
+    vel_rep = AN.sku_velocity_report(db, sku, platform=platform)   # V20: stale chetaavni ke saath
+    vel = vel_rep["velocity_per_day"]
     from fba_planner import days_of_cover
     cover = days_of_cover(int(total_qty), vel) if vel > 0 else None
     versions = db.execute("SELECT version, status, created_at FROM listing_versions WHERE sku=? ORDER BY version DESC LIMIT 5", (sku,)).fetchall()
     actions = db.execute("SELECT COUNT(*) c FROM action_v12 WHERE payload LIKE ?", (f'%"{sku}"%',)).fetchone()["c"]
     fees_exact = F.sku_fee_rate(db, sku, prod["platform"] or "Amazon")
-    # V19: stock channel-wise — location ke naam se channel pehchan (FBA/Warehouse), jo na mile woh 'unclassified'
-    def _chan(loc):
-        l = (loc or "").lower()
-        return "Amazon" if "amazon" in l or "fba" in l else ("Flipkart" if "flipkart" in l else "unclassified")
-    stock_by_channel = {}
-    for r in inv_rows: stock_by_channel[_chan(r["location"])] = stock_by_channel.get(_chan(r["location"]), 0) + r["qty"]
-    view_qty = stock_by_channel.get(platform, 0) if platform else total_qty
+    # V20: stock channel ab explicit mapping se (stock_channel_map), naam-andaz sirf fallback;
+    # channel hisaab SELLABLE qty par — kharab/fasa hua stock cover nahi badha sakta
+    import stock as ST
+    stock_by_channel, stock_total_by_channel, unsellable_by_channel, loc_detail = {}, {}, {}, []
+    for r in inv_rows:
+        ch, basis = ST.channel_for(db, r["location"])
+        s, u = ST.sellable_of(r), ST.unsellable_of(r)
+        stock_by_channel[ch] = stock_by_channel.get(ch, 0) + s
+        stock_total_by_channel[ch] = stock_total_by_channel.get(ch, 0) + int(r["qty"] or 0)
+        if u: unsellable_by_channel[ch] = unsellable_by_channel.get(ch, 0) + u
+        loc_detail.append({"location": r["location"], "qty": r["qty"], "sellable": s, "unsellable": u,
+                           "channel": ch, "channel_basis": basis})
+    view_qty = stock_by_channel.get(platform, 0) if platform else sum(stock_by_channel.values())
     from fba_planner import days_of_cover as _dc
-    view_cover = _dc(int(view_qty), vel) if (platform and vel > 0) else cover
+    view_cover = _dc(int(view_qty), vel) if (platform and vel > 0) else (
+        _dc(int(view_qty), vel) if vel > 0 else cover)
     return {"found": True, "sku": sku, "name": prod["name"], "platform": prod["platform"],
             "platform_view": platform or "ALL", "channels": sorted(by_platform.keys()),
             "sales_by_platform": by_platform,
             "price": prod["price"], "rating": prod["rating"], "reviews": prod["reviews"],
             "sales": sales, "finance": fin,
-            "inventory": {"total_qty": total_qty, "by_location": [dict(r) for r in inv_rows],
+            "inventory": {"total_qty": total_qty, "by_location": loc_detail,
                           "stock_by_channel": stock_by_channel,
-                          "view_qty": view_qty, "view_basis": (platform + " channel ka stock") if platform else "saare channels kul",
-                          "velocity_per_day": round(vel, 2), "days_of_cover": view_cover},
+                          "stock_total_by_channel": stock_total_by_channel,
+                          "unsellable_by_channel": unsellable_by_channel,
+                          "view_qty": view_qty, "view_basis": ((platform + " channel ka SELLABLE stock") if platform else "saare channels ka SELLABLE stock kul"),
+                          "velocity_per_day": round(vel, 2), "days_of_cover": view_cover,
+                          "velocity_report": vel_rep},
             "listing_versions": [dict(r) for r in versions],
             "open_actions_mentioning_sku": actions,
             "fee_exact": fees_exact,

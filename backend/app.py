@@ -84,6 +84,15 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/season-pack":
                 from season_planner import build_season_pack
                 return self._env(200, build_season_pack(s))
+            if p == "/api/v1/brand-analytics":
+                import brand_analytics as BA
+                return self._env(200, BA.summary(s.db, _q.get("platform") or "Amazon"))
+            if p == "/api/v1/stock/channel-map":
+                import stock as ST
+                locs = [dict(r) for r in s.db.execute("SELECT DISTINCT location FROM inventory ORDER BY location")]
+                for l in locs:
+                    ch, basis = ST.channel_for(s.db, l["location"]); l["channel"], l["basis"] = ch, basis
+                return self._env(200, {"explicit_map": ST.channel_map(s.db), "locations": locs})
             if p == "/api/v1/control/kill": return self._env(200, act.kill_status(s.db))
             if p == "/api/v1/jobs/status":
                 from jobrunner import jobs_status
@@ -208,6 +217,14 @@ class H(BaseHTTPRequestHandler):
             try:
                 b = self._body()
                 return self._env(200, act.set_kill(s.db, bool(b.get("engaged")), user["username"], b.get("reason", "")))
+            finally: s.close()
+        if p == "/api/v1/stock/channel-map":
+            s, user, err = self._auth("propose")
+            if err: s.close(); return
+            try:
+                b = self._body()
+                import stock as ST
+                return self._env(200, ST.set_stock_channel(s.db, b.get("location", ""), b.get("channel", "unclassified"), user["username"]))
             finally: s.close()
         if p == "/api/v1/proposals":
             s, user, err = self._auth("propose")

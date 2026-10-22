@@ -70,8 +70,21 @@ CREATE TABLE IF NOT EXISTS outcomes(
   metric TEXT, before REAL, after REAL, before_val REAL, after_val REAL,
   success INT, guardrail_ok INT, executed INT, measured_at TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS order_fees(
-  platform TEXT, external_order_id TEXT, sku TEXT, gross REAL, fees REAL, refund REAL DEFAULT 0,
-  PRIMARY KEY(platform, external_order_id, sku));
+  platform TEXT, seller_account TEXT DEFAULT 'default', external_order_id TEXT, sku TEXT,
+  gross REAL, fees REAL, refund REAL DEFAULT 0,
+  PRIMARY KEY(platform, seller_account, external_order_id, sku));
+CREATE TABLE IF NOT EXISTS order_fee_events(
+  event_id TEXT PRIMARY KEY, platform TEXT, seller_account TEXT DEFAULT 'default',
+  external_order_id TEXT, sku TEXT, event_type TEXT, gross REAL, fees REAL, refund REAL,
+  posted_at TEXT, imported_at TEXT);
+CREATE TABLE IF NOT EXISTS stock_channel_map(
+  location TEXT PRIMARY KEY, channel TEXT, updated_by TEXT, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS brand_analytics(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, seller_account TEXT, report_type TEXT,
+  period_start TEXT, period_end TEXT, asin TEXT, query TEXT, search_volume REAL,
+  impressions REAL, brand_impressions REAL, clicks REAL, brand_clicks REAL,
+  cart_adds REAL, brand_cart_adds REAL, purchases REAL, brand_purchases REAL,
+  batch_id TEXT, imported_at TEXT);
 CREATE TABLE IF NOT EXISTS campaign_map(
   platform TEXT, seller_account TEXT, campaign_id TEXT, name TEXT,
   PRIMARY KEY(platform, seller_account, campaign_id));
@@ -99,6 +112,32 @@ def ensure_v12(db) -> None:
             db.execute("ALTER TABLE order_fees ADD COLUMN refund REAL DEFAULT 0"); db.commit()
     except Exception:
         pass
+    # V20: order_fees ki key me seller_account — bina iske do khaaton ke ek-jaise order-id mix ho jate the.
+    # SQLite me PK badalna table dobara banane se hi hota hai; purana data 'default' khaate me surakshit rakha.
+    try:
+        fcols = [c[1] for c in db.execute("PRAGMA table_info(order_fees)")]
+        if fcols and "seller_account" not in fcols:
+            db.executescript("""
+            CREATE TABLE order_fees_v20(
+              platform TEXT, seller_account TEXT DEFAULT 'default', external_order_id TEXT, sku TEXT,
+              gross REAL, fees REAL, refund REAL DEFAULT 0,
+              PRIMARY KEY(platform, seller_account, external_order_id, sku));
+            INSERT OR REPLACE INTO order_fees_v20(platform,seller_account,external_order_id,sku,gross,fees,refund)
+              SELECT platform,'default',external_order_id,sku,gross,fees,COALESCE(refund,0) FROM order_fees;
+            DROP TABLE order_fees; ALTER TABLE order_fees_v20 RENAME TO order_fees;
+            """); db.commit()
+    except Exception:
+        pass
+    # V20: inventory par sellable/unsellable alag ginati (channel hisaab sirf bikne-yogya stock par hoga)
+    try:
+        icols = [c[1] for c in db.execute("PRAGMA table_info(inventory)")]
+        if icols:
+            for col in ("sellable_qty", "unsellable_qty"):
+                if col not in icols:
+                    db.execute(f"ALTER TABLE inventory ADD COLUMN {col} INT")
+            db.commit()
+    except Exception:
+        pass
     # V13: action baseline (execute ke samay ki tasveer — outcome maap ka aadhaar)
     try:
         acols = [c[1] for c in db.execute("PRAGMA table_info(action_v12)")]
@@ -112,7 +151,8 @@ def ensure_v12(db) -> None:
         if ocols:
             for col, typ in (("action_id", "INT"), ("action_ref", "TEXT"), ("kind", "TEXT"),
                              ("before_val", "REAL"), ("after_val", "REAL"), ("success", "INT"),
-                             ("guardrail_ok", "INT"), ("measured_at", "TEXT")):
+                             ("guardrail_ok", "INT"), ("measured_at", "TEXT"),
+                             ("attribution", "TEXT"), ("coverage_pct", "REAL")):
                 if col not in ocols:
                     db.execute(f"ALTER TABLE outcomes ADD COLUMN {col} {typ}")
             db.commit()
