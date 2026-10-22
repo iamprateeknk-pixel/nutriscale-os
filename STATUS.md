@@ -1,5 +1,51 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 21 Oct 2026_
+_Updated: 22 Oct 2026 (V12)_
+
+## 🚀 V12 — Master Blueprint ke hisaab se poora development (22 Oct 2026)
+User ke bheje **V12 Blueprint + Developer Backlog** (docs/V12_BACKLOG.md) ke har requirement ID par kaam hua.
+**Kul 16 test suites, sab pass** (purane 11 + 5 naye V12: p0, integrations, growth, uc, qa).
+
+| ID | Kya bana | Saboot |
+|---|---|---|
+| SEC-01 | Login + RBAC (6 roles), saare API band bina token ke | test_v12_p0 + HTTP parikshan (401/200) |
+| SEC-02 | Kill switch server-side, DB me persist — restart par bhi yaad | test kill + QA-06 (file-DB restart) |
+| SEC-03 | Approval state machine (9 states), Tier-2 par 2 alag Owner, idempotency key, poora event audit | test_v12_p0, UC-09 |
+| SEC-04 | Keys sirf env/file; repo-wide secret scan script + CI-ready | scripts/secret_scan.py (QA-14 me pass) |
+| DAT-01 | Canonical schema: order_headers/order_items (line-level), settlements, batch SHA-256, duplicate import block | UC-07, wizard test |
+| DAT-02 | Matched-period gating — windows na milein to TACOS = NOT_COMPARABLE | test_v12_p0 metrics |
+| JOB-01 | Durable job runner: IST next_run DB me, lock, retry/backoff, dead-letter record, daemon mode | QA-11 |
+| UI-01 | Naya dashboard: koi demo number nahi; khaali DB = imaandaar khaali state | QA-03 |
+| INT-01 | SP-API LWA-only (AWS keys ki shart khatm), orders pagination | test_v12_integrations |
+| INT-02 | Ads Reporting v3 poora pipeline: create→poll→gzip download→DB import + batch record | mock-transport test |
+| INT-03/05, API-03 | Capability registry: Flipkart ads = report-only, write = unavailable (fictional button kabhi nahi); Intel adapter bina license ke UNAVAILABLE | UC-06 |
+| INT-04 | CSV Wizard: preview (hash/kind/rows) → commit, duplicate block, receipt | wizard test |
+| ADS-01..06 | Ads Studio: health, **profit-led bid** (SKU margin se target ACOS, max CPC, 20% daily cap), harvest/negative safety, pacing, 3 budget scenarios | test_v12_growth, UC-03/04 |
+| KWD-01..04 | **clicks×20 wala jhootha volume hata diya**; taxonomy (badam↔almond), opportunity matrix (volume = null/UNAVAILABLE), rank alerts ≥3 points | UC-02 |
+| RNK-01..04 | Rank observations scope ke saath (locale/device/source), funnel ki neev, experiment verdict se jod | keyword_lab |
+| CMP-01..04 + CP-01..05 | Peer matching (grade/pack/processing; **W240≠W320**), ₹/100g, dated snapshots + change feed, decision packets (saboot→farq→parikalpana→margin guardrail→tajurba) | UC-01/05 |
+| LST-01..05 | Listing Score **v2** (versioned, 'Amazon formula nahi' saaf likha), content gap audit, listing versions + approve gate + rollback | UC-08 |
+| CVR-01..04 | Creative brief endpoint, experiment registry (min sample bina jeet nahi), season/BOM lab | UC-10 |
+| FIN-01/02 | Versioned costs; **cost unknown/stale = scale band**; settlement import + reconciliation (MATCHED/EXCEPTION) | QA-07 prakar ke tests |
+| INV-01/02 | Stock-to-ads gate (STOCKOUT = scale band), hamper BOM feasibility | UC-04/10 |
+| AGY-01 | Agency scorecard — saboot bina task DONE nahi, fees + verified badlav | growth test |
+| AIG-01/02 | Learning store (lagu na hue action se seekh nahi), LLM budget governor (roz/mahina cap, prompt hash-matra log) | growth test |
+| POL-01 | Verified Fact Registry — saboot bina dawa copy me nahi (NEEDS_EVIDENCE) | UC-08 |
+| OPS-01 | System health (jobs/kill/capabilities/alerts), backup + restore parikshan | QA-14 |
+| API-01/02 | OpenAPI spec (docs/openapi.yaml), envelope {data, meta, errors}, idempotent proposals/execution | backend HTTP test |
+| UX-01..16 | Dashboard ke **16 screens** saare API-backed, login ke saath, evidence badges, live kill switch | QA-13 + JS syntax + saare endpoints 200 |
+
+### V12 me bhi jo CODE se aage ki cheez hai (jhooth nahi bolenge)
+| Cheez | Asli wajah |
+|---|---|
+| Live API certification (QA-04 asal) | Tumhari SP-API/Ads keys lagein tabhi — code + mock pipeline taiyaar hai |
+| Vendor par asal write + verification (GATE-D) | ManualAdapter saboot (ref) maangta hai; live write adapter owner ke pilot sign-off ke baad |
+| Licensed keyword/rank data (Helium10 aadi) | Contract kharidna tumhara faisla hai — tab tak volume/rank 'unknown' hi dikhega |
+| PostgreSQL/Next.js jaisi badi migration | Blueprint ki 'suggested' topology hai; maujuda stdlib+SQLite asal kaam kar raha hai — bojh badhne par migration ka faisla |
+| GATE-F pilot (2 hafto ki asal chaap) | System 24×7 host par chalega tabhi gin sakte hain — hosting faisla tumhara |
+
+---
+
+# Purana record (V11 tak)
 
 ## Ban gaya hai (code + tests ke saath)
 | Hissa | Halat |

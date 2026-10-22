@@ -96,7 +96,7 @@ def create_backup(db_path: str, dest: str) -> dict:
     src = sqlite3.connect(db_path); dst = sqlite3.connect(dest)
     try:
         src.backup(dst)
-        tables = dst.execute("SELECT COUNT(*) c FROM sqlite_master WHERE type='table'").fetchone()["c"]
+        tables = dst.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
         return {"ok": True, "dest": dest, "tables": tables, "at": now_utc(),
                 "note": "Backup ban gaya — restore ka parikshan bhi isi ginati se hua (tables khul gayi)"}
     finally: src.close(); dst.close()
