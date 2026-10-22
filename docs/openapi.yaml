@@ -1,0 +1,83 @@
+openapi: 3.0.3
+info:
+  title: NutriScale OS API
+  version: v1-v12
+  description: >
+    Saare endpoints par login (Bearer token) lazmi hai — sirf /health aur
+    /api/v1/auth/login khule hain. Har jawab envelope me aata hai:
+    {data, meta:{request_id, computed_at}, errors:[]}.
+    Jo data uplabdh nahi, woh null/UNAVAILABLE ke saath aayega — kabhi banaya hua number nahi.
+paths:
+  /health:
+    get: {summary: Service zinda hai ya nahi, security: []}
+  /api/v1/auth/login:
+    post: {summary: Username/password -> token (12 ghante), security: []}
+  /api/v1/warroom:
+    get: {summary: War Room KPI — sirf asal data; khaali DB = connected false}
+  /api/v1/campaigns:
+    get: {summary: Campaigns (source + observed_at ke saath)}
+  /api/v1/keywords/matrix:
+    get: {summary: Keyword opportunity matrix — volume null jab provider na ho}
+  /api/v1/ads/health:
+    get: {summary: Campaign health, pacing alerts, harvest/negative candidates, budget scenarios}
+  /api/v1/competitors:
+    get: {summary: Peers + taazaa snapshots}
+  /api/v1/competitors/peers:
+    post: {summary: Peer jodo (manual verified URL)}
+  /api/v1/competitors/snapshots:
+    post: {summary: Dated snapshot darj karo — jawab me change events}
+  /api/v1/competitors/packet:
+    get: {summary: "Decision packet: ?sku=&peer=&grade=&pack_g=&nut="}
+  /api/v1/rank:
+    get: {summary: "Rank trend: ?term=&sku= (kam se kam 3 points bina natija nahi)"}
+  /api/v1/proposals:
+    get: {summary: V12 proposals (state machine wale)}
+    post: {summary: Naya proposal (DRAFT->APPROVAL_PENDING, idempotency_key ke saath)}
+  /api/v1/proposals/{id}/approve:
+    post: {summary: Tier-2 par do ALAG Owner pushtiyaan}
+  /api/v1/proposals/{id}/dry-run:
+    post: {summary: Vendor ko chhue bina diff/risk purvavalokan}
+  /api/v1/proposals/{id}/queue:
+    post: {summary: APPROVED -> QUEUED (kill switch ON ho to rukega)}
+  /api/v1/proposals/{id}/execute:
+    post: {summary: Sirf pushti (manual_ref) mile to APPLIED_VERIFIED, warna FAILED}
+  /api/v1/actions/{id}:
+    get: {summary: Action + poori state timeline (audit)}
+  /api/v1/control/kill:
+    get: {summary: Kill switch ki halat (DB-persist)}
+    post: {summary: "Owner only: {engaged, reason}"}
+  /api/v1/jobs/status:
+    get: {summary: Durable jobs — next/last run, status}
+  /api/v1/imports/preview:
+    post: {summary: "CSV wizard preview: {path} -> hash/kind/rows/duplicate"}
+  /api/v1/imports/commit:
+    post: {summary: Wizard commit — duplicate block ke saath receipt}
+  /api/v1/costs:
+    get: {summary: Versioned costs}
+    post: {summary: "Nayi cost darj: {sku, cogs, packaging}"}
+  /api/v1/finance/reconciliation:
+    get: {summary: Order GMV vs settlement — MATCHED/EXCEPTION}
+  /api/v1/listings/versions:
+    get: {summary: Listing versions}
+  /api/v1/listings/draft:
+    post: {summary: Draft banao}
+  /api/v1/listings/approve:
+    post: {summary: Approve — fact registry ke saboot bina NEEDS_EVIDENCE}
+  /api/v1/experiments:
+    get: {summary: Experiment registry}
+    post: {summary: Naya experiment}
+  /api/v1/agency/scorecard:
+    get: {summary: Agency — saboot wale kaam + fees}
+  /api/v1/system/health:
+    get: {summary: Kill/jobs/capabilities/alerts}
+  /api/v1/capabilities:
+    get: {summary: Platform capability registry (Flipkart write_ads = unavailable aadi)}
+  /api/v1/inventory/gate:
+    get: {summary: "?sku= — stock gate (STOCKOUT par scale band)"}
+  /api/v1/creative/brief:
+    get: {summary: "?product=&grade=&weight= — 7-shot image brief"}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+security:
+  - bearer: []
