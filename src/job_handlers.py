@@ -109,8 +109,20 @@ def _learning_summary(store):
     s = ", ".join(f"{r['status']}:{r['c']}" for r in runs) or "aaj ke runs abhi darj ho rahe hain"
     return f"Din ka saar — jobs: {s}"
 
+def _backup(store):
+    """Roz ka backup data/backups/ me — restore parikshan create_backup ke andar hi hota hai."""
+    import os, datetime
+    import ops_finance as OF
+    from db_store import DEFAULT_PATH
+    db_path = getattr(store, "path", None) or DEFAULT_PATH
+    dest_dir = os.path.join(os.path.dirname(db_path), "backups"); os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, f"growth_os-{datetime.date.today().isoformat()}.db")
+    r = OF.create_backup(db_path, dest)
+    return f"Backup taiyaar: {os.path.basename(dest)} ({r['tables']} tables, restore-parikshan ke saath)" if r["ok"] else "Backup fail"
+
 def build_handlers(store) -> dict:
     return {
+        "backup_restore": lambda: _backup(store),
         "learning_crawl": lambda: _learning_crawl(store),
         "data_sync": lambda: _data_sync(store),
         "measure_results": lambda: _measure_results(store),

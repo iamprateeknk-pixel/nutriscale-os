@@ -40,13 +40,27 @@ def import_order_fees(db, rows: list, platform: str = "Amazon") -> dict:
     db.commit(); return {"imported": n}
 
 def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
-    """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15)."""
+    """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15).
+    V17: ek hi order+SKU ki kai lines hon to refund har line par poora NAHI lagega —
+    gross ke hisse ke anupaat me bantenga, bachi rakam sabse badi line par (line-level imaandaari)."""
     ensure_v12(db); n = 0
     for r in rows:
         if not r.get("sku"): continue
-        cur = db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND sku=?",
-                         (float(r.get("refund") or 0), platform, r["order_id"], r["sku"]))
-        n += cur.rowcount
+        total_refund = float(r.get("refund") or 0)
+        lines = db.execute("""SELECT line_id, gross FROM order_items
+                              WHERE platform=? AND external_order_id=? AND sku=? ORDER BY gross DESC""",
+                           (platform, r["order_id"], r["sku"])).fetchall()
+        if not lines: continue
+        gsum = sum(l["gross"] or 0 for l in lines) or 1.0
+        allocated = 0.0
+        for i, l in enumerate(lines):
+            share = total_refund if len(lines) == 1 else (
+                round(total_refund - allocated, 2) if i == len(lines) - 1
+                else round(total_refund * (l["gross"] or 0) / gsum, 2))
+            allocated += share
+            db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND line_id=?",
+                       (share, platform, r["order_id"], l["line_id"]))
+            n += 1
     db.commit(); return {"updated_lines": n}
 
 def sku_fee_rate(db, sku: str, platform: str = "Amazon") -> dict:

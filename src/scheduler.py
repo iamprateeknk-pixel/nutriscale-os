@@ -13,6 +13,7 @@ DAILY_JOBS = [
     {"time": "12:00", "job": "fba_cover_check",        "owner": "F3 Inventory",   "desc": "Days-of-cover — 15 din se kam par replenishment proposal"},
     {"time": "18:00", "job": "rank_probe",             "owner": "A03/A09",        "desc": "Hero keywords ki rank + CTR/CVR record (algorithm seekh)"},
     {"time": "23:00", "job": "daily_learning_summary", "owner": "A09 Governance", "desc": "Aaj kya seekha, kal kya hoga — summary"},
+    {"time": "23:30", "job": "backup_restore",       "owner": "OPS-01",         "desc": "Roz raat ka DB backup (data/backups/) restore-parikshan ke saath"},
 ]
 WEEKLY_JOBS = [
     {"day": "Sunday", "job": "agent_strength_report", "desc": "Har agent ka Strength Score — pichle Sunday se upar jana chahiye"},

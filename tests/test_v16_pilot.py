@@ -59,8 +59,8 @@ def test_reconciliation_report():
     st.db.execute("INSERT INTO order_items VALUES ('Amazon','default','R1','L1','SKU','B0',1,1000,0)")
     st.db.commit()
     rep = P.reconciliation_report(st)
-    assert rep["orders_vs_settlements"]["order_gmv"] == 1000
-    assert rep["orders_vs_settlements"]["status"] == "EXCEPTION", "settlement na ho to EXCEPTION saaf dikhna chahiye"
+    assert rep["orders_in_window"]["net_revenue"] == 1000
+    assert rep["window_status"] == "EXCEPTION", "settlement na ho to EXCEPTION saaf dikhna chahiye"
     st.close()
 
 if __name__ == "__main__":

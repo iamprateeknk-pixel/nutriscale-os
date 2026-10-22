@@ -31,8 +31,10 @@ def preflight(db) -> dict:
     import actions as act
     ks = act.kill_status(db)
     add("kill_switch_off", not ks["engaged"], "ON hai — drill nahi chalega" if ks["engaged"] else "band hai, theek")
-    backs = glob.glob(os.path.join(ROOT, "data", "backups", "*.db")) + glob.glob(os.path.join(ROOT, "backups", "*.db"))
-    add("backup_exists", len(backs) > 0, f"{len(backs)} backup file(s)" if backs else "koi backup nahi mila — pehle backup_restore job chalao")
+    from db_store import DEFAULT_PATH
+    _dd = os.path.dirname(DEFAULT_PATH)
+    backs = glob.glob(os.path.join(_dd, "backups", "*.db")) + glob.glob(os.path.join(_dd, "*backup*.db"))
+    add("backup_exists", len(backs) > 0, f"{len(backs)} backup file(s)" if backs else "koi backup nahi mila — backup_restore job chalao (data/backups/)")
     add("https_pack", os.path.exists(os.path.join(ROOT, "deploy", "Caddyfile")) and
         os.path.exists(os.path.join(ROOT, "docker-compose.prod.yml")), "Caddy + prod compose maujud")
     add("llm_key", bool(os.environ.get("GOS_LLM_API_KEY")), "LLM key mili" if os.environ.get("GOS_LLM_API_KEY") else "LLM key nahi — system rules par chalega (chalega, par AI-copy band)")
@@ -40,18 +42,34 @@ def preflight(db) -> dict:
     return {"ready_for_pilot": ready, "checks": checks, "at": now_utc(),
             "note": "ready_for_pilot = sirf takneeki taiyaari; asal pilot ke liye keys + sign-off + hosting chahiye"}
 
-def reconciliation_report(store, platform: str = "Amazon") -> dict:
+def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> dict:
+    """V17: scoped milaan — platform + a/c + ek hi samay-khidki (30 din) ke andar teeno taraf.
+    Settlements ka apna period hota hai: khidki se takraane wale hi gine jayenge."""
+    import datetime as _dt
     import ops_finance as OF
     import analytics as AN
-    rec = OF.reconciliation(store, platform)
-    totals = AN.sales_totals(store.db, platform)
-    ads = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa FROM campaigns WHERE platform=?",
-                           (platform,)).fetchone()
-    terms = store.db.execute("SELECT COALESCE(SUM(spend),0) sp FROM search_terms WHERE period_start<>''").fetchone()
-    return {"platform": platform, "orders_vs_settlements": rec,
-            "sales_totals": totals, "campaigns_table": {"spend": ads["sp"], "sales": ads["sa"]},
-            "search_terms_period_tagged_spend": terms["sp"],
-            "verdict": "MILaan ke liye data taiyaar hai" if totals["lines"] else "Abhi canonical data nahi — pehle sync/import karo"}
+    db = store.db
+    end = _dt.date.today(); start = end - _dt.timedelta(days=days - 1)
+    ws, we = start.isoformat(), end.isoformat()
+    rec_all = OF.reconciliation(store, platform)
+    ow = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n FROM order_items oi
+                       JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                       WHERE oi.platform=? AND oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
+                    (platform, ws, we)).fetchone()
+    sw = db.execute("""SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(net),0) n FROM settlements
+                       WHERE platform=? AND period_start<=? AND period_end>=?""", (platform, we, ws)).fetchone()
+    terms = db.execute("SELECT COALESCE(SUM(spend),0) sp FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
+                       (ws, we, platform + "%")).fetchone()
+    wdiff = round((ow["g"] or 0) - (sw["g"] or 0), 2)
+    return {"platform": platform, "window": {"from": ws, "to": we, "days": days},
+            "orders_in_window": {"net_revenue": ow["g"], "lines": ow["n"]},
+            "settlements_overlapping_window": {"gross": sw["g"], "net_payout": sw["n"]},
+            "window_difference": wdiff,
+            "window_status": "MATCHED" if sw["g"] and abs(wdiff) <= max(ow["g"] * 0.02, 100) else "EXCEPTION",
+            "search_terms_spend_in_window": terms["sp"],
+            "lifetime_reference": {"orders_vs_settlements_all": rec_all,
+                                   "sales_totals": AN.sales_totals(db, platform)},
+            "note": "Khidki ke bahar ke settlements/orders is milaan me NAHI hain — farq pehle khidki se parkho"}
 
 def controlled_drill(db, payload: dict, actor: dict, live: bool = False, adapter=None, store=None) -> dict:
     """Audit gate #3 ka astra: approve → execute → vendor pushti → rollback — poora saboot sahit.

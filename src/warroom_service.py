@@ -33,13 +33,36 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
             WHERE oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""" +
             (" AND oi.platform=?" if platform else ""),
             ((_start.isoformat(), _end.isoformat()) + ((platform,) if platform else ()))).fetchone()
-        _aw = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COUNT(*) n FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>''",
-                               (_start.isoformat(), _end.isoformat())).fetchone()
-        if _sw["n"] and _aw["n"] and _sw["g"]:
+        # V17: sirf rows ka hona kaafi nahi — din-ginti coverage + channel-scope bhi parkha jayega
+        _src_like = (platform + "%") if platform else "%"
+        _aw = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COUNT(*) n FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
+                               (_start.isoformat(), _end.isoformat(), _src_like)).fetchone()
+        _periods = store.db.execute("SELECT DISTINCT period_start, period_end FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
+                                     (_start.isoformat(), _end.isoformat(), _src_like)).fetchall()
+        _covered = set()
+        for _p in _periods:
+            _d1 = _dt.date.fromisoformat(str(_p["period_start"])[:10]); _d2 = _dt.date.fromisoformat(str(_p["period_end"])[:10])
+            while _d1 <= _d2:
+                if _start <= _d1 <= _end: _covered.add(_d1)
+                _d1 += _dt.timedelta(days=1)
+        _cov = len(_covered) / 30.0
+        _mix_ok, _mix_reason = True, ""
+        if not platform:
+            _other = store.db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi
+                JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                WHERE oh.order_date>=? AND oh.order_date<=? AND oi.platform<>'Amazon'""",
+                (_start.isoformat(), _end.isoformat())).fetchone()["g"]
+            if _other and _other > 0:
+                _mix_ok, _mix_reason = False, "bikri me gair-Amazon hissa hai par ads data sirf Amazon ka — platform chun kar dekho"
+        if _sw["n"] >= 5 and _aw["n"] and _sw["g"] and _cov >= 0.8 and _mix_ok:
             tacos_m = {"pct": round(100.0 * _aw["sp"] / _sw["g"], 2), "status": "MATCHED",
+                       "ads_coverage_pct": round(100 * _cov, 1),
                        "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
         else:
-            tacos_m = {"pct": None, "status": "NOT_COMPARABLE",
+            _why = _mix_reason or (f"ads coverage sirf {round(100*_cov)}% hai (80% chahiye)" if _aw["n"] else "period-tagged ads data nahi") \
+                   or (f"bikri lines sirf {_sw['n']} (kam se kam 5 chahiye)")
+            tacos_m = {"pct": None, "status": "NOT_COMPARABLE", "reason": _why,
+                       "ads_coverage_pct": round(100 * _cov, 1),
                        "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
         fw = flywheel(ad_spend, paid_sales, organic) if ad_spend else {
             "blended_roas": 0, "paid_roas": 0, "tacos_pct": 0, "organic_share_pct": 0}

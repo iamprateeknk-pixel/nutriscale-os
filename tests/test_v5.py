@@ -21,7 +21,7 @@ def test_db_persistence():
     s.close()
 
 def test_scheduler():
-    assert len(DAILY_JOBS) == 9 and len(WEEKLY_JOBS) == 2
+    assert len(DAILY_JOBS) == 10 and len(WEEKLY_JOBS) == 2
     times = [j["time"] for j in DAILY_JOBS]; assert times == sorted(times)   # din ka kram sahi
     out = run_jobs({"learning_crawl": lambda: "12 nayi seekh mili",
                     "data_sync": lambda: 1 / 0})

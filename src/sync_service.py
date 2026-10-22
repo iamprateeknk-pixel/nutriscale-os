@@ -48,8 +48,13 @@ def sync_campaign_map(store, ads=None) -> dict:
     ads = ads or AmazonAds()
     camps = ads.list_campaigns()
     for c in camps:
-        if c.get("name"): store.upsert_campaign(c["name"], "Amazon", 0, 0, source="Ads API")
         if c.get("campaignId") and c.get("name"): map_campaign(store.db, "Amazon", c["campaignId"], c["name"])
+        if c.get("name"):
+            # V17 fix: metrics wali asal row ko ₹0 se KUCHALNA band — naam sirf tab ghusaao jab row hi na ho
+            store.db.execute("""INSERT INTO campaigns(name, platform, spend, sales, clicks, impressions, source)
+                                VALUES (?, 'Amazon', 0, 0, 0, 0, 'Ads API (naam-matra)')
+                                ON CONFLICT(name, platform) DO NOTHING""", (c["name"],))
+    store.db.commit()
     return {"campaigns": len(camps), "mapped": sum(1 for c in camps if c.get("campaignId"))}
 
 def sync_order_fees(store, days: int = 3, sp=None) -> dict:

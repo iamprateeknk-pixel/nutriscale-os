@@ -80,14 +80,17 @@ def test_warroom_matched_tacos():
     from warroom_service import warroom_data as war_room
     from platform_core import ensure_v12
     st = Store(":memory:"); ensure_v12(st.db)
-    for i in range(4): _order(st, f"W{i}", 2, "SKU-T", 2500)
+    for i in range(5): _order(st, f"W{i}", 2, "SKU-T", 2000)
     st.db.commit()
     wr = war_room(st)
     assert wr["kpis"]["tacos_status"] == "NOT_COMPARABLE" and wr["kpis"]["tacos_pct"] is None, \
         f"ads period data bina TACOS nahi banna chahiye: {wr['kpis'].get('tacos_status')}"
-    st.add_search_term("badam", "C", 2000, 4000, 50, 4, source="T", period_start=d(5), period_end=d(0))
+    # V17: MATCHED ke liye 30-din khidki ki >=80% din-coverage chahiye — roz ke periods bharo (kul kharch ₹2000)
+    for k in range(30):
+        st.add_search_term("badam", "C", round(2000 / 30, 2), 100, 2, 0, source="Amazon Ads API (Reporting v3)",
+                           period_start=d(29 - k), period_end=d(29 - k))
     wr2 = war_room(st)
-    assert wr2["kpis"]["tacos_status"] == "MATCHED" and wr2["kpis"]["tacos_pct"] == 20.0, wr2["kpis"]
+    assert wr2["kpis"]["tacos_status"] == "MATCHED" and abs(wr2["kpis"]["tacos_pct"] - 20.0) < 0.2, wr2["kpis"]
     st.close()
 
 def test_product360_platforms():

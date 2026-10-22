@@ -4,10 +4,11 @@ Production me yahi schema Postgres par jayega — interface wahi rahega.
 """
 import sqlite3, json, os, time
 
-DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "growth_os.db")
+DEFAULT_PATH = os.environ.get("NUTRISCALE_DB") or os.path.join(os.path.dirname(__file__), "..", "data", "growth_os.db")
 
 class Store:
     def __init__(self, path: str = DEFAULT_PATH):
+        self.path = path
         if path != ":memory:": os.makedirs(os.path.dirname(path), exist_ok=True)
         self.db = sqlite3.connect(path); self.db.row_factory = sqlite3.Row
         self.db.executescript("""

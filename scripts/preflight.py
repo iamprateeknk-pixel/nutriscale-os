@@ -7,7 +7,9 @@ from db_store import Store
 import pilot as P
 
 def main():
-    db_path = os.environ.get("NUTRISCALE_DB", os.path.join(os.path.dirname(__file__), "..", "data", "nutriscale.db"))
+    # V17 fix: backend ke saath EK hi DB path — db_store.DEFAULT_PATH (data/growth_os.db)
+    from db_store import DEFAULT_PATH
+    db_path = os.environ.get("NUTRISCALE_DB") or DEFAULT_PATH
     store = Store(db_path)
     pf = P.preflight(store.db)
     print("=" * 60)

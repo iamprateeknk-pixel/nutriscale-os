@@ -73,9 +73,7 @@ class H(BaseHTTPRequestHandler):
             _seg = p.strip("/").split("/")
             if len(_seg) == 5 and _seg[:3] == ["api", "v1", "products"] and _seg[4] == "360":
                 import product360
-                from urllib.parse import parse_qs
-                _pf = (parse_qs(u.query).get("platform") or [None])[0]
-                return self._env(200, product360.product_360(s.db, _seg[3], _pf))
+                return self._env(200, product360.product_360(s.db, _seg[3], _q.get("platform")))
             if p == "/api/approvals": return self._env(200, {"approvals": _waiting_approvals()})
             if p == "/api/connectors/status":
                 from connectors.config import status_all

@@ -1,5 +1,17 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V16 — Acceptance Gates Kit)_
+_Updated: 22 Oct 2026 (V17 — audit-5 core bugs)_
+
+## 🐛 V17 — Paanchve audit ke verified core bugs (22 Oct 2026)
+Is baar audit ne mere hi V15/V16 ke kaam me asli bugs pakde — sab verify karke fix (saboot: test_v17_audit5.py incl. **asal HTTP regression test**, kul 23 suites pass):
+| Bug | Fix |
+|---|---|
+| **SKU 360 API asal HTTP par crash** (undefined `u.query` — mera V15 code) | Sahi `_q.get('platform')`; ab backend ko asal chalakar login→360 (platform ke saath aur bina) 200 verify hota hai |
+| campaign-map sync asal campaign metrics ko ₹0 se kuchal deta tha | Mapping ab sirf ID↔naam; campaign row sirf tab banti hai jab ho hi na, metrics ko haath nahi lagta |
+| TACOS "false MATCHED" — rows hona hi kaafi tha | Ab **din-ginti coverage ≥80%** (30-din khidki) + channel-scope (gair-Amazon bikri + sirf-Amazon ads = NOT_COMPARABLE wajah sahit) + kam-se-kam 5 bikri-lines |
+| Preflight alag DB (nutriscale.db) dekhta tha, backend growth_os.db | **Ek hi raasta**: `db_store.DEFAULT_PATH`, aur `NUTRISCALE_DB` env ab poore system (backend/jobs/preflight) me sammanit |
+| Reconciliation unscoped thi | Platform + 30-din khidki scoped: khidki ke orders NET banam takraane wale settlements; purane settlements bahar |
+| Refund ek order+SKU ki saari lines par poora lag jata tha | **Line-level anupaat baant** (gross ke hisse se, bacha sabse badi line par) |
+| Backup ka koi scheduled job hi nahi tha | **23:30 backup_restore job** (data/backups/, restore-parikshan ke saath); preflight wahi jagah dekhta hai |
 
 ## 🚪 V16 — Acceptance Gates Kit (22 Oct 2026)
 Audit ke 5 live gates ko "salah" se "chalane yogya astra" me badla — keys aate hi ek command:
