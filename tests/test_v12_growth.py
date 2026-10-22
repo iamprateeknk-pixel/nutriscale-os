@@ -119,8 +119,23 @@ def test_settlements_bom_agency_llm_ops():
     assert "kill_switch" in h and "capabilities" in h
     st.close()
 
+def test_rank_diagnostic_and_funnel():
+    from keyword_lab import rank_diagnostic, rank_funnel
+    st = Store(":memory:")
+    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-R','Rank Wala', 'Amazon', 300, 0, 3.8, 40, 't')"); st.db.commit()
+    d = rank_diagnostic(st, "kaju", "SKU-R")
+    hyps = " ".join(h["hypothesis"] for h in d["hypotheses"])
+    assert "Stock" in hyps, "stockout sabse pehle parakhna chahiye"
+    st.set_inventory("SKU-R", "WH", 100)
+    d2 = rank_diagnostic(st, "kaju", "SKU-R")
+    assert any("Rating" in h["hypothesis"] for h in d2["hypotheses"]), "3.8 rating par trust-wali parikalpana aani chahiye"
+    st.add_search_term("kaju", "C", 50, 300, 25, 3, "t")
+    f = rank_funnel(st, "kaju", "SKU-R")
+    assert f["clicks"] == 25 and f["orders"] == 3 and "UNAVAILABLE" in f["rank_data"]
+    st.close()
+
 if __name__ == "__main__":
-    for t in [test_ads_studio_profit_bid, test_keyword_honesty, test_competitor_lab,
+    for t in [test_ads_studio_profit_bid, test_keyword_honesty, test_competitor_lab, test_rank_diagnostic_and_funnel,
               test_listing_v2_and_versions, test_experiments_and_learning, test_settlements_bom_agency_llm_ops]:
         t(); print("PASS", t.__name__)
     print("ALL V12 GROWTH TESTS PASS")

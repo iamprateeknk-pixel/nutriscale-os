@@ -122,12 +122,18 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/v1/capabilities":
                 import capabilities as caps
                 return self._env(200, {"capabilities": caps.all_capabilities(s.db)})
-            if p in ("/api/v1/rank", "/api/v1/competitors/packet", "/api/v1/inventory/gate", "/api/v1/creative/brief"):
+            if p in ("/api/v1/rank", "/api/v1/rank/diagnostic", "/api/v1/rank/funnel", "/api/v1/competitors/packet", "/api/v1/inventory/gate", "/api/v1/creative/brief"):
                 from urllib.parse import urlparse, parse_qs
                 q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
                 if p == "/api/v1/rank":
                     from keyword_lab import rank_trend
                     return self._env(200, rank_trend(s.db, q.get("term", ""), q.get("sku", "")))
+                if p == "/api/v1/rank/diagnostic":
+                    from keyword_lab import rank_diagnostic
+                    return self._env(200, rank_diagnostic(s, q.get("term", ""), q.get("sku", "")))
+                if p == "/api/v1/rank/funnel":
+                    from keyword_lab import rank_funnel
+                    return self._env(200, rank_funnel(s, q.get("term", ""), q.get("sku", "")))
                 if p == "/api/v1/inventory/gate":
                     import ops_finance as OF
                     return self._env(200, OF.stock_gate(s, q.get("sku", "")))

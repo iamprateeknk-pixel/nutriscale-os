@@ -49,6 +49,46 @@ def record_rank(db, platform, term, sku, position, rank_type="ORGANIC", page=1,
     db.execute("INSERT INTO rank_observations(platform,term,sku,rank_type,position,page,locale,device,source,captured_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                (platform, term, sku, rank_type, position, page, locale, device, source, now_utc())); db.commit()
 
+def rank_diagnostic(store, term: str, sku: str) -> dict:
+    """RNK-02: rank girne par pehle sabse aam kaaran parkho — seedha title ko dosh nahi.
+    Har parikalpana (hypothesis) ke saath saboot; kaaran pakka kabhi nahi likhenge."""
+    db = store.db; ensure_v12(db)
+    trend = rank_trend(db, term, sku)
+    hyps = []
+    qty = db.execute("SELECT COALESCE(SUM(qty),0) q FROM inventory WHERE sku=?", (sku,)).fetchone()["q"]
+    if qty <= 0:
+        hyps.append({"rank": 1, "hypothesis": "Stock khatm — bina stock ke rank girna aam hai",
+                     "evidence": f"inventory qty = {qty}", "action": "Pehle stock bharo, phir rank napo"})
+    prod = db.execute("SELECT rating, reviews FROM products WHERE sku=?", (sku,)).fetchone()
+    if prod and (prod["rating"] or 0) < 4.0:
+        hyps.append({"rank": 2, "hypothesis": "Rating kamzor — kharidaar ka bharosa aur conversion dono dabte hain",
+                     "evidence": f"rating {prod['rating']} ({prod['reviews']} reviews)", "action": "Review-agent ki shikayat mining dekho"})
+    st = db.execute("SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(clicks),0) cl FROM search_terms WHERE term=?", (term,)).fetchone()
+    if st and st["cl"] and st["sp"] == 0:
+        hyps.append({"rank": 3, "hypothesis": "Is term par ads ka sahara band hai", "evidence": "clicks hain par spend 0",
+                     "action": "Ads Studio me is term ka harvest/bid parkho"})
+    if qty > 0 and not hyps:
+        hyps.append({"rank": 1, "hypothesis": "Stock/rating/ads teeno theek — mausam/mang ya pratiyogita ka asar ho sakta hai",
+                     "evidence": "buniyadi checks saaf", "action": "3 aur rank points jodo, phir tajurba (experiment) banao"})
+    return {"term": term, "sku": sku, "trend": trend, "hypotheses": hyps,
+            "class": "HYPOTHESIS", "note": "Ye disha-suchak hain, siddh kaaran nahi — tajurbe se hi pakka hoga"}
+
+def rank_funnel(store, term: str, sku: str) -> dict:
+    """RNK-03: query -> apne clicks/orders (observed) -> SKU contribution (cost pata ho tab)."""
+    import finance as F
+    db = store.db
+    r = db.execute("""SELECT COALESCE(SUM(clicks),0) cl, COALESCE(SUM(purchases),0) pu,
+                      COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa
+                      FROM search_terms WHERE term=?""", (term,)).fetchone()
+    prod = db.execute("SELECT price FROM products WHERE sku=?", (sku,)).fetchone()
+    fin = F.contribution_v2(db, sku, prod["price"]) if prod else {"known": False, "reason": "product catalog me nahi"}
+    return {"term": term, "clicks": r["cl"], "orders": r["pu"],
+            "cvr_pct": round(r["pu"] / r["cl"] * 100, 1) if r["cl"] else None,
+            "ad_spend": r["sp"], "attributed_sales": r["sa"],
+            "contribution": fin, "rank_data": "Rank provider bina rank ka hissa UNAVAILABLE hai",
+            "coverage": "Sirf apne Ads search-term data par — kul khoj-mang ka dawa nahi"}
+
+
 def rank_trend(db, term, sku, rank_type="ORGANIC") -> dict:
     """RNK-01/04: rank ka record scope ke saath; alert ke liye kam se kam 3 tulna-yogya points."""
     rows = [dict(r) for r in db.execute("""SELECT * FROM rank_observations WHERE term=? AND sku=? AND rank_type=?
