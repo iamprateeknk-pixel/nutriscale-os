@@ -28,13 +28,24 @@ def product_360(db, sku: str, platform: str = None) -> dict:
     versions = db.execute("SELECT version, status, created_at FROM listing_versions WHERE sku=? ORDER BY version DESC LIMIT 5", (sku,)).fetchall()
     actions = db.execute("SELECT COUNT(*) c FROM action_v12 WHERE payload LIKE ?", (f'%"{sku}"%',)).fetchone()["c"]
     fees_exact = F.sku_fee_rate(db, sku, prod["platform"] or "Amazon")
+    # V19: stock channel-wise — location ke naam se channel pehchan (FBA/Warehouse), jo na mile woh 'unclassified'
+    def _chan(loc):
+        l = (loc or "").lower()
+        return "Amazon" if "amazon" in l or "fba" in l else ("Flipkart" if "flipkart" in l else "unclassified")
+    stock_by_channel = {}
+    for r in inv_rows: stock_by_channel[_chan(r["location"])] = stock_by_channel.get(_chan(r["location"]), 0) + r["qty"]
+    view_qty = stock_by_channel.get(platform, 0) if platform else total_qty
+    from fba_planner import days_of_cover as _dc
+    view_cover = _dc(int(view_qty), vel) if (platform and vel > 0) else cover
     return {"found": True, "sku": sku, "name": prod["name"], "platform": prod["platform"],
             "platform_view": platform or "ALL", "channels": sorted(by_platform.keys()),
             "sales_by_platform": by_platform,
             "price": prod["price"], "rating": prod["rating"], "reviews": prod["reviews"],
             "sales": sales, "finance": fin,
             "inventory": {"total_qty": total_qty, "by_location": [dict(r) for r in inv_rows],
-                          "velocity_per_day": round(vel, 2), "days_of_cover": cover},
+                          "stock_by_channel": stock_by_channel,
+                          "view_qty": view_qty, "view_basis": (platform + " channel ka stock") if platform else "saare channels kul",
+                          "velocity_per_day": round(vel, 2), "days_of_cover": view_cover},
             "listing_versions": [dict(r) for r in versions],
             "open_actions_mentioning_sku": actions,
             "fee_exact": fees_exact,

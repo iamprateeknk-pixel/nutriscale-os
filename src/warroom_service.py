@@ -29,7 +29,7 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
         import datetime as _dt
         _end = _dt.date.today(); _start = _end - _dt.timedelta(days=29)
         _sw = store.db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n
-            FROM order_items oi JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+            FROM order_items oi JOIN order_headers oh ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
             WHERE oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""" +
             (" AND oi.platform=?" if platform else ""),
             ((_start.isoformat(), _end.isoformat()) + ((platform,) if platform else ()))).fetchone()
@@ -49,7 +49,7 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
         _mix_ok, _mix_reason = True, ""
         if not platform:
             _other = store.db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi
-                JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                JOIN order_headers oh ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                 WHERE oh.order_date>=? AND oh.order_date<=? AND oi.platform<>'Amazon'""",
                 (_start.isoformat(), _end.isoformat())).fetchone()["g"]
             if _other and _other > 0:

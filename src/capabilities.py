@@ -10,17 +10,19 @@ DEFAULT_CAPS = [
     ("Amazon", "read_orders", "code_ready", "SP-API code taiyaar hai; live certification seller keys ke baad"),
     ("Amazon", "read_ads", "code_ready", "Ads Reporting v3 pipeline taiyaar; live certification keys ke baad"),
     ("Amazon", "write_ads", "not_certified", "Write adapter pilot + owner sign-off ke baad hi on hoga"),
-    ("Amazon", "edit_listing", "not_certified", "Listings API pilot ke baad"),
+    ("Amazon", "write_listings", "not_certified", "Listings API pilot ke baad"),
     ("Flipkart", "read_orders", "code_ready", "Seller API/CSV; live parity test keys ke baad"),
     ("Flipkart", "read_ads", "report_only", "Programmatic Ads API uplabdh nahi — sirf report/CSV import chalega"),
     ("Flipkart", "write_ads", "unavailable", "Flipkart par ads write ka koi certified rasta nahi — UI me button hi nahi dikhega"),
-    ("Flipkart", "edit_listing", "not_certified", "Seller API manzuri ke baad"),
+    ("Flipkart", "write_listings", "not_certified", "Seller API manzuri ke baad"),
     ("External", "keyword_provider", "unavailable", "Licensed provider (Helium10 aadi) ka contract nahi — volume/rank 'unknown' rahega"),
     ("External", "rank_provider", "unavailable", "Rank observation sirf apne darj kiye hue/licensed data se"),
 ]
 
 def seed_capabilities(db):
     ensure_v12(db)
+    # V19: purana naam edit_listing -> write_listings (publish gate yahi dekhta hai — naam ek rakho)
+    db.execute("UPDATE capabilities SET capability='write_listings' WHERE capability='edit_listing'"); db.commit()
     for p, c, s, r in DEFAULT_CAPS:
         db.execute("INSERT OR IGNORE INTO capabilities VALUES (?,?,?,?,?)", (p, c, s, r, "")); db.commit()
 

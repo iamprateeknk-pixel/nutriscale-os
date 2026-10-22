@@ -1,5 +1,14 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 23 Oct 2026 (V18 — data-correctness closure)_
+_Updated: 23 Oct 2026 (V19 — financial/stock/account bugs)_
+
+## 🔧 V19 — Saatve audit ke bache bugs band (23 Oct 2026)
+(saboot: test_v19_finance_stock.py, kul 25 suites pass)
+- **P0 Velocity jhoothi raftaar**: all-time units ko 30 din se baantna band — ab sirf **trailing 30-din** ki bikri, cancelled bahar. Purani galti se cover kam aur raftaar zyada dikhti thi.
+- **P0 Finance milaan ka aadhaar hi ulta tha**: NET banam GROSS ki tulna band — ab **gross-se-gross aur refund-se-refund** alag parkhe jayenge; order_fees me refund column + Finances se refunds bhi SKU-war darj.
+- **Seller-account isolation**: saare order joins ab (platform, seller_account, order) teeno kunji par — do khaaton ka ek-jaisa order-id data nahi milayega; orders ginati bhi khaate-war.
+- **Product 360 channel stock**: stock ab channel ke hisaab se (location-naam se pehchan: Amazon FBA / Flipkart Warehouse / unclassified alag); channel view me sirf usi channel ka bechne-yogya stock aur usi par cover.
+- **Capability naam ek**: registry ka `edit_listing` ab `write_listings` — wahi naam jo publish gate dekhta hai (pehle certified karna hi mumkin nahi tha, registry me woh kunji thi hi nahi); purani DBs par auto-migration.
+- **Settlement tulna NON-FINAL ghoshit**: overlap wale settlement ki poori rakam khidki ki nahi mani jayegi — din-anupaat anumaan alag dikhega, final milaan transaction-level data se hoga (report me saaf likha).
 
 ## ✅ V18 — Chhathe audit ki data-correctness closure (23 Oct 2026)
 Audit ke bache hue teen "partial" mudde poori tarah band + ginati ki ek aur chhupi galti (saboot: test_v18_closure.py, kul 24 suites pass):

@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS outcomes(
   metric TEXT, before REAL, after REAL, before_val REAL, after_val REAL,
   success INT, guardrail_ok INT, executed INT, measured_at TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS order_fees(
-  platform TEXT, external_order_id TEXT, sku TEXT, gross REAL, fees REAL,
+  platform TEXT, external_order_id TEXT, sku TEXT, gross REAL, fees REAL, refund REAL DEFAULT 0,
   PRIMARY KEY(platform, external_order_id, sku));
 CREATE TABLE IF NOT EXISTS campaign_map(
   platform TEXT, seller_account TEXT, campaign_id TEXT, name TEXT,
@@ -90,6 +90,13 @@ def ensure_v12(db) -> None:
             if col not in cols:
                 db.execute(f"ALTER TABLE search_terms ADD COLUMN {col} TEXT")
         db.commit()
+    except Exception:
+        pass
+    # V19: order_fees par refund column (gross/refund alag-alag milaan ke liye)
+    try:
+        fcols = [c[1] for c in db.execute("PRAGMA table_info(order_fees)")]
+        if fcols and "refund" not in fcols:
+            db.execute("ALTER TABLE order_fees ADD COLUMN refund REAL DEFAULT 0"); db.commit()
     except Exception:
         pass
     # V13: action baseline (execute ke samay ki tasveer — outcome maap ka aadhaar)

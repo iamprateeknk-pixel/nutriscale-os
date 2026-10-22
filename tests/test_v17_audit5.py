@@ -76,8 +76,8 @@ def test_reconciliation_scoped_and_backup_job():
     st.db.commit()
     rep = P.reconciliation_report(st, "Amazon", days=30)
     assert rep["orders_in_window"]["net_revenue"] == 2000
-    assert rep["settlements_overlapping_window"]["gross"] == 1980, "purana settlement khidki se bahar rahega"
-    assert rep["window_difference"] == 20.0
+    assert rep["settlements_overlapping_window"]["gross_full"] == 1980, "purana settlement khidki se bahar rahega"
+    assert rep["window_difference_full_amounts"] == 20.0
     st.close()
     # backup job — file DB par
     import job_handlers as JH

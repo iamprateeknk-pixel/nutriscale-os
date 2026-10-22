@@ -70,12 +70,12 @@ def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> d
     sku = payload.get("sku")
     if sku:
         r = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi JOIN order_headers oh
-                          ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                          ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                           WHERE oi.sku=? AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
                        (sku, d0, d1)).fetchone()
         out["sku_revenue"] = r["g"] if r else 0.0
     t = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n FROM order_items oi JOIN order_headers oh
-                      ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                      ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                       WHERE oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""", (d0, d1)).fetchone()
     if t and t["n"]: out["total_revenue"] = t["g"]
     out["_lines"] = t["n"] if t else 0

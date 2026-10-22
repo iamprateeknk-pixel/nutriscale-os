@@ -73,7 +73,19 @@ class AmazonSP:
                     if c.get("ChargeType") == "Principal":
                         gross += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
                 out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
-                            "gross": gross, "fees": abs(fees)})
+                            "gross": gross, "fees": abs(fees), "refund": 0.0})
+        # V19: usi order ke refunds bhi SKU-war isi record me — milaan gross/refund alag-alag hoga
+        for ev in events.get("RefundEventList", []):
+            for it in ev.get("ShipmentItemAdjustmentList", []):
+                amt = 0.0
+                for c in it.get("ItemChargeList", []):
+                    if c.get("ChargeType") == "Principal":
+                        amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
+                if not amt: continue
+                row = next((x for x in out if x["sku"] == it.get("SellerSKU", "")), None)
+                if row: row["refund"] += abs(amt)
+                else: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
+                                  "gross": 0.0, "fees": 0.0, "refund": abs(amt)})
         return out
 
     def get_order_refunds(self, order_id: str) -> list:

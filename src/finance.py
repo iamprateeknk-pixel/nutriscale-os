@@ -34,8 +34,9 @@ def import_order_fees(db, rows: list, platform: str = "Amazon") -> dict:
     ensure_v12(db); n = 0
     for r in rows:
         if not r.get("sku"): continue
-        db.execute("INSERT OR REPLACE INTO order_fees VALUES (?,?,?,?,?)",
-                   (platform, r["order_id"], r["sku"], float(r.get("gross") or 0), float(r.get("fees") or 0)))
+        db.execute("INSERT OR REPLACE INTO order_fees VALUES (?,?,?,?,?,?)",
+                   (platform, r["order_id"], r["sku"], float(r.get("gross") or 0), float(r.get("fees") or 0),
+                    float(r.get("refund") or 0)))
         n += 1
     db.commit(); return {"imported": n}
 

@@ -38,8 +38,8 @@ def test_finance_grade_and_completeness():
     _o(st, "F1", 2, "SKU-F", 1000)
     _o(st, "F2", 2, "SKU-F", 500)
     _o(st, "F3", 2, "SKU-F", 800)
-    st.db.execute("INSERT INTO order_fees VALUES ('Amazon','F1','SKU-F',1000,120)")
-    st.db.execute("INSERT INTO order_fees VALUES ('Amazon','F3','SKU-F',850,100)")  # rakam alag — mismatch
+    st.db.execute("INSERT INTO order_fees(platform,external_order_id,sku,gross,fees) VALUES ('Amazon','F1','SKU-F',1000,120)")
+    st.db.execute("INSERT INTO order_fees(platform,external_order_id,sku,gross,fees) VALUES ('Amazon','F3','SKU-F',850,100)")  # rakam alag — mismatch
     st.db.commit()
     fg = P.finance_grade_matching(st.db, "Amazon", 30)
     assert fg["orders_checked"] == 3 and fg["matched"] == 1 and fg["fee_data_missing"] == 1 and fg["amount_mismatch"] == 1, fg

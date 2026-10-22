@@ -49,26 +49,33 @@ def finance_grade_matching(db, platform: str = "Amazon", days: int = 30) -> dict
     import datetime as _dt
     ensure_v12(db)
     ws = (_dt.date.today() - _dt.timedelta(days=days - 1)).isoformat()
-    orders = db.execute("""SELECT oh.external_order_id oid, COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) net
+    orders = db.execute("""SELECT oh.external_order_id oid, COALESCE(SUM(oi.gross),0) gross,
+                                  COALESCE(SUM(COALESCE(oi.refund,0)),0) refund
                            FROM order_headers oh JOIN order_items oi
-                             ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                             ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                            WHERE oh.platform=? AND oh.order_date>=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'
                            GROUP BY oh.external_order_id""", (platform, ws)).fetchall()
+    # V19 P0: milaan GROSS-se-GROSS aur REFUND-se-REFUND alag-alag — NET ko GROSS se parkhna galat tha
     matched, missing, mismatch, exceptions = 0, 0, 0, []
     for o in orders:
-        f = db.execute("SELECT COALESCE(SUM(gross),0) g, COUNT(*) n FROM order_fees WHERE platform=? AND external_order_id=?",
+        f = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(COALESCE(refund,0)),0) rf, COUNT(*) n FROM order_fees WHERE platform=? AND external_order_id=?",
                        (platform, o["oid"])).fetchone()
         if not f["n"]:
             missing += 1; exceptions.append({"order": o["oid"], "issue": "FEE_DATA_MISSING"}); continue
-        if abs(f["g"] - o["net"]) > max(1.0, 0.005 * o["net"]):
-            mismatch += 1; exceptions.append({"order": o["oid"], "issue": "AMOUNT_MISMATCH",
-                                               "orders_net": o["net"], "finances_gross": f["g"]})
+        bad = []
+        if abs(f["g"] - o["gross"]) > max(1.0, 0.005 * o["gross"]):
+            bad.append(f"GROSS_MISMATCH orders={o['gross']} finances={f['g']}")
+        if abs(f["rf"] - o["refund"]) > max(1.0, 0.005 * max(o["refund"], 1)):
+            bad.append(f"REFUND_MISMATCH orders={o['refund']} finances={f['rf']}")
+        if bad:
+            mismatch += 1; exceptions.append({"order": o["oid"], "issue": "; ".join(bad)})
         else:
             matched += 1
     total = len(orders)
     return {"orders_checked": total, "matched": matched, "fee_data_missing": missing,
             "amount_mismatch": mismatch, "exceptions": exceptions[:50],
             "match_rate_pct": round(100.0 * matched / total, 1) if total else None,
+            "basis": "gross-vs-gross + refund-vs-refund (V19)",
             "verdict": "FINANCE_GRADE_OK" if total and missing == 0 and mismatch == 0 else
                        ("DATA_APARYAPT" if total == 0 else "EXCEPTIONS_HAIN — upar ki suchi parkho")}
 
@@ -109,18 +116,33 @@ def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> di
     ws, we = start.isoformat(), end.isoformat()
     rec_all = OF.reconciliation(store, platform)
     ow = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n FROM order_items oi
-                       JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                       JOIN order_headers oh ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                        WHERE oi.platform=? AND oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
                     (platform, ws, we)).fetchone()
     sw = db.execute("""SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(net),0) n FROM settlements
                        WHERE platform=? AND period_start<=? AND period_end>=?""", (platform, we, ws)).fetchone()
+    # V19: overlap wale settlement ki POORI rakam khidki ki nahi hoti — din-anupaat anumaan alag se,
+    # aur sthiti saaf taur par NON-FINAL (transaction-level data aane tak final milaan dawa nahi)
+    _pro = db.execute("""SELECT gross, period_start, period_end FROM settlements
+                         WHERE platform=? AND period_start<=? AND period_end>=?""", (platform, we, ws)).fetchall()
+    _ws_d, _we_d = _dt.date.fromisoformat(ws), _dt.date.fromisoformat(we)
+    prorated = 0.0
+    for _s in _pro:
+        try:
+            ps, pe = _dt.date.fromisoformat(str(_s["period_start"])[:10]), _dt.date.fromisoformat(str(_s["period_end"])[:10])
+            span = (pe - ps).days + 1; ov = (min(pe, _we_d) - max(ps, _ws_d)).days + 1
+            prorated += (_s["gross"] or 0) * max(0, ov) / max(1, span)
+        except Exception:
+            prorated += _s["gross"] or 0
     terms = db.execute("SELECT COALESCE(SUM(spend),0) sp FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
                        (ws, we, platform + "%")).fetchone()
     wdiff = round((ow["g"] or 0) - (sw["g"] or 0), 2)
     return {"platform": platform, "window": {"from": ws, "to": we, "days": days},
             "orders_in_window": {"net_revenue": ow["g"], "lines": ow["n"]},
-            "settlements_overlapping_window": {"gross": sw["g"], "net_payout": sw["n"]},
-            "window_difference": wdiff,
+            "settlements_overlapping_window": {"gross_full": sw["g"], "net_payout": sw["n"],
+                                               "gross_prorated_estimate": round(prorated, 2),
+                                               "comparison_status": "NON_FINAL — settlement period khidki se bada ho sakta hai; poori rakam khidki ki nahi. Final milaan transaction-level settlement data se hoga"},
+            "window_difference_full_amounts": wdiff,
             "window_status": "MATCHED" if sw["g"] and abs(wdiff) <= max(ow["g"] * 0.02, 100) else "EXCEPTION",
             "search_terms_spend_in_window": terms["sp"],
             "finance_grade_matching": finance_grade_matching(db, platform, days),
