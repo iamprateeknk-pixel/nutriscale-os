@@ -70,6 +70,8 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
                 "connectors_status": cfg.status_all(),
                 "kpis": {**fw, "tacos_pct": tacos_m["pct"], "tacos_status": tacos_m["status"],
                          "tacos_window": tacos_m["window"],
+                         "tacos_spend_basis": "period-tagged search-terms kharch (khidki ke andar ke periods hi)",
+                         "orders_count_basis": "cancelled orders ginati se bahar; cancelled_orders alag se darj",
                          "revenue": st["revenue"], "total_sales": st["revenue"],
                          "orders": st["orders"], "sales_source": st["source"],
                          "ad_spend": ad_spend, "paid_sales": paid_sales,

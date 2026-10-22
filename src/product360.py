@@ -22,7 +22,7 @@ def product_360(db, sku: str, platform: str = None) -> dict:
     fin = F.contribution_v2(db, sku, prod["price"], prod["platform"] or "Amazon")
     inv_rows = db.execute("SELECT location, qty FROM inventory WHERE sku=?", (sku,)).fetchall()
     total_qty = sum(r["qty"] for r in inv_rows)
-    vel = AN.sku_velocity_per_day(db, sku)
+    vel = AN.sku_velocity_per_day(db, sku, platform=platform)   # V18: channel view = channel ki raftaar; ALL view = kul
     from fba_planner import days_of_cover
     cover = days_of_cover(int(total_qty), vel) if vel > 0 else None
     versions = db.execute("SELECT version, status, created_at FROM listing_versions WHERE sku=? ORDER BY version DESC LIMIT 5", (sku,)).fetchall()

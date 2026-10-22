@@ -47,6 +47,11 @@ def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
     for r in rows:
         if not r.get("sku"): continue
         total_refund = float(r.get("refund") or 0)
+        # V18: vendor ne exact line-id diya hai to refund seedha USI line par — anupaat-baant sirf fallback hai
+        if r.get("line_id"):
+            cur = db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND line_id=?",
+                             (total_refund, platform, r["order_id"], r["line_id"]))
+            if cur.rowcount: n += cur.rowcount; continue
         lines = db.execute("""SELECT line_id, gross FROM order_items
                               WHERE platform=? AND external_order_id=? AND sku=? ORDER BY gross DESC""",
                            (platform, r["order_id"], r["sku"])).fetchall()

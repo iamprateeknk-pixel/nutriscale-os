@@ -88,7 +88,8 @@ class AmazonSP:
                 for c in it.get("ItemChargeList", []):
                     if c.get("ChargeType") == "Principal":
                         amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
-                if amt: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""), "refund": abs(amt)})
+                if amt: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
+                                    "line_id": it.get("OrderItemId") or "", "refund": abs(amt)})
         return out
 
     def put_listing(self, sku: str, product_type: str, attributes: dict, mode: str = "VALIDATION_PREVIEW") -> dict:

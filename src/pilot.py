@@ -42,6 +42,62 @@ def preflight(db) -> dict:
     return {"ready_for_pilot": ready, "checks": checks, "at": now_utc(),
             "note": "ready_for_pilot = sirf takneeki taiyaari; asal pilot ke liye keys + sign-off + hosting chahiye"}
 
+def finance_grade_matching(db, platform: str = "Amazon", days: int = 30) -> dict:
+    """Finance-grade milaan (V18): har order alag se — canonical bikri banam Finances ki darj fees/gross.
+    Har order ek shreni me: MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH. Settlements me order-key
+    hota hi nahi, isiliye order-stariya milaan Finances se hoga; settlement khidki-stariya rahega."""
+    import datetime as _dt
+    ensure_v12(db)
+    ws = (_dt.date.today() - _dt.timedelta(days=days - 1)).isoformat()
+    orders = db.execute("""SELECT oh.external_order_id oid, COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) net
+                           FROM order_headers oh JOIN order_items oi
+                             ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                           WHERE oh.platform=? AND oh.order_date>=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'
+                           GROUP BY oh.external_order_id""", (platform, ws)).fetchall()
+    matched, missing, mismatch, exceptions = 0, 0, 0, []
+    for o in orders:
+        f = db.execute("SELECT COALESCE(SUM(gross),0) g, COUNT(*) n FROM order_fees WHERE platform=? AND external_order_id=?",
+                       (platform, o["oid"])).fetchone()
+        if not f["n"]:
+            missing += 1; exceptions.append({"order": o["oid"], "issue": "FEE_DATA_MISSING"}); continue
+        if abs(f["g"] - o["net"]) > max(1.0, 0.005 * o["net"]):
+            mismatch += 1; exceptions.append({"order": o["oid"], "issue": "AMOUNT_MISMATCH",
+                                               "orders_net": o["net"], "finances_gross": f["g"]})
+        else:
+            matched += 1
+    total = len(orders)
+    return {"orders_checked": total, "matched": matched, "fee_data_missing": missing,
+            "amount_mismatch": mismatch, "exceptions": exceptions[:50],
+            "match_rate_pct": round(100.0 * matched / total, 1) if total else None,
+            "verdict": "FINANCE_GRADE_OK" if total and missing == 0 and mismatch == 0 else
+                       ("DATA_APARYAPT" if total == 0 else "EXCEPTIONS_HAIN — upar ki suchi parkho")}
+
+def reporting_completeness(db, platform: str = "Amazon", days: int = 30) -> dict:
+    """Reporting sampurnata (V18): khidki ke kitne din ka data asal me maujud hai — teen taraf se."""
+    import datetime as _dt
+    ensure_v12(db)
+    end = _dt.date.today(); start = end - _dt.timedelta(days=days - 1)
+    od = db.execute("SELECT COUNT(DISTINCT order_date) c FROM order_headers WHERE platform=? AND order_date>=? AND order_date<=?",
+                    (platform, start.isoformat(), end.isoformat())).fetchone()["c"]
+    periods = db.execute("SELECT DISTINCT period_start, period_end FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
+                         (start.isoformat(), end.isoformat(), platform + "%")).fetchall()
+    covered = set()
+    for p in periods:
+        d1 = _dt.date.fromisoformat(str(p["period_start"])[:10]); d2 = _dt.date.fromisoformat(str(p["period_end"])[:10])
+        while d1 <= d2:
+            if start <= d1 <= end: covered.add(d1)
+            d1 += _dt.timedelta(days=1)
+    fee = db.execute("""SELECT COUNT(DISTINCT oh.external_order_id) tot,
+                               COUNT(DISTINCT of2.external_order_id) with_fees
+                        FROM order_headers oh LEFT JOIN order_fees of2
+                          ON of2.platform=oh.platform AND of2.external_order_id=oh.external_order_id
+                        WHERE oh.platform=? AND oh.order_date>=?""", (platform, start.isoformat())).fetchone()
+    return {"window_days": days,
+            "order_days_present": od, "order_days_note": "orders har din hona lazmi nahi — ye sirf maujudgi ki jaankari hai",
+            "ads_period_coverage_pct": round(100.0 * len(covered) / days, 1),
+            "orders_total": fee["tot"], "orders_with_fee_data": fee["with_fees"],
+            "fee_coverage_pct": round(100.0 * fee["with_fees"] / fee["tot"], 1) if fee["tot"] else None}
+
 def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> dict:
     """V17: scoped milaan — platform + a/c + ek hi samay-khidki (30 din) ke andar teeno taraf.
     Settlements ka apna period hota hai: khidki se takraane wale hi gine jayenge."""
@@ -67,6 +123,8 @@ def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> di
             "window_difference": wdiff,
             "window_status": "MATCHED" if sw["g"] and abs(wdiff) <= max(ow["g"] * 0.02, 100) else "EXCEPTION",
             "search_terms_spend_in_window": terms["sp"],
+            "finance_grade_matching": finance_grade_matching(db, platform, days),
+            "completeness": reporting_completeness(db, platform, days),
             "lifetime_reference": {"orders_vs_settlements_all": rec_all,
                                    "sales_totals": AN.sales_totals(db, platform)},
             "note": "Khidki ke bahar ke settlements/orders is milaan me NAHI hain — farq pehle khidki se parkho"}

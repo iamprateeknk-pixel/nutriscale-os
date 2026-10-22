@@ -1,5 +1,14 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V17 — audit-5 core bugs)_
+_Updated: 23 Oct 2026 (V18 — data-correctness closure)_
+
+## ✅ V18 — Chhathe audit ki data-correctness closure (23 Oct 2026)
+Audit ke bache hue teen "partial" mudde poori tarah band + ginati ki ek aur chhupi galti (saboot: test_v18_closure.py, kul 24 suites pass):
+- **Cancelled-order ginati bhi galat thi** — revenue to bahar tha, par "orders" ki sankhya cancelled ko ginti thi (dashboard ka order count bada dikhta tha). Ab `orders` saaf ginati, `cancelled_orders` alag se dikhega.
+- **Finance-grade settlement matching** — totals ke milaan se aage: har order alag parkha jayega (canonical NET banam Finances gross/fees) — MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH shreniyon + exceptions suchi ke saath. Settlements me order-key hota hi nahi, isiliye order-stariya milaan Finances se — ye seema report me saaf likhi hai.
+- **Reporting completeness** — har reconciliation ke saath sampurnata: khidki me ads-coverage %, fee-coverage %, order-days ki maujudgi. Aadha data ab chup chaap "poora" nahi kahlayega.
+- **Refund exact line-id** — vendor ne line-id diya to refund seedha usi line par; anupaat-baant sirf fallback.
+- **Channel-specific stock hisaab** — velocity ab platform-wise; Product 360 ke channel view me usi channel ki raftaar se cover banta hai.
+- TACOS kharch ka aadhaar bhi ab KPIs me label sahit hai (period-tagged search-terms).
 
 ## 🐛 V17 — Paanchve audit ke verified core bugs (22 Oct 2026)
 Is baar audit ne mere hi V15/V16 ke kaam me asli bugs pakde — sab verify karke fix (saboot: test_v17_audit5.py incl. **asal HTTP regression test**, kul 23 suites pass):
