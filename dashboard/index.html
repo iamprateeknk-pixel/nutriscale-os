@@ -91,17 +91,19 @@ async function toggleKill(){
 }
 const VIEWS={
 async warroom(m){
-  const w=await api('/api/warroom'); const h=await api('/api/v1/system/health');
+  const pf=m.dataset.pf||'';
+  const w=await api('/api/warroom'+(pf?'?platform='+pf:'')); const h=await api('/api/v1/system/health');
   if(!w.connected){m.innerHTML='<h2>War Room</h2><div class="empty">Database me abhi asal data nahi hai.<br>Integrations screen se CSV import karo ya API keys jodo — tab yahan asal numbers aayenge.</div>'+ev('warroom service');return;}
   const k=w.kpis||{};
-  m.innerHTML='<h2>War Room — aaj ki tasveer</h2>'+cards([['Revenue',inr(k.revenue),'orders: '+(k.orders??'—')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—',''],['TACOS',k.tacos_pct?k.tacos_pct+'%':'—','matched period par hi']])+
+  m.innerHTML='<h2>War Room — aaj ki tasveer</h2><p>Platform: <select onchange="document.getElementById(\'main\').dataset.pf=this.value;show(\'warroom\')"><option value=""'+(pf===''?' selected':'')+'>Sab</option><option'+(pf==='Amazon'?' selected':'')+'>Amazon</option><option'+(pf==='Flipkart'?' selected':'')+'>Flipkart</option></select> <span class="evidence">Source: '+esc(k.sales_source||'')+'</span></p>'+cards([['Revenue',inr(k.revenue),'orders: '+(k.orders??'—')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—',''],['TACOS',k.tacos_pct?k.tacos_pct+'%':'—','matched period par hi']])+
   (h.alerts&&h.alerts.length?'<h3>⚠️ Alerts</h3>'+h.alerts.map(a=>'<p>'+badge('ALERT','warn')+' '+a+'</p>').join(''):'<p>'+badge('Sab theek','ok')+'</p>')+ev('apne imported data se — OBSERVED');
 },
 async products(m){
   const plan=await api('/api/action-plan'); const costs=await api('/api/v1/costs');
   const p=plan.plan||{};
   m.innerHTML='<h2>Product Intelligence</h2>'+cards([['Pause list', (p.pause||[]).length+' campaigns','zero-sale'],['Scale list',(p.scale||[]).length+' campaigns',''],['Andazan bachat',inr(p.savings_est),'/cycle']])+
-  '<h3>SKU Costs (versioned)</h3>'+table([{t:'SKU',k:'sku'},{t:'COGS',k:'cogs',n:1},{t:'Packing',k:'packaging',n:1},{t:'Laagu',k:'effective_from'}],costs.costs,'Cost darj nahi — bina cost ke scale ki sifarish band hai (FIN-01)')+ev('action planner + cost registry');
+  '<h3>SKU Costs (versioned)</h3>'+table([{t:'SKU',k:'sku'},{t:'COGS',k:'cogs',n:1},{t:'Packing',k:'packaging',n:1},{t:'Laagu',k:'effective_from'}],costs.costs,'Cost darj nahi — bina cost ke scale ki sifarish band hai (FIN-01)')+
+  '<h3>SKU 360° — ek SKU ki poori tasveer</h3><form class="row" onsubmit="return load360(event)"><input name="sku" placeholder="SKU daalo (jaise catalog wala)" required><button class="btn">360° dekho</button></form><div id="p360"></div>'+ev('action planner + cost registry + product 360');
 },
 async competitors(m){
   const d=await api('/api/v1/competitors');
@@ -187,6 +189,14 @@ async function addDraft(e){e.preventDefault();const f=new FormData(e.target);awa
 async function loadBrief(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/creative/brief?product='+encodeURIComponent(f.product)+'&grade='+encodeURIComponent(f.grade||'')+'&weight='+encodeURIComponent(f.weight||''));document.getElementById('brief').innerHTML=table([{t:'#',k:'shot'},{t:'Prakar',k:'type'},{t:'Brief',k:'brief'}],d.shots);return false;}
 async function addCost(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));await api('/api/v1/costs','POST',{sku:f.sku,cogs:Number(f.cogs),packaging:Number(f.packaging||0)});show('profit');return false;}
 async function loadGate(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/inventory/gate?sku='+encodeURIComponent(f.sku));document.getElementById('gate').innerHTML='<div class="card"><b>'+d.sku+'</b> — stock: '+d.qty+' · '+badge(d.status,d.status==='OK'?'ok':d.status==='LOW'?'warn':'bad')+' '+(d.note||'')+'</div>';return false;}
+async function load360(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/products/'+encodeURIComponent(f.sku)+'/360');const el=document.getElementById('p360');
+  if(!d.found){el.innerHTML='<div class="empty">'+esc(d.error||'SKU nahi mila')+'</div>';return false;}
+  const fin=d.finance||{};
+  el.innerHTML='<div class="card"><b>'+esc(d.name)+'</b> · '+esc(d.platform)+' · '+inr(d.price)+' · ⭐ '+(d.rating??'—')+' ('+(d.reviews??0)+')<br>'+
+  'Bikri: '+(d.sales.units||0)+' units · '+inr(d.sales.revenue||0)+'<br>'+
+  'Munafa: '+(fin.known?('contribution '+inr(fin.contribution)+' · margin '+fin.margin_pct+'% · fee: '+esc(fin.fee_source||'')):'cost uplabdh nahi — margin ka number nahi banta')+'<br>'+
+  'Stock: '+d.inventory.total_qty+' units · raftaar '+d.inventory.velocity_per_day+'/din · cover: '+(d.inventory.days_of_cover==null?'bikri data nahi':Math.round(d.inventory.days_of_cover)+' din')+'<br>'+
+  'Listing versions: '+(d.listing_versions.length?d.listing_versions.map(v=>'v'+v.version+' ('+v.status+')').join(', '):'koi nahi')+'</div>';return false;}
 async function propAct(id,op){try{const r=await api('/api/v1/proposals/'+id+'/'+op,'POST',{});alert(r.state?(op==='approve'&&r.needed?'Pushti darj — '+(r.approvals||1)+'/'+r.needed:'State: '+r.state):(r.error||'ho gaya'));}catch(e){alert('Nahi ho paya: '+e.message);}show('approvals');}
 async function propExec(id){const ref=prompt('Vendor console me badlav karke uska ref/saboot do (bina saboot ke APPLIED nahi likha jayega):');if(!ref)return;try{const r=await api('/api/v1/proposals/'+id+'/execute','POST',{manual_ref:ref});alert(r.state==='APPLIED_VERIFIED'?'✔ APPLIED_VERIFIED — saboot: '+ref:('Nahi hua: '+(r.error||r.state)));}catch(e){alert(e.message);}show('approvals');}
 async function legacyAct(id,op){try{await api('/api/approvals/'+id+'/'+op,'POST',{});}catch(e){alert(e.message);}show('approvals');}

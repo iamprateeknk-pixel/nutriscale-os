@@ -41,7 +41,7 @@ API keys kaise bharni hain: **[CONNECTORS_SETUP.md](CONNECTORS_SETUP.md)** — k
 ## Tests
 
 ```bash
-for t in tests/test_*.py; do python3 $t; done   # 7 suites, 28 tests
+python3 run_tests.py   # saare suites ek saath (V13 par 19 suites)
 ```
 
 ## Halat (Status)

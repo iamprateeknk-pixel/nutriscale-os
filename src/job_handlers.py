@@ -27,11 +27,12 @@ def _data_sync(store):
     return "Sync hua: " + ", ".join(out) if out else "SKIP: configured connector ka sync function is job me nahi joda"
 
 def _measure_results(store):
-    ensure_v12(store.db)
-    store.db.execute("CREATE TABLE IF NOT EXISTS outcomes(id INTEGER PRIMARY KEY, action_ref TEXT, window_days INT, metric TEXT, before REAL, after REAL, executed INT, at TEXT)")
+    import outcome_engine as OE
+    r = OE.measure_due(store.db)
+    conf = OE.rule_confidence(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM outcomes").fetchone()["c"]
-    ex = store.db.execute("SELECT COUNT(*) c FROM experiments WHERE verdict IS NOT NULL").fetchone()["c"]
-    return f"Maape gaye nateeje: {n} outcomes, {ex} experiments par verdict — seekh inhi se banti hai"
+    s = "; ".join(f"{c['kind']}: jeet-dar {c['win_rate']} ({c['measured']} maap)" for c in conf) or "abhi koi maapa nateeja nahi"
+    return f"Is chakra me {r['measured']} naye nateeje maape (baseline-bina skip: {r['skipped_no_baseline']}); kul {n}. Seekh: {s}"
 
 def _seller_health(store):
     ensure_v12(store.db)

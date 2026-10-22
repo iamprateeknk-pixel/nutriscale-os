@@ -59,7 +59,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = self.path.split("?")[0]
-        if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V12.1"})
+        if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V13"})
         # Same-origin serving (V12.1): dashboard isi backend se — CORS ki zaroorat hi nahi, token bhi ek hi origin par
         if p in ("/", "/dashboard", "/dashboard/"): return self._serve_dashboard("index.html")
         if p.startswith("/dashboard/"): return self._serve_dashboard(p[len("/dashboard/"):])
@@ -67,7 +67,13 @@ class H(BaseHTTPRequestHandler):
         if err: s.close(); return
         try:
             from platform_core import ensure_v12; ensure_v12(s.db)
-            if p == "/api/warroom": return self._env(200, warroom_data())
+            from urllib.parse import urlparse, parse_qs
+            _q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+            if p == "/api/warroom": return self._env(200, warroom_data(s, _q.get("platform") or None))
+            _seg = p.strip("/").split("/")
+            if len(_seg) == 5 and _seg[:3] == ["api", "v1", "products"] and _seg[4] == "360":
+                import product360
+                return self._env(200, product360.product_360(s.db, _seg[3]))
             if p == "/api/approvals": return self._env(200, {"approvals": _waiting_approvals()})
             if p == "/api/connectors/status":
                 from connectors.config import status_all

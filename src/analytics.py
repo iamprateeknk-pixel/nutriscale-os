@@ -5,13 +5,15 @@ import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12
 
-def sales_totals(db) -> dict:
+def sales_totals(db, platform: str = None) -> dict:
     ensure_v12(db)
-    ci = db.execute("SELECT COALESCE(SUM(gross),0) g, COUNT(*) lines FROM order_items").fetchone()
+    w = "WHERE platform=?" if platform else ""
+    args = (platform,) if platform else ()
+    ci = db.execute(f"SELECT COALESCE(SUM(gross),0) g, COUNT(*) lines FROM order_items {w}", args).fetchone()
     if ci["lines"]:
-        oc = db.execute("SELECT COUNT(DISTINCT platform||'|'||external_order_id) c FROM order_headers").fetchone()["c"]
+        oc = db.execute(f"SELECT COUNT(DISTINCT platform||'|'||external_order_id) c FROM order_headers {w}", args).fetchone()["c"]
         return {"revenue": round(ci["g"], 2), "orders": oc, "lines": ci["lines"], "source": "CANONICAL (order_items)"}
-    lo = db.execute("SELECT COALESCE(SUM(amount),0) s, COUNT(*) c FROM orders").fetchone()
+    lo = db.execute(f"SELECT COALESCE(SUM(amount),0) s, COUNT(*) c FROM orders {w}", args).fetchone()
     return {"revenue": round(lo["s"], 2), "orders": lo["c"], "lines": lo["c"], "source": "LEGACY (orders table — purana import)"}
 
 def sku_sales(db) -> list:

@@ -65,6 +65,13 @@ CREATE TABLE IF NOT EXISTS peer_snapshots(
   title TEXT, source TEXT, capture_id TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS login_attempts(
   username TEXT, at TEXT, success INT);
+CREATE TABLE IF NOT EXISTS outcomes(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, action_id INT, action_ref TEXT, kind TEXT, window_days INT,
+  metric TEXT, before REAL, after REAL, before_val REAL, after_val REAL,
+  success INT, guardrail_ok INT, executed INT, measured_at TEXT, at TEXT);
+CREATE TABLE IF NOT EXISTS order_fees(
+  platform TEXT, external_order_id TEXT, sku TEXT, gross REAL, fees REAL,
+  PRIMARY KEY(platform, external_order_id, sku));
 CREATE TABLE IF NOT EXISTS experiments(
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, sku TEXT, platform TEXT, hypothesis TEXT,
   primary_metric TEXT, intervention TEXT, baseline_note TEXT, start_date TEXT, end_date TEXT,
@@ -80,6 +87,25 @@ def ensure_v12(db) -> None:
             if col not in cols:
                 db.execute(f"ALTER TABLE search_terms ADD COLUMN {col} TEXT")
         db.commit()
+    except Exception:
+        pass
+    # V13: action baseline (execute ke samay ki tasveer — outcome maap ka aadhaar)
+    try:
+        acols = [c[1] for c in db.execute("PRAGMA table_info(action_v12)")]
+        if acols and "baseline" not in acols:
+            db.execute("ALTER TABLE action_v12 ADD COLUMN baseline TEXT"); db.commit()
+    except Exception:
+        pass
+    # V13: outcomes superset — experiments (purana roop) aur outcome_engine (naya) ek hi table
+    try:
+        ocols = [c[1] for c in db.execute("PRAGMA table_info(outcomes)")]
+        if ocols:
+            for col, typ in (("action_id", "INT"), ("action_ref", "TEXT"), ("kind", "TEXT"),
+                             ("before_val", "REAL"), ("after_val", "REAL"), ("success", "INT"),
+                             ("guardrail_ok", "INT"), ("measured_at", "TEXT")):
+                if col not in ocols:
+                    db.execute(f"ALTER TABLE outcomes ADD COLUMN {col} {typ}")
+            db.commit()
     except Exception:
         pass
 

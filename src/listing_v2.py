@@ -64,6 +64,36 @@ def approve_version(db, vid: int, approver: str) -> dict:
     db.execute("UPDATE listing_versions SET status='APPROVED', approved_by=? WHERE id=?", (approver, vid)); db.commit()
     return {"ok": True, "status": "APPROVED", "claim_check": chk}
 
+def publish(db, vid: int, product_type: str, sp=None, live: bool = False) -> dict:
+    """LST publish path (V13): APPROVED version hi jayega; pehle VALIDATION_PREVIEW (parkh),
+    live sirf tab jab capability write_listings=certified ho. Amazon ke issues jaise-aaye waise darj."""
+    import capabilities as caps
+    ensure_v12(db)
+    r = db.execute("SELECT * FROM listing_versions WHERE id=?", (vid,)).fetchone()
+    if not r: return {"ok": False, "error": "Version mila nahi"}
+    if r["status"] != "APPROVED":
+        return {"ok": False, "error": f"Version {r['status']} hai — pehle approve hoga, phir publish"}
+    if r["platform"] != "Amazon":
+        return {"ok": False, "error": "Abhi publish sirf Amazon (SP-API Listings) ke liye hai; Flipkart listing CSV/portal se jati hai"}
+    bullets = json.loads(r["bullets"] or "[]")
+    attributes = {"item_name": [{"value": r["title"], "marketplace_id": "A21TJRUUN4KGV"}],
+                  "bullet_point": [{"value": b, "marketplace_id": "A21TJRUUN4KGV"} for b in bullets]}
+    if live:
+        c = caps.capability(db, "Amazon", "write_listings")
+        if c["status"] != "certified":
+            return {"ok": False, "error": f"Live publish band hai — write_listings capability '{c['status']}' hai. Pehle VALIDATION_PREVIEW parkho, phir pilot sign-off se certified karo."}
+    if sp is None:
+        from connectors.amazon_sp import AmazonSP
+        sp = AmazonSP()
+    mode = "NORMAL" if live else "VALIDATION_PREVIEW"
+    resp = sp.put_listing(r["sku"], product_type, attributes, mode=mode)
+    issues = resp.get("issues", []) if isinstance(resp, dict) else []
+    if live and resp.get("status") == "ACCEPTED":
+        db.execute("UPDATE listing_versions SET status='PUBLISHED' WHERE id=?", (vid,)); db.commit()
+    return {"ok": True, "mode": mode, "submission": resp.get("submissionId"),
+            "vendor_status": resp.get("status"), "issues": issues,
+            "note": "VALIDATION_PREVIEW me kuch live nahi hua — sirf Amazon ki parakh hai" if not live else "Live publish bhej diya gaya"}
+
 def rollback_to(db, sku, platform, version, by) -> dict:
     """LST-04: purana version naya DRAFT bankar wapas — itihaas kabhi mita nahi."""
     ensure_v12(db)

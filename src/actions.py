@@ -114,6 +114,9 @@ def execute(db, aid: int, user: dict, adapter) -> dict:
     if res.get("vendor_ref"):
         db.execute("UPDATE action_v12 SET vendor_ref=? WHERE id=?", (res["vendor_ref"], aid)); db.commit()
         _move(db, aid, "APPLIED_VERIFIED", user["username"], f"pushti mili: {res['vendor_ref']}")
+        try:  # V13: nateeja maapne ke liye isi pal ki tasveer (baseline)
+            import outcome_engine; outcome_engine.capture_baseline(db, aid)
+        except Exception: pass
         return {"ok": True, "id": aid, "state": "APPLIED_VERIFIED", "vendor_ref": res["vendor_ref"]}
     _move(db, aid, "FAILED", user["username"], "pushti nahi mili — applied NAHI mana jayega")
     return {"ok": False, "id": aid, "state": "FAILED",

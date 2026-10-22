@@ -1,0 +1,20 @@
+# NutriScale OS — production HTTPS (Caddy apne aap Let's Encrypt certificate laata hai)
+# Chalana:  DOMAIN=app.tumhari-domain.in docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Shartein: domain ka DNS is server par ho, port 80/443 khule hon.
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    depends_on:
+      - nutriscale
+volumes:
+  caddy-data:
+  caddy-config:

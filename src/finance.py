@@ -29,6 +29,25 @@ def get_cost(db, sku: str, on_date: str = None) -> dict:
             "stale": age > STALE_DAYS, "age_days": age,
             "reason": "Cost 90 din se purani hai — nayi cost daalo, scale roka gaya" if age > STALE_DAYS else "Cost taaza hai"}
 
+def import_order_fees(db, rows: list, platform: str = "Amazon") -> dict:
+    """SP Finances se aayi per-order fees order_fees me — SKU-exact dar ka saboot."""
+    ensure_v12(db); n = 0
+    for r in rows:
+        if not r.get("sku"): continue
+        db.execute("INSERT OR REPLACE INTO order_fees VALUES (?,?,?,?,?)",
+                   (platform, r["order_id"], r["sku"], float(r.get("gross") or 0), float(r.get("fees") or 0)))
+        n += 1
+    db.commit(); return {"imported": n}
+
+def sku_fee_rate(db, sku: str, platform: str = "Amazon") -> dict:
+    """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT)."""
+    ensure_v12(db)
+    r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f FROM order_fees WHERE sku=? AND platform=?",
+                   (sku, platform)).fetchone()
+    if r and r["g"] and r["g"] >= 5000:
+        return {"rate": r["f"] / r["g"], "gross_basis": r["g"], "precision": "SKU_EXACT"}
+    return {"rate": None, "gross_basis": r["g"] if r else 0, "precision": None}
+
 def realized_fee_rate(db, platform: str = "Amazon") -> dict:
     """Settlements se asal fee-dar — andaaz ki jagah asal, jab paryapt settlement data ho (V12.1)."""
     ensure_v12(db)
@@ -48,7 +67,11 @@ def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spe
     from flipkart_calculator import flipkart_profit
     rf = realized_fee_rate(db, platform)
     est_fees = flipkart_profit(price, 0)["total_fees"] if platform == "Flipkart" else contribution(PricedSKU(sku, price, 0))["marketplace_fees"]
-    if rf["rate"] is not None:
+    sf = sku_fee_rate(db, sku, platform)
+    if sf["rate"] is not None:
+        fees = round(price * sf["rate"], 2); fee_precision = "SKU_EXACT"
+        fee_source = f"SKU_EXACT — SP Finances ke ₹{sf['gross_basis']:,.0f} gross par is SKU ki asal fee-dar {sf['rate']*100:.1f}%"
+    elif rf["rate"] is not None:
         # V12.2 fee precision: settlements kul bikri ka kitna hissa dhakte hain, usi hisaab se bharosa
         import analytics as AN
         gmv = AN.sales_totals(db)["revenue"] or 0

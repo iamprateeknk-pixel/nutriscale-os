@@ -57,6 +57,36 @@ class AmazonSP:
         r = self._get(f"/orders/{ORDERS_VERSION}/orders/{order_id}/orderItems")
         return r.get("payload", {}).get("OrderItems", [])
 
+    def get_order_financials(self, order_id: str) -> list:
+        """Finances API: order ki asal fees SKU tak (V13 — SKU-exact fees ka rasta).
+        Har shipment item se: sku, gross (ItemPrice), fees (ItemFeeList ka yog, rinatmak)."""
+        r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
+        events = (r.get("payload") or {}).get("FinancialEvents", {})
+        out = []
+        for ev in events.get("ShipmentEventList", []):
+            for it in ev.get("ShipmentItemList", []):
+                fees = 0.0
+                for f in it.get("ItemFeeList", []):
+                    fees += float((f.get("FeeAmount") or {}).get("CurrencyAmount", 0) or 0)
+                gross = 0.0
+                for c in it.get("ItemChargeList", []):
+                    if c.get("ChargeType") == "Principal":
+                        gross += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
+                out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
+                            "gross": gross, "fees": abs(fees)})
+        return out
+
+    def put_listing(self, sku: str, product_type: str, attributes: dict, mode: str = "VALIDATION_PREVIEW") -> dict:
+        """Listings Items API (2021-08-01): listing publish/update. Sirf certified capability par chalega.
+        mode=VALIDATION_PREVIEW par Amazon sirf parkhega, live nahi karega — pilot ke liye surakshit pehla kadam."""
+        seller = self.cfg.get("seller_id")
+        if not seller:
+            raise ValueError("amazon_sp config me seller_id baki hai — bina iske Listings API nahi chalegi")
+        body = {"productType": product_type, "mode": mode, "attributes": attributes}
+        url = ENDPOINT + f"/listings/2021-08-01/items/{seller}/{sku}"
+        return request_json("PUT", url + f"?marketplaceIds={self.cfg['marketplace_id']}",
+                            headers=self._headers(), json_body=body, transport=self.transport)
+
     def search_catalog_items(self, keywords: str) -> list:
         r = self._get("/catalog/2022-04-01/items", {"marketplaceIds": self.cfg["marketplace_id"],
                                                     "keywords": keywords, "pageSize": 20})

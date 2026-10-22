@@ -1,5 +1,19 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V12.2 audit-fix-2)_
+_Updated: 22 Oct 2026 (V13 — code-side 100% band)_
+
+## 🏁 V13 — Code-side jo kuch bhi bacha tha, sab band (22 Oct 2026)
+| Bacha hua kaam | Hal |
+|---|---|
+| Self-learning aadha tha (action lagta, nateeja khud nahi maapa jata tha) | **Outcome Engine**: execute par baseline tasveer; 7/14 din par asal dobara-maap; jeet/guardrail se success; kind-wise asal jeet-dar (rule confidence) — seekh ab asal bikri se banti hai |
+| SKU-wise exact fees baaki thi | **SP Finances API** se per-order fees → `order_fees`; contribution me sabse pakkī `SKU_EXACT` shreni sabse upar |
+| Automatic listing publishing pending tha | **Listings Items API** path: APPROVED version hi; pehle VALIDATION_PREVIEW parkh; live sirf `write_listings=certified` par; Amazon ke issues jaise-aaye darj |
+| SKU 360° drilldown nahi tha | Products screen me **360° panel** (bikri, munafa+fee precision, stock cover, listing versions) + War Room **platform filter** |
+| HTTPS/protected deployment | `docker-compose.prod.yml` + Caddy (auto-HTTPS + security headers) — domain/host milte hi chalu |
+| Security/load saboot | Injection-parakh, kill-switch par vendor execute block, 2000-order performance smoke — `test_v13_hundred.py` |
+
+**Code-side: 19/19 suites, kuch pending nahi।** Iske aage ke % code se nahi badhenge — woh live duniya ke hain:
+live certification (tumhari API keys), Ads/Listings pilot sign-off (certified gates), licensed rank data (contract),
+repo Private (GitHub Settings), hosting + 14-din pilot, aur hero SKU cost sheet.
 
 ## 🔧 V12.2 — Dusre audit ke 6 asal source-mismatch fix (22 Oct 2026)
 | Issue | Fix |
