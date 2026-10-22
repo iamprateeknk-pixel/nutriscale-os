@@ -25,16 +25,32 @@ def sync_amazon_orders(store, since: str, sp=None) -> dict:
     for o in orders:
         oid = o.get("AmazonOrderId", "")
         total = float((o.get("OrderTotal") or {}).get("Amount", 0) or 0)
-        db.execute("INSERT OR IGNORE INTO order_headers VALUES (?,?,?,?,?,?,?)",
+        # V15: IGNORE nahi, UPSERT — order ki halat (Shipped->Cancelled) aur rakam badal sakti hai
+        db.execute("""INSERT INTO order_headers VALUES (?,?,?,?,?,?,?)
+                      ON CONFLICT(platform,seller_account,external_order_id)
+                      DO UPDATE SET status=excluded.status, total=excluded.total""",
                    ("Amazon", "default", oid, str(o.get("PurchaseDate", ""))[:10], o.get("OrderStatus", ""), total, "INR"))
         for it in sp.get_order_items(oid):
             amt = float((it.get("ItemPrice") or {}).get("Amount", 0) or 0)
-            db.execute("INSERT OR IGNORE INTO order_items VALUES (?,?,?,?,?,?,?,?,?)",
+            db.execute("""INSERT INTO order_items VALUES (?,?,?,?,?,?,?,?,?)
+                          ON CONFLICT(platform,seller_account,external_order_id,line_id)
+                          DO UPDATE SET qty=excluded.qty, gross=excluded.gross""",
                        ("Amazon", "default", oid, str(it.get("OrderItemId", "")), it.get("SellerSKU", ""),
                         it.get("ASIN", ""), float(it.get("QuantityOrdered", 1) or 1), amt, 0))
             n_items += 1
     db.commit()
     return {"orders": len(orders), "items": n_items, "note": "Canonical line-level sync ho gaya"}
+
+def sync_campaign_map(store, ads=None) -> dict:
+    """Ads API se campaign ID -> naam ka naksha (V15): outcome maap ID se naam tak pakka pahunche."""
+    from connectors.amazon_ads import AmazonAds
+    from platform_core import map_campaign
+    ads = ads or AmazonAds()
+    camps = ads.list_campaigns()
+    for c in camps:
+        if c.get("name"): store.upsert_campaign(c["name"], "Amazon", 0, 0, source="Ads API")
+        if c.get("campaignId") and c.get("name"): map_campaign(store.db, "Amazon", c["campaignId"], c["name"])
+    return {"campaigns": len(camps), "mapped": sum(1 for c in camps if c.get("campaignId"))}
 
 def sync_order_fees(store, days: int = 3, sp=None) -> dict:
     """SP Finances: taaza orders ki per-order fees order_fees me (SKU-exact dar ke liye, V14 scheduled)."""
@@ -46,11 +62,13 @@ def sync_order_fees(store, days: int = 3, sp=None) -> dict:
     cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
     ids = [r["external_order_id"] for r in db.execute(
         "SELECT external_order_id FROM order_headers WHERE platform='Amazon' AND order_date>=?", (cutoff,))]
-    total = 0
+    total, refunds = 0, 0
     for oid in ids:
         total += F.import_order_fees(db, sp.get_order_financials(oid))["imported"]
-    return {"orders_checked": len(ids), "fee_rows": total,
-            "note": "Fees SP Finances se aayi — SKU-exact dar ab in par banega"}
+        if hasattr(sp, "get_order_refunds"):
+            refunds += F.record_refunds(db, sp.get_order_refunds(oid))["updated_lines"]
+    return {"orders_checked": len(ids), "fee_rows": total, "refund_lines": refunds,
+            "note": "Fees + refunds SP Finances se aaye — revenue ab NET ginega"}
 
 def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:
     """Flipkart orders (canonical) + listings (catalog). Ads Flipkart par report-only hai (capability registry)."""
@@ -62,9 +80,14 @@ def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:
         oid = str(it.get("orderId") or it.get("order_id") or "")
         if not oid: continue
         price = float(it.get("price") or it.get("sellingPrice") or 0)
-        db.execute("INSERT OR IGNORE INTO order_headers VALUES (?,?,?,?,?,?,?)",
-                   ("Flipkart", "default", oid, str(it.get("orderDate", ""))[:10], "imported", price, "INR"))
-        db.execute("INSERT OR IGNORE INTO order_items VALUES (?,?,?,?,?,?,?,?,?)",
+        status = str(it.get("status") or "imported")
+        db.execute("""INSERT INTO order_headers VALUES (?,?,?,?,?,?,?)
+                      ON CONFLICT(platform,seller_account,external_order_id)
+                      DO UPDATE SET status=excluded.status, total=excluded.total""",
+                   ("Flipkart", "default", oid, str(it.get("orderDate", ""))[:10], status, price, "INR"))
+        db.execute("""INSERT INTO order_items VALUES (?,?,?,?,?,?,?,?,?)
+                      ON CONFLICT(platform,seller_account,external_order_id,line_id)
+                      DO UPDATE SET qty=excluded.qty, gross=excluded.gross""",
                    ("Flipkart", "default", oid, str(it.get("orderItemId") or it.get("order_item_id") or oid),
                     str(it.get("sku") or it.get("skuId") or ""), str(it.get("fsn") or ""),
                     float(it.get("quantity") or 1), price, 0))
@@ -115,10 +138,7 @@ def main():
             from connectors.amazon_ads import AmazonAds
             print(AmazonAds().sync_search_terms(store, a.start, a.end))
         elif a.connector == "amazon_ads":
-            from connectors.amazon_ads import AmazonAds
-            camps = AmazonAds().list_campaigns()
-            for c in camps: store.upsert_campaign(c.get("name", ""), "Amazon", 0, 0, source="Ads API")
-            print(f"Amazon Ads se campaigns sync hue: {len(camps)}")
+            print(sync_campaign_map(store))
         elif a.connector == "flipkart":
             print(sync_flipkart(store, a.from_date, a.to_date))
         elif a.connector == "unicommerce":

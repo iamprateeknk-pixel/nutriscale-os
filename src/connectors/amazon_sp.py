@@ -76,6 +76,21 @@ class AmazonSP:
                             "gross": gross, "fees": abs(fees)})
         return out
 
+    def get_order_refunds(self, order_id: str) -> list:
+        """Finances RefundEventList: kis SKU par kitna refund gaya (V15 — reconciliation).
+        Refund charges rinatmak Principal ke roop me aate hain; hum sakaratmak rakam lautate hain."""
+        r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
+        events = (r.get("payload") or {}).get("FinancialEvents", {})
+        out = []
+        for ev in events.get("RefundEventList", []):
+            for it in ev.get("ShipmentItemAdjustmentList", []):
+                amt = 0.0
+                for c in it.get("ItemChargeList", []):
+                    if c.get("ChargeType") == "Principal":
+                        amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
+                if amt: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""), "refund": abs(amt)})
+        return out
+
     def put_listing(self, sku: str, product_type: str, attributes: dict, mode: str = "VALIDATION_PREVIEW") -> dict:
         """Listings Items API (2021-08-01): listing publish/update. Sirf certified capability par chalega.
         mode=VALIDATION_PREVIEW par Amazon sirf parkhega, live nahi karega — pilot ke liye surakshit pehla kadam."""

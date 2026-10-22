@@ -61,7 +61,9 @@ def test_outcome_windowed():
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',?,'INR')", (oid, d, gross))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-W','B0',1,?,0)", (oid, oid + "L", gross))
     order("B1", 10, 1000)   # lagne se pehle ki khidki
+    order("B2", 11, 500)
     order("A1", 3, 3000)    # lagne ke baad ki khidki
+    order("A2", 4, 500)
     st.db.commit()
     p = create_proposal(st.db, "PRICE_TEST", "Amazon", "acc", {"sku": "SKU-W"}, "ONE_TAP", "t", "ow-1")
     approve(st.db, p["id"], owner); queue_action(st.db, p["id"], owner)
@@ -73,7 +75,7 @@ def test_outcome_windowed():
     out = OE.measure_due(st.db, windows=(7,))
     assert out["measured"] == 1, f"khidki-maap hona chahiye: {out}"
     row = st.db.execute("SELECT * FROM outcomes WHERE action_id=?", (p["id"],)).fetchone()
-    assert row["metric"] == "sku_revenue_window" and row["before_val"] == 1000 and row["after_val"] == 3000 and row["success"] == 1
+    assert row["metric"] == "sku_revenue_window" and row["before_val"] == 1500 and row["after_val"] == 3500 and row["success"] == 1
     st.close()
 
 def test_fees_in_data_sync_and_publish_endpoint():

@@ -40,26 +40,45 @@ def capture_baseline(db, action_id: int):
     db.execute("UPDATE action_v12 SET baseline=? WHERE id=?",
                (json.dumps(snapshot(db, payload)), action_id)); db.commit()
 
-def _window_data(db, payload: dict, d0: str, d1: str) -> dict:
-    """[d0, d1) khidki ka ASAL dated data — V14: jama-kul (accumulated) totals se tulna galat thi,
-    isiliye campaign ke liye period-tagged search_terms aur SKU ke liye dated canonical orders."""
+def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> dict:
+    """[d0, d1) khidki ka ASAL dated data — V14 khidki-maap, V15 me ID-resolution + coverage gate.
+    Campaign sirf tab maapa jayega jab period-coverage khidki ke >=70% din dhake;
+    SKU sirf tab jab dono khidkiyon me milakar kam-se-kam 4 order-lines hon (warna INSUFFICIENT)."""
     out = {"campaign": None, "sku_revenue": None, "total_revenue": None}
     camp = payload.get("campaign") or payload.get("campaign_name")
+    if not camp and payload.get("campaign_id"):
+        from platform_core import campaign_name_for
+        camp = campaign_name_for(db, payload.get("platform", "Amazon"), payload["campaign_id"])
     if camp:
+        import datetime as _dt
         r = db.execute("""SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa, COUNT(*) n FROM search_terms
                           WHERE campaign=? AND period_start>=? AND period_end<? AND period_start<>''""",
                        (camp, d0, d1)).fetchone()
-        if r and r["n"]: out["campaign"] = {"spend": r["sp"], "sales": r["sa"]}
+        periods = db.execute("""SELECT DISTINCT period_start, period_end FROM search_terms
+                                WHERE campaign=? AND period_start>=? AND period_end<? AND period_start<>''""",
+                             (camp, d0, d1)).fetchall()
+        lo, hi = _dt.date.fromisoformat(d0), _dt.date.fromisoformat(d1) - _dt.timedelta(days=1)
+        covered = set()
+        for p in periods:
+            d = _dt.date.fromisoformat(str(p["period_start"])[:10])
+            e = _dt.date.fromisoformat(str(p["period_end"])[:10])
+            while d <= e:
+                if lo <= d <= hi: covered.add(d)
+                d += _dt.timedelta(days=1)
+        if r and r["n"] and len(covered) >= 0.7 * window_days:
+            out["campaign"] = {"spend": r["sp"], "sales": r["sa"]}
     sku = payload.get("sku")
     if sku:
-        r = db.execute("""SELECT COALESCE(SUM(oi.gross),0) g FROM order_items oi JOIN order_headers oh
+        r = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi JOIN order_headers oh
                           ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
-                          WHERE oi.sku=? AND oh.order_date>=? AND oh.order_date<?""", (sku, d0, d1)).fetchone()
+                          WHERE oi.sku=? AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
+                       (sku, d0, d1)).fetchone()
         out["sku_revenue"] = r["g"] if r else 0.0
-    t = db.execute("""SELECT COALESCE(SUM(oi.gross),0) g, COUNT(*) n FROM order_items oi JOIN order_headers oh
+    t = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n FROM order_items oi JOIN order_headers oh
                       ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
-                      WHERE oh.order_date>=? AND oh.order_date<?""", (d0, d1)).fetchone()
+                      WHERE oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""", (d0, d1)).fetchone()
     if t and t["n"]: out["total_revenue"] = t["g"]
+    out["_lines"] = t["n"] if t else 0
     return out
 
 def _judge_windows(kind: str, b: dict, a: dict):
@@ -93,8 +112,11 @@ def measure_due(db, windows=(7, 14)) -> dict:
             if now < applied + datetime.timedelta(days=w): continue
             if db.execute("SELECT 1 FROM outcomes WHERE action_id=? AND window_days=?", (r["id"], w)).fetchone(): continue
             d = lambda dt: dt.date().isoformat()
-            b = _window_data(db, payload, d(applied - datetime.timedelta(days=w)), d(applied))
-            a = _window_data(db, payload, d(applied), d(applied + datetime.timedelta(days=w)))
+            b = _window_data(db, payload, d(applied - datetime.timedelta(days=w)), d(applied), w)
+            a = _window_data(db, payload, d(applied), d(applied + datetime.timedelta(days=w)), w)
+            # V15 coverage gate: SKU-raah par kul order-lines bahut kam hon to nateeja andaza hoga — rokho
+            if not (b["campaign"] and a["campaign"]) and (b["_lines"] + a["_lines"]) < 4:
+                b["sku_revenue"] = a["sku_revenue"] = None
             judged = _judge_windows(r["kind"], b, a)
             if judged is None:
                 if now >= applied + datetime.timedelta(days=2 * w):

@@ -39,6 +39,16 @@ def import_order_fees(db, rows: list, platform: str = "Amazon") -> dict:
         n += 1
     db.commit(); return {"imported": n}
 
+def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
+    """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15)."""
+    ensure_v12(db); n = 0
+    for r in rows:
+        if not r.get("sku"): continue
+        cur = db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND sku=?",
+                         (float(r.get("refund") or 0), platform, r["order_id"], r["sku"]))
+        n += cur.rowcount
+    db.commit(); return {"updated_lines": n}
+
 def sku_fee_rate(db, sku: str, platform: str = "Amazon") -> dict:
     """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT)."""
     ensure_v12(db)

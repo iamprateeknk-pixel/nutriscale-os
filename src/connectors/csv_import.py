@@ -106,9 +106,14 @@ def import_orders_canonical(path: str, store, platform: str = "Amazon", account:
             amt = _num(_find(row, "item-price", "Item Price", "Selling Price", "Amount", "price"))
             qty = _num(_find(row, "quantity-purchased", "Quantity", "Qty")) or 1
             if not oid or not sku: bad += 1; continue
-            db.execute("INSERT OR IGNORE INTO order_headers VALUES (?,?,?,?,?,?,?)",
-                       (platform, account, str(oid).strip(), str(_find(row, "purchase-date", "Order Date") or "")[:10], "imported", amt, "INR"))
-            db.execute("INSERT OR IGNORE INTO order_items VALUES (?,?,?,?,?,?,?,?,?)",
+            status = str(_find(row, "order-status", "Order Status", "status") or "imported")
+            db.execute("""INSERT INTO order_headers VALUES (?,?,?,?,?,?,?)
+                          ON CONFLICT(platform,seller_account,external_order_id)
+                          DO UPDATE SET status=excluded.status, total=excluded.total""",
+                       (platform, account, str(oid).strip(), str(_find(row, "purchase-date", "Order Date") or "")[:10], status, amt, "INR"))
+            db.execute("""INSERT INTO order_items VALUES (?,?,?,?,?,?,?,?,?)
+                          ON CONFLICT(platform,seller_account,external_order_id,line_id)
+                          DO UPDATE SET qty=excluded.qty, gross=excluded.gross""",
                        (platform, account, str(oid).strip(), str(line).strip(), str(sku).strip(),
                         str(_find(row, "asin", "ASIN") or ""), qty, amt, 0))
             n += 1

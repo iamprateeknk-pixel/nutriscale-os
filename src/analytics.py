@@ -9,17 +9,25 @@ def sales_totals(db, platform: str = None) -> dict:
     ensure_v12(db)
     w = "WHERE platform=?" if platform else ""
     args = (platform,) if platform else ()
-    ci = db.execute(f"SELECT COALESCE(SUM(gross),0) g, COUNT(*) lines FROM order_items {w}", args).fetchone()
+    # V15: revenue NET hai (gross - refund) aur Cancelled orders ginati se bahar
+    jw = ("WHERE oi.platform=?" if platform else "") + (" AND" if platform else "WHERE") + " COALESCE(oh.status,'') NOT LIKE 'Cancel%'"
+    ci = db.execute(f"""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) lines
+                        FROM order_items oi JOIN order_headers oh
+                          ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id {jw}""", args).fetchone()
     if ci["lines"]:
         oc = db.execute(f"SELECT COUNT(DISTINCT platform||'|'||external_order_id) c FROM order_headers {w}", args).fetchone()["c"]
-        return {"revenue": round(ci["g"], 2), "orders": oc, "lines": ci["lines"], "source": "CANONICAL (order_items)"}
+        return {"revenue": round(ci["g"], 2), "orders": oc, "lines": ci["lines"], "source": "CANONICAL NET (order_items − refunds, cancelled bahar)"}
     lo = db.execute(f"SELECT COALESCE(SUM(amount),0) s, COUNT(*) c FROM orders {w}", args).fetchone()
     return {"revenue": round(lo["s"], 2), "orders": lo["c"], "lines": lo["c"], "source": "LEGACY (orders table — purana import)"}
 
-def sku_sales(db) -> list:
+def sku_sales(db, platform: str = None) -> list:
     ensure_v12(db)
-    rows = db.execute("""SELECT sku, SUM(qty) units, SUM(gross) revenue FROM order_items
-                         GROUP BY sku ORDER BY revenue DESC""").fetchall()
+    w = "WHERE oi.platform=?" if platform else ""
+    rows = db.execute(f"""SELECT oi.sku, SUM(oi.qty) units, SUM(oi.gross - COALESCE(oi.refund,0)) revenue
+                          FROM order_items oi LEFT JOIN order_headers oh
+                            ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+                          {w} {'AND' if platform else 'WHERE'} COALESCE(oh.status,'') NOT LIKE 'Cancel%'
+                          GROUP BY oi.sku ORDER BY revenue DESC""", (platform,) if platform else ()).fetchall()
     if rows: return [dict(r) for r in rows]
     return [dict(r) for r in db.execute(
         "SELECT sku, COUNT(*) units, SUM(amount) revenue FROM orders GROUP BY sku ORDER BY revenue DESC")]

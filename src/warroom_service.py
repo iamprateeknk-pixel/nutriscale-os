@@ -24,11 +24,30 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
         ad_spend, paid_sales = round(camp["sp"], 2), round(camp["sa"], 2)
         # Organic = kul order sales - paid sales (flywheel ka asal hisaab)
         organic = max(0.0, st["revenue"] - paid_sales)
+        # V15: TACOS sirf MATCHED khidki par — pichle 30 din ki dated bikri banam usi khidki ka ads kharch;
+        # dono taraf ka dated data na mile to NOT_COMPARABLE (lifetime totals se jhootha ratio nahi)
+        import datetime as _dt
+        _end = _dt.date.today(); _start = _end - _dt.timedelta(days=29)
+        _sw = store.db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n
+            FROM order_items oi JOIN order_headers oh ON oi.platform=oh.platform AND oi.external_order_id=oh.external_order_id
+            WHERE oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""" +
+            (" AND oi.platform=?" if platform else ""),
+            ((_start.isoformat(), _end.isoformat()) + ((platform,) if platform else ()))).fetchone()
+        _aw = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COUNT(*) n FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>''",
+                               (_start.isoformat(), _end.isoformat())).fetchone()
+        if _sw["n"] and _aw["n"] and _sw["g"]:
+            tacos_m = {"pct": round(100.0 * _aw["sp"] / _sw["g"], 2), "status": "MATCHED",
+                       "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
+        else:
+            tacos_m = {"pct": None, "status": "NOT_COMPARABLE",
+                       "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
         fw = flywheel(ad_spend, paid_sales, organic) if ad_spend else {
             "blended_roas": 0, "paid_roas": 0, "tacos_pct": 0, "organic_share_pct": 0}
         return {"connected": True, "demo_data": False,
                 "connectors_status": cfg.status_all(),
-                "kpis": {**fw, "revenue": st["revenue"], "total_sales": st["revenue"],
+                "kpis": {**fw, "tacos_pct": tacos_m["pct"], "tacos_status": tacos_m["status"],
+                         "tacos_window": tacos_m["window"],
+                         "revenue": st["revenue"], "total_sales": st["revenue"],
                          "orders": st["orders"], "sales_source": st["source"],
                          "ad_spend": ad_spend, "paid_sales": paid_sales,
                          "organic_sales": round(organic, 2),

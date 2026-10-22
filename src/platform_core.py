@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS outcomes(
 CREATE TABLE IF NOT EXISTS order_fees(
   platform TEXT, external_order_id TEXT, sku TEXT, gross REAL, fees REAL,
   PRIMARY KEY(platform, external_order_id, sku));
+CREATE TABLE IF NOT EXISTS campaign_map(
+  platform TEXT, seller_account TEXT, campaign_id TEXT, name TEXT,
+  PRIMARY KEY(platform, seller_account, campaign_id));
 CREATE TABLE IF NOT EXISTS experiments(
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, sku TEXT, platform TEXT, hypothesis TEXT,
   primary_metric TEXT, intervention TEXT, baseline_note TEXT, start_date TEXT, end_date TEXT,
@@ -108,6 +111,17 @@ def ensure_v12(db) -> None:
             db.commit()
     except Exception:
         pass
+
+def map_campaign(db, platform: str, campaign_id: str, name: str, account: str = "default"):
+    ensure_v12(db)
+    db.execute("""INSERT INTO campaign_map VALUES (?,?,?,?)
+                  ON CONFLICT(platform,seller_account,campaign_id) DO UPDATE SET name=excluded.name""",
+               (platform, account, str(campaign_id), name)); db.commit()
+
+def campaign_name_for(db, platform: str, campaign_id: str):
+    ensure_v12(db)
+    r = db.execute("SELECT name FROM campaign_map WHERE platform=? AND campaign_id=?", (platform, str(campaign_id))).fetchone()
+    return r["name"] if r else None
 
 def now_utc() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")

@@ -1,5 +1,16 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 22 Oct 2026 (V14 — audit-3 correctness)_
+_Updated: 22 Oct 2026 (V15 — audit-4 data accuracy)_
+
+## 🎯 V15 — Chauthe audit ke data-accuracy mudde (22 Oct 2026)
+| Issue | Fix |
+|---|---|
+| War Room TACOS lifetime unmatched totals se banta tha | **Matched-period enforcement**: TACOS sirf pichle 30 din ki dated NET bikri banam usi khidki ke period-tagged ads kharch par; data aparyapt to `tacos_pct = null, status = NOT_COMPARABLE` — screen par jhootha ratio nahi dikhega |
+| Outcome maap campaign naam par nirbhar tha, actions me campaign_id hota hai | **campaign_map** (Ads sync se ID→naam naksha, roz ke sync me bhi); outcome ab ID se naam pakka dhoondhta hai |
+| Kam dated data par bhi success ghoshit ho sakta tha | **Coverage gates**: campaign raah par khidki ke ≥70% din ke periods dono taraf; SKU raah par kul ≥4 order-lines — warna INSUFFICIENT_DATA |
+| Canonical orders INSERT OR IGNORE — status/refund kabhi update nahi hote the | Teeno raasto (SP API, Flipkart, CSV) par **UPSERT**; refunds Finances se `order_items.refund` me; **revenue ab NET** hai aur **Cancelled orders ginati se bahar** |
+| Boundary din share karne wale periods ka takraav choot jata tha | Periods ab **inclusive date hisaab** se — ek din ka takraav bhi BLOCK; satta hua par alag dinon wala saaf |
+| Product 360 channels mix karta tha | `?platform=` par ek-channel nazar; bina platform ke **sales_by_platform** alag-alag + channels suchi |
+| Bacha hua (code se bahar) | Competitor/rank ka licensed provider, live seller-account verification, asal reports ka reconciliation, controlled pilot — sab live duniya ke kadam (neeche suchi) |
 
 ## 🎯 V14 — Teesre audit ki correctness kamiyaan (22 Oct 2026)
 Audit is baar aur gehrai me gaya — aur phir sahi nikla. Fixes (saboot: test_v14_audit3.py, kul 20 suites pass):

@@ -17,7 +17,9 @@ def test_outcome_engine_loop():
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',?,'INR')", (oid, d, gross))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-BR','B0',1,?,0)", (oid, oid + "L", gross))
     order("PB1", 10, 1500)   # pehle ki khidki
+    order("PB2", 11, 500)
     order("PA1", 3, 2600)    # baad ki khidki — behtar
+    order("PA2", 4, 400)
     st.db.commit()
     p = create_proposal(st.db, "BID_DOWN", "Amazon", "acc", {"sku": "SKU-BR"}, "ONE_TAP", "t", "oc-1")
     approve(st.db, p["id"], owner); queue_action(st.db, p["id"], owner)

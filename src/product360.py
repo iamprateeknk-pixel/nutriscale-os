@@ -5,12 +5,19 @@ sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12
 import analytics as AN
 
-def product_360(db, sku: str) -> dict:
+def product_360(db, sku: str, platform: str = None) -> dict:
+    """V15: channel-mixing band — platform diya to sirf wahi channel; warna har channel ki bikri
+    alag (sales_by_platform) aur kul ke saath channels ki suchi saaf dikhegi."""
     ensure_v12(db)
-    prod = db.execute("SELECT * FROM products WHERE sku=?", (sku,)).fetchone()
+    prod = db.execute("SELECT * FROM products WHERE sku=? AND (? IS NULL OR platform=?) ORDER BY platform LIMIT 1",
+                      (sku, platform, platform)).fetchone()
     if not prod: return {"found": False, "sku": sku, "error": "Catalog me ye SKU nahi hai"}
     prod = dict(prod)
-    sales = next((r for r in AN.sku_sales(db) if r["sku"] == sku), {"units": 0, "revenue": 0})
+    by_platform = {}
+    for pf in [r["platform"] for r in db.execute("SELECT DISTINCT platform FROM order_items WHERE sku=?", (sku,))]:
+        s = next((x for x in AN.sku_sales(db, pf) if x["sku"] == sku), None)
+        if s: by_platform[pf] = {"units": s["units"], "revenue": round(s["revenue"], 2)}
+    sales = next((r for r in AN.sku_sales(db, platform) if r["sku"] == sku), {"units": 0, "revenue": 0})
     import finance as F
     fin = F.contribution_v2(db, sku, prod["price"], prod["platform"] or "Amazon")
     inv_rows = db.execute("SELECT location, qty FROM inventory WHERE sku=?", (sku,)).fetchall()
@@ -22,6 +29,8 @@ def product_360(db, sku: str) -> dict:
     actions = db.execute("SELECT COUNT(*) c FROM action_v12 WHERE payload LIKE ?", (f'%"{sku}"%',)).fetchone()["c"]
     fees_exact = F.sku_fee_rate(db, sku, prod["platform"] or "Amazon")
     return {"found": True, "sku": sku, "name": prod["name"], "platform": prod["platform"],
+            "platform_view": platform or "ALL", "channels": sorted(by_platform.keys()),
+            "sales_by_platform": by_platform,
             "price": prod["price"], "rating": prod["rating"], "reviews": prod["reviews"],
             "sales": sales, "finance": fin,
             "inventory": {"total_qty": total_qty, "by_location": [dict(r) for r in inv_rows],

@@ -17,10 +17,16 @@ def _data_sync(store):
     today = datetime.date.today()
     if "amazon_ads" in ready:
         from connectors.amazon_ads import AmazonAds
+        import sync_service
         yday = (today - datetime.timedelta(days=1)).isoformat()
         # V14: ek-din ki khidki — roz wahi din ek hi baar, overlap ka sawal hi nahi
         r = AmazonAds().sync_search_terms(store, yday, yday)
         out.append(f"ads terms {r['imported']} ({r.get('overlap_status', '')})")
+        try:
+            m = sync_service.sync_campaign_map(store)
+            out.append(f"campaign naksha {m['mapped']}")
+        except Exception as e:
+            out.append(f"campaign naksha skip: {type(e).__name__}")
     if "amazon_sp" in ready:
         import sync_service
         since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)).isoformat()
