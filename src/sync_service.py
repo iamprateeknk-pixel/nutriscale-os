@@ -75,7 +75,8 @@ def sync_order_fees(store, days: int = 3, sp=None) -> dict:
         total += F.import_order_fees(db, sp.get_order_financials(oid),
                                      seller_account=row["seller_account"] or "default")["imported"]
         if hasattr(sp, "get_order_refunds"):
-            refunds += F.record_refunds(db, sp.get_order_refunds(oid))["updated_lines"]
+            refunds += F.record_refunds(db, sp.get_order_refunds(oid),
+                                        seller_account=row["seller_account"] or "default")["updated_lines"]
     return {"orders_checked": len(rows), "fee_rows": total, "refund_lines": refunds,
             "note": "Fees + refunds SP Finances se aaye — revenue ab NET ginega"}
 

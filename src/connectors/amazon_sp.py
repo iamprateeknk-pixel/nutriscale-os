@@ -67,13 +67,7 @@ class AmazonSP:
         import hashlib
         r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
         events = (r.get("payload") or {}).get("FinancialEvents", {})
-        out, seq = [], {}
-        def _eid(etype, posted, sku, gross, fees, refund):
-            key = (etype, sku)
-            seq[key] = seq.get(key, 0) + 1
-            basis = "|".join([order_id, etype, str(posted or ""), sku,
-                              f"{gross:.2f}", f"{fees:.2f}", f"{refund:.2f}", str(seq[key])])
-            return "spfin:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
+        raw = []
         for ev in events.get("ShipmentEventList", []):
             posted = str(ev.get("PostedDate", "") or "")
             for it in ev.get("ShipmentItemList", []):
@@ -84,10 +78,8 @@ class AmazonSP:
                 for c in it.get("ItemChargeList", []):
                     if c.get("ChargeType") == "Principal":
                         gross += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
-                sku = it.get("SellerSKU", "")
-                out.append({"order_id": order_id, "sku": sku, "event_type": "SHIPMENT",
-                            "posted_at": posted, "gross": gross, "fees": abs(fees), "refund": 0.0,
-                            "event_id": _eid("SHIPMENT", posted, sku, gross, abs(fees), 0.0)})
+                raw.append({"order_id": order_id, "sku": it.get("SellerSKU", ""), "event_type": "SHIPMENT",
+                            "posted_at": posted, "gross": gross, "fees": abs(fees), "refund": 0.0})
         for ev in events.get("RefundEventList", []):
             posted = str(ev.get("PostedDate", "") or "")
             for it in ev.get("ShipmentItemAdjustmentList", []):
@@ -96,26 +88,49 @@ class AmazonSP:
                     if c.get("ChargeType") == "Principal":
                         amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
                 if not amt: continue
-                sku = it.get("SellerSKU", "")
-                out.append({"order_id": order_id, "sku": sku, "event_type": "REFUND",
-                            "posted_at": posted, "gross": 0.0, "fees": 0.0, "refund": abs(amt),
-                            "event_id": _eid("REFUND", posted, sku, 0.0, 0.0, abs(amt))})
-        return out
+                raw.append({"order_id": order_id, "sku": it.get("SellerSKU", ""), "event_type": "REFUND",
+                            "posted_at": posted, "gross": 0.0, "fees": 0.0, "refund": abs(amt)})
+        # V21: event-id ab RESPONSE KE ORDER par nirbhar NAHI — pehle rows ek pakke kram me
+        # sajengi, phir har BILKUL-IDENTICAL samuh ke andar hi ginati lagegi. API events ko
+        # dusre kram me bheje to bhi ids wahi rahengi; naya alag event judne se purane ids
+        # nahi badlenge (partial/reordered responses par duplicate/miss ka regression test hai).
+        raw.sort(key=lambda x: (x["event_type"], x["posted_at"], x["sku"], x["gross"], x["fees"], x["refund"]))
+        seen = {}
+        for row in raw:
+            key = (row["event_type"], row["posted_at"], row["sku"], row["gross"], row["fees"], row["refund"])
+            seen[key] = seen.get(key, 0) + 1
+            basis = "|".join([order_id, row["event_type"], row["posted_at"], row["sku"],
+                              f"{row['gross']:.2f}", f"{row['fees']:.2f}", f"{row['refund']:.2f}", str(seen[key])])
+            row["event_id"] = "spfin:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
+        return raw
 
     def get_order_refunds(self, order_id: str) -> list:
-        """Finances RefundEventList: kis SKU par kitna refund gaya (V15 — reconciliation).
+        """Finances RefundEventList: kis SKU/line par kitna refund gaya (V15 — reconciliation).
+        V21: har refund-adjustment apni EVENT row hai (stable event_id + posted date) —
+        record_refunds inhe ledger me jodta hai; partial refunds ab ek dusre ko mitayenge nahi.
         Refund charges rinatmak Principal ke roop me aate hain; hum sakaratmak rakam lautate hain."""
+        import hashlib
         r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
         events = (r.get("payload") or {}).get("FinancialEvents", {})
         out = []
         for ev in events.get("RefundEventList", []):
+            posted = str(ev.get("PostedDate", "") or "")
             for it in ev.get("ShipmentItemAdjustmentList", []):
                 amt = 0.0
                 for c in it.get("ItemChargeList", []):
                     if c.get("ChargeType") == "Principal":
                         amt += float((c.get("ChargeAmount") or {}).get("CurrencyAmount", 0) or 0)
                 if amt: out.append({"order_id": order_id, "sku": it.get("SellerSKU", ""),
-                                    "line_id": it.get("OrderItemId") or "", "refund": abs(amt)})
+                                    "line_id": it.get("OrderItemId") or "", "refund": abs(amt),
+                                    "posted_at": posted})
+        out.sort(key=lambda x: (x["posted_at"], x["sku"], x["line_id"], x["refund"]))
+        seen = {}
+        for row in out:
+            key = (row["posted_at"], row["sku"], row["line_id"], row["refund"])
+            seen[key] = seen.get(key, 0) + 1
+            basis = "|".join([order_id, "REFUND", row["posted_at"], row["sku"], row["line_id"],
+                              f"{row['refund']:.2f}", str(seen[key])])
+            row["event_id"] = "spref:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
         return out
 
     def put_listing(self, sku: str, product_type: str, attributes: dict, mode: str = "VALIDATION_PREVIEW") -> dict:

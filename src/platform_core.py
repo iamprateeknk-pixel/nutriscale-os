@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS order_fee_events(
   event_id TEXT PRIMARY KEY, platform TEXT, seller_account TEXT DEFAULT 'default',
   external_order_id TEXT, sku TEXT, event_type TEXT, gross REAL, fees REAL, refund REAL,
   posted_at TEXT, imported_at TEXT);
+CREATE TABLE IF NOT EXISTS refund_events(
+  event_id TEXT PRIMARY KEY, platform TEXT, seller_account TEXT DEFAULT 'default',
+  external_order_id TEXT, line_id TEXT, sku TEXT, amount REAL, posted_at TEXT, imported_at TEXT);
+CREATE TABLE IF NOT EXISTS catalog_snapshots(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, seller_account TEXT, asin TEXT, sku TEXT,
+  title TEXT, category TEXT, bsr INT, price REAL, rating REAL, reviews INT,
+  captured_date TEXT, source TEXT, batch_id TEXT, imported_at TEXT);
 CREATE TABLE IF NOT EXISTS stock_channel_map(
   location TEXT PRIMARY KEY, channel TEXT, updated_by TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS brand_analytics(

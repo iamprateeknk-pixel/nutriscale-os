@@ -53,20 +53,27 @@ def sku_velocity_report(db, sku: str, window_days: int = 30, platform: str = Non
            WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'"""
     mx = db.execute(f"SELECT MAX(oh.order_date) m {j}", (sku, platform, platform)).fetchone()
     last = str(mx["m"])[:10] if mx and mx["m"] else None
-    r = db.execute(f"""SELECT COALESCE(SUM(oi.qty),0) q, MIN(oh.order_date) f, MAX(oh.order_date) t {j}
+    r = db.execute(f"""SELECT COALESCE(SUM(oi.qty),0) q, MIN(oh.order_date) f, MAX(oh.order_date) t,
+                              COUNT(DISTINCT oh.order_date) od {j}
                        AND oh.order_date>=? AND oh.order_date<=?""",
                    (sku, platform, platform, start.isoformat(), end.isoformat())).fetchone()
     units = float(r["q"] or 0) if r else 0.0
-    vel = 0.0
+    # V21 P0 FIX: denominator ab POORA reporting window (30 din) hai — V20 tak units sirf
+    # pehli-aakhri bikri ke beech ke dino se bant-te the, jisse 3-din ki bikri bhi poori
+    # raftaar lagti thi aur cover kam dikhta tha. Span-wali sankhya ab alag 'run_rate' hai.
+    vel = units / window_days if units else 0.0
+    run_rate = 0.0
     if units:
         span = (_dt.date.fromisoformat(str(r["t"])[:10]) - _dt.date.fromisoformat(str(r["f"])[:10])).days + 1
-        vel = units / max(1, min(window_days, span))
+        run_rate = units / max(1, span)
     since = (end - _dt.date.fromisoformat(last)).days if last else None
     return {"sku": sku, "platform": platform, "velocity_per_day": round(vel, 4),
+            "run_rate_per_day": round(run_rate, 4),
+            "observed_sale_days": (r["od"] if r else 0),
             "window_start": start.isoformat(), "window_end": end.isoformat(), "window_days": window_days,
             "units_in_window": units, "last_sale_date": last, "days_since_last_sale": since,
             "stale": (since is None or since > STALE_WARN_DAYS),
-            "basis": "CANONICAL trailing window — aaj se peeche (V20)",
+            "basis": "CANONICAL — units / POORA reporting window (V21); run_rate sirf jaankari ke liye",
             "warning": ("STALE DATA — is SKU ki aakhri bikri " + (f"{since} din pehle" if since is not None else "kabhi darj hi nahi") +
                         "; raftaar purane data par bharosa karke mat chalao, pehle taaza sync karo") if (since is None or since > STALE_WARN_DAYS) else None}
 

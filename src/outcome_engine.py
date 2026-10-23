@@ -87,6 +87,11 @@ def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> d
     out["_order_day_coverage"] = round(100.0 * (t["od"] if t else 0) / window_days, 1)
     return out
 
+def _min_order_days(window_days: int) -> int:
+    """VERIFIED ke liye har khidki me kam-se-kam itne order-din (V21 threshold)."""
+    import math
+    return max(2, math.ceil(0.25 * window_days))
+
 def _contamination(db, action_id: int, payload: dict, applied, window_days: int) -> list:
     """Cross-channel / same-target contamination (V20): isi SKU ya campaign par koi AUR
     APPLIED_VERIFIED action is maap-khidki ke aas-paas laga ho to nateeja kisi ek ke naam
@@ -164,8 +169,10 @@ def measure_due(db, windows=(7, 14)) -> dict:
                 attribution, succ_val = "CONTAMINATED", None
             elif metric == "campaign_roas_window":
                 attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # campaign raah 70% coverage gate pehle se lazmi hai
-            elif b["_order_days"] >= 1 and a["_order_days"] >= 1:
-                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # dono khidkiyon me orders-feed zinda tha
+            elif (b["_lines"] + a["_lines"]) >= 8 and b["_order_days"] >= _min_order_days(w) and a["_order_days"] >= _min_order_days(w):
+                # V21: VERIFIED ke liye asal namuna chahiye — kul >=8 order-lines aur har khidki me
+                # kam-se-kam max(2, khidki ke 25%) order-din. Ek-ek din ke data par 'verified' jhooth tha.
+                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0
             else:
                 attribution, succ_val = "LOW_COVERAGE", 1 if (success and guard) else 0
             db.execute("INSERT INTO outcomes(action_id,kind,window_days,metric,before_val,after_val,success,guardrail_ok,measured_at,attribution,coverage_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?)",

@@ -56,7 +56,8 @@ def test_channel_velocity():
     _o(st, "VF1", 1, "SKU-V", 0, platform="Flipkart", qty=5)
     va = AN.sku_velocity_per_day(st.db, "SKU-V", platform="Amazon")
     vf = AN.sku_velocity_per_day(st.db, "SKU-V", platform="Flipkart")
-    assert abs(va - 2.0) < 0.01 and vf == 5.0, (va, vf)
+    # V21: denominator poora 30-din window — Amazon 20 units, Flipkart 5 units
+    assert abs(va - 20 / 30) < 0.01 and abs(vf - 5 / 30) < 0.01, (va, vf)
     st.close()
 
 if __name__ == "__main__":

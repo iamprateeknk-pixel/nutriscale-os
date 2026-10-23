@@ -23,7 +23,9 @@ def test_velocity_span():
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?, 'SKU-V','B0',5,500,0)", (f"V{i}", f"L{i}"))
     st.db.commit()
     v = AN.sku_velocity_per_day(st.db, "SKU-V")
-    assert abs(v - 1.0) < 0.01, f"span 10 din par 10 units = 1/din hona chahiye, mila {v}"
+    # V21: mukhya velocity = units / POORA window (10/30); span-wala 1.0 ab sirf run_rate (jaankari)
+    assert abs(v - 10 / 30) < 0.01, f"poora-window velocity 10/30 honi chahiye, mili {v}"
+    assert abs(AN.sku_velocity_report(st.db, "SKU-V")["run_rate_per_day"] - 1.0) < 0.01
     st.close()
 
 def test_period_overlap_rules():

@@ -120,8 +120,16 @@ def _backup(store):
     r = OF.create_backup(db_path, dest)
     return f"Backup taiyaar: {os.path.basename(dest)} ({r['tables']} tables, restore-parikshan ke saath)" if r["ok"] else "Backup fail"
 
+def _brand_analytics_import(store):
+    """V22: drop-folder automation — nayi SQP/SCP files khud import, purani SHA se rukengi."""
+    import brand_analytics as BA
+    r = BA.import_dropfolder(store.db)
+    if not r["available"]: return r["note"]
+    return f"Brand Analytics: {r['files_seen']} file(s) dekhi, {r['imported_files']} nayi import ({r['rows_imported']} rows)"
+
 def build_handlers(store) -> dict:
     return {
+        "brand_analytics_import": lambda: _brand_analytics_import(store),
         "backup_restore": lambda: _backup(store),
         "learning_crawl": lambda: _learning_crawl(store),
         "data_sync": lambda: _data_sync(store),

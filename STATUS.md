@@ -1,5 +1,20 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 23 Oct 2026 (V20 — audit-8 closure: stale velocity, fee events, stock mapping, attribution, Brand Analytics)_
+_Updated: 23 Oct 2026 (V21+V22 — audit-9 closure + marketplace data automation)_
+
+## 🔧 V21 — Naven audit ke 5 calculation/data issues band (23 Oct 2026)
+(saboot: test_v21_v22_fixes.py + purane suites naye basis par update; kul 27 suites pass)
+- **P0 Refund overwrite**: `record_refunds` ab **event-ledger** par hai (`refund_events`, scope = platform+seller_account+order+line) — ek line par kai partial refunds **judte** hain, mitte nahi; wahi event dobara aane par dohari ginati nahi. Pro-rata baant bhi ab cumulative kul par.
+- **P0 Velocity denominator**: mukhya velocity = units / **poora 30-din reporting window**; span-wali sankhya alag `run_rate_per_day` (sirf jaankari) + `observed_sale_days` report me. Cover ab is conservativ hisaab par banta hai.
+- **P1 VERIFIED sakht**: SKU outcome ab VERIFIED tabhi jab kul **≥8 order-lines** aur har khidki me **≥max(2, window ka 25%) order-din**; warna LOW_COVERAGE (nateeja darj, seekh nahi). Chhota namuna ab 'verified' nahi kahlayega.
+- **P1 Event-ID stability**: financial event-ids ab response ke **order se swatantra** (pehle pakka kram-sort, phir identical-samuh ke andar ginati) — reordered response par ids wahi, naya event judne par purane ids sthir; reorder/partial ke regression tests maujud.
+- **P1 Availability imaandaari**: Product 360 me stock ab **VERIFIED sellable** aur **UNKNOWN availability** alag-alag dikhata hai (sellable_qty darj na ho to stock 'unknown' hai, verified me chup chaap nahi milta); har location par availability tag.
+
+## 🔌 V22 — Marketplace data automation (code-side) (23 Oct 2026)
+- **Brand Analytics scheduled import**: roz 06:45 job `brand_analytics_import` — `data/brand_analytics_inbox/` me padi SQP/SCP files khud import (SHA dedup). Seller Central se export karke folder me daalna hi bacha.
+- **Catalog ASIN/BSR snapshots**: `catalog_snapshots.py` + wizard kind — dated snapshots, BSR trend (pehli vs aakhri tasveer) summary ke saath.
+- **Seller Acceptance report**: `scripts/acceptance_report.py` — asal DB se pehli report bani: `docs/ACCEPTANCE_2026-10-22.md` (legacy revenue ₹46,069/104 orders; canonical 30-din khidki abhi khaali — yehi sach hai, live sync ke baad bharegi).
+- **Pehla asal backup ban gaya** ✔: `data/backups/growth_os-2026-10-22.db` (41 tables, restore-parikshan ke saath) — preflight me backup_exists ab ✔.
+- **Jo code se NAHI hoga (imaandaari se)**: teeno parameters (core dev / workflows / production) ka 100% live duniya maangta hai — SP-API/Ads/Flipkart live authorization, asal 7/14-din pilot saboot, HTTPS hosting par deployment, repo Private (GitHub Settings). Code-side vikas yahan **poora** hai; bachi hai sirf live pushti, jo credentials/hosting/user-kadam ke bina koi code nahi de sakta.
 
 ## 🔧 V20 — Aathve audit ke saare code-issues band (23 Oct 2026)
 (saboot: test_v20_audit8.py — 9 tests incl. asal HTTP; kul 26 suites pass)

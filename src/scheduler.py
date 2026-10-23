@@ -6,6 +6,7 @@ koi job fail ho to baaki nahi rukenge — error record hoga aur A09 ko escalate 
 DAILY_JOBS = [
     {"time": "06:00", "job": "learning_crawl",        "owner": "A09 Governance", "desc": "Saare sources se nayi seekh, fee/policy alerts pehle"},
     {"time": "06:30", "job": "data_sync",             "owner": "F1 Data Sync",   "desc": "Amazon/Flipkart/Unicommerce ka taaza data"},
+    {"time": "06:45", "job": "brand_analytics_import", "owner": "F1 Data Sync",  "desc": "Brand Analytics drop-folder (SQP/SCP) ki nayi files khud import"},
     {"time": "07:00", "job": "measure_results",       "owner": "A09 Governance", "desc": "Kal/7-din/14-din purane actions ke results — confidence up/down"},
     {"time": "07:15", "job": "seller_health_check",   "owner": "F10 Health",     "desc": "ODR/cancellation/late dispatch — limit ke paas laal alert"},
     {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock milaan — mismatch = oversell rokna"},

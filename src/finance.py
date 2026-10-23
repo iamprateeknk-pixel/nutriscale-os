@@ -67,34 +67,65 @@ def import_order_fees(db, rows: list, platform: str = "Amazon", seller_account: 
     db.commit()
     return {"imported": new_events, "events_total_seen": len(rows), "orders_updated": len(touched)}
 
-def record_refunds(db, rows: list, platform: str = "Amazon") -> dict:
+def record_refunds(db, rows: list, platform: str = "Amazon", seller_account: str = "default") -> dict:
     """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15).
-    V17: ek hi order+SKU ki kai lines hon to refund har line par poora NAHI lagega —
-    gross ke hisse ke anupaat me bantenga, bachi rakam sabse badi line par (line-level imaandaari)."""
-    ensure_v12(db); n = 0
+    V21 P0 FIX: pehle har call line ki refund ko SET (overwrite) kar deta tha — ek hi line par
+    dusra partial refund aate hi pehla MIT jata tha. Ab har refund pehle refund_events LEDGER me
+    darj hota hai (event-id/content-hash pehchan, scope = platform+seller_account+order+line),
+    aur line ki refund uske saare events ka YOG hoti hai — partial refunds JUDTE hain, mitte nahi.
+    Line-id wala event seedha usi line par; bina line-id wala SKU-ke-kul par gross-anupaat me
+    banta hai (V17 ka niyam, par ab CUMULATIVE kul par, har call ke tukde par nahi)."""
+    import hashlib
+    ensure_v12(db); new_events, touched = 0, set()
     for r in rows:
-        if not r.get("sku"): continue
-        total_refund = float(r.get("refund") or 0)
-        # V18: vendor ne exact line-id diya hai to refund seedha USI line par — anupaat-baant sirf fallback hai
-        if r.get("line_id"):
-            cur = db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND line_id=?",
-                             (total_refund, platform, r["order_id"], r["line_id"]))
-            if cur.rowcount: n += cur.rowcount; continue
-        lines = db.execute("""SELECT line_id, gross FROM order_items
-                              WHERE platform=? AND external_order_id=? AND sku=? ORDER BY gross DESC""",
-                           (platform, r["order_id"], r["sku"])).fetchall()
-        if not lines: continue
-        gsum = sum(l["gross"] or 0 for l in lines) or 1.0
-        allocated = 0.0
-        for i, l in enumerate(lines):
-            share = total_refund if len(lines) == 1 else (
-                round(total_refund - allocated, 2) if i == len(lines) - 1
-                else round(total_refund * (l["gross"] or 0) / gsum, 2))
-            allocated += share
-            db.execute("UPDATE order_items SET refund=? WHERE platform=? AND external_order_id=? AND line_id=?",
-                       (share, platform, r["order_id"], l["line_id"]))
-            n += 1
-    db.commit(); return {"updated_lines": n}
+        if not r.get("sku") and not r.get("line_id"): continue
+        amt = float(r.get("refund") or 0)
+        if amt <= 0: continue
+        acct = str(r.get("seller_account") or seller_account)
+        eid = str(r.get("event_id") or "h:" + hashlib.sha1("|".join([
+            platform, acct, str(r.get("order_id")), str(r.get("line_id") or ""), str(r.get("sku") or ""),
+            f"{amt:.2f}", str(r.get("posted_at") or "")]).encode()).hexdigest()[:24])
+        cur = db.execute("""INSERT OR IGNORE INTO refund_events
+                            (event_id,platform,seller_account,external_order_id,line_id,sku,amount,posted_at,imported_at)
+                            VALUES (?,?,?,?,?,?,?,?,?)""",
+                         (eid, platform, acct, r["order_id"], str(r.get("line_id") or ""), str(r.get("sku") or ""),
+                          amt, str(r.get("posted_at") or ""), now_utc()))
+        if cur.rowcount: new_events += 1
+        touched.add((platform, acct, r["order_id"]))
+    n = 0
+    for (pf, acct, oid) in touched:
+        # exact-line events ka yog line-war
+        exact = {row["line_id"]: row["s"] for row in db.execute(
+            """SELECT line_id, SUM(amount) s FROM refund_events
+               WHERE platform=? AND seller_account=? AND external_order_id=? AND line_id<>''
+               GROUP BY line_id""", (pf, acct, oid))}
+        # bina-line events SKU-war kul — gross-anupaat me bantenge
+        sku_totals = {row["sku"]: row["s"] for row in db.execute(
+            """SELECT sku, SUM(amount) s FROM refund_events
+               WHERE platform=? AND seller_account=? AND external_order_id=? AND line_id=''
+               GROUP BY sku""", (pf, acct, oid))}
+        lines = db.execute("""SELECT line_id, sku, gross FROM order_items
+                              WHERE platform=? AND seller_account=? AND external_order_id=? ORDER BY gross DESC""",
+                           (pf, acct, oid)).fetchall()
+        by_sku = {}
+        for l in lines: by_sku.setdefault(l["sku"], []).append(l)
+        final = {l["line_id"]: float(exact.get(l["line_id"], 0.0)) for l in lines}
+        for sku, tot in sku_totals.items():
+            ls = by_sku.get(sku, [])
+            if not ls: continue
+            gsum = sum(l["gross"] or 0 for l in ls) or 1.0
+            allocated = 0.0
+            for i, l in enumerate(ls):
+                share = tot if len(ls) == 1 else (
+                    round(tot - allocated, 2) if i == len(ls) - 1
+                    else round(tot * (l["gross"] or 0) / gsum, 2))
+                allocated += share
+                final[l["line_id"]] = round(final.get(l["line_id"], 0.0) + share, 2)
+        for lid, val in final.items():
+            if val or lid in exact:
+                db.execute("UPDATE order_items SET refund=? WHERE platform=? AND seller_account=? AND external_order_id=? AND line_id=?",
+                           (round(val, 2), pf, acct, oid, lid)); n += 1
+    db.commit(); return {"updated_lines": n, "new_refund_events": new_events}
 
 def sku_fee_rate(db, sku: str, platform: str = "Amazon", seller_account: str = None) -> dict:
     """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT).

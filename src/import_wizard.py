@@ -20,6 +20,8 @@ def guess_kind(headers: list) -> str:
     if "search query" in h: return "brand_analytics"   # V20: Brand Analytics SQP — search-terms se pehle parkho
     if "customer search term" in h or "search term" in h: return "search_terms"
     if "order-id" in h or "amazon-order-id" in h: return "orders"
+    if "asin" in h and "impressions" in h: return "brand_analytics"   # V22: SCP (ASIN funnel) report
+    if "bsr" in h or "sales rank" in h or "best sellers rank" in h: return "catalog_snapshot"   # V22
     if "campaign" in h and ("total cost" in h or "spend" in h): return "campaigns"
     if "sku" in h and ("quantity" in h or "stock" in h): return "inventory"
     return "unknown"
@@ -61,6 +63,11 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
         r = BA.import_brand_analytics(db, path, platform, account, period, imported_by)
         return {"ok": r.get("ok", False), "duplicate": r.get("duplicate", False), "imported": r.get("imported", 0),
                 "exceptions": [], "how": "brand_analytics table (SQP/SCP — V20)", "receipt": r}
+    elif kind == "catalog_snapshot":
+        import catalog_snapshots as CS
+        r = CS.import_catalog_csv(db, path, platform, account, captured_date=period[1] or period[0], imported_by=imported_by)
+        return {"ok": r.get("ok", False), "duplicate": r.get("duplicate", False), "imported": r.get("imported", 0),
+                "exceptions": [], "how": "catalog_snapshots table (ASIN/BSR — V22)", "receipt": r}
     elif kind == "inventory":
         n = csv_import.import_inventory_csv(path, store); how = "legacy table: inventory"
     else:

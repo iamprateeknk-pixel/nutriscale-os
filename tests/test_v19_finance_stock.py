@@ -19,7 +19,10 @@ def test_velocity_trailing_only():
     _o(st, "N1", 5, "SKU-T", 0, qty=6); _o(st, "N2", 1, "SKU-T", 0, qty=4)   # trailing: 10 units, span 5 din
     _o(st, "CX", 2, "SKU-T", 0, qty=50, status="Cancelled")                  # cancelled bhi bahar
     v = AN.sku_velocity_per_day(st.db, "SKU-T")
-    assert abs(v - 2.0) < 0.01, f"trailing 10 units / 5 din = 2.0 hona chahiye, mila {v}"
+    # V21: denominator ab POORA 30-din window hai (span-basis audit-9 me P0 mana gaya) — 10/30
+    assert abs(v - 10 / 30) < 0.01, f"trailing 10 units / poora 30-din window hona chahiye, mila {v}"
+    rep = AN.sku_velocity_report(st.db, "SKU-T")
+    assert rep["units_in_window"] == 10 and abs(rep["run_rate_per_day"] - 2.0) < 0.01, rep  # span run-rate jaankari ke liye alag
     st.close()
 
 def test_finance_matching_gross_refund_split():

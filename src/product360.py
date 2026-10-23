@@ -33,14 +33,21 @@ def product_360(db, sku: str, platform: str = None) -> dict:
     # channel hisaab SELLABLE qty par — kharab/fasa hua stock cover nahi badha sakta
     import stock as ST
     stock_by_channel, stock_total_by_channel, unsellable_by_channel, loc_detail = {}, {}, {}, []
+    sellable_verified_by_channel, unknown_avail_by_channel = {}, {}
     for r in inv_rows:
         ch, basis = ST.channel_for(db, r["location"])
         s, u = ST.sellable_of(r), ST.unsellable_of(r)
         stock_by_channel[ch] = stock_by_channel.get(ch, 0) + s
         stock_total_by_channel[ch] = stock_total_by_channel.get(ch, 0) + int(r["qty"] or 0)
         if u: unsellable_by_channel[ch] = unsellable_by_channel.get(ch, 0) + u
+        # V21: availability ka saboot alag — sellable_qty darj hai to VERIFIED, warna UNKNOWN
+        # (UNKNOWN stock ko verified sellable me chup chaap nahi milaya jayega)
+        verified = r["sellable_qty"] is not None
+        if verified: sellable_verified_by_channel[ch] = sellable_verified_by_channel.get(ch, 0) + s
+        else: unknown_avail_by_channel[ch] = unknown_avail_by_channel.get(ch, 0) + int(r["qty"] or 0)
         loc_detail.append({"location": r["location"], "qty": r["qty"], "sellable": s, "unsellable": u,
-                           "channel": ch, "channel_basis": basis})
+                           "channel": ch, "channel_basis": basis,
+                           "availability": "VERIFIED" if verified else "UNKNOWN"})
     view_qty = stock_by_channel.get(platform, 0) if platform else sum(stock_by_channel.values())
     from fba_planner import days_of_cover as _dc
     view_cover = _dc(int(view_qty), vel) if (platform and vel > 0) else (
@@ -54,6 +61,11 @@ def product_360(db, sku: str, platform: str = None) -> dict:
                           "stock_by_channel": stock_by_channel,
                           "stock_total_by_channel": stock_total_by_channel,
                           "unsellable_by_channel": unsellable_by_channel,
+                          "sellable_verified_by_channel": sellable_verified_by_channel,
+                          "unknown_availability_by_channel": unknown_avail_by_channel,
+                          "availability_note": ("Kuch stock ki availability VERIFIED nahi hai (sellable_qty darj nahi) — "
+                                                "woh upar alag dikh raha hai; cover us par bharosa karke mat chalao")
+                                               if unknown_avail_by_channel else "Saare stock ki availability verified (sellable darj) hai",
                           "view_qty": view_qty, "view_basis": ((platform + " channel ka SELLABLE stock") if platform else "saare channels ka SELLABLE stock kul"),
                           "velocity_per_day": round(vel, 2), "days_of_cover": view_cover,
                           "velocity_report": vel_rep},

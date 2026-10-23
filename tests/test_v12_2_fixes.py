@@ -56,10 +56,14 @@ def test_fba_days_of_cover():
     from platform_core import ensure_v12
     st = Store(":memory:"); ensure_v12(st.db)
     st.set_inventory("SKU-SLOW", "FBA", 40)
-    st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default','O9','2026-10-05','Shipped',100,'INR')")
-    st.db.execute("INSERT INTO order_items VALUES ('Amazon','default','O9','I9','SKU-SLOW','B0',2,100,0)")
+    # V21 velocity (poora 30-din window): 60 units khidki me = 2/din -> 40 stock par 20 din cover < 21
+    import datetime as _dt
+    for i, ago in enumerate((2, 1)):
+        dd = (_dt.date.today() - _dt.timedelta(days=ago)).isoformat()
+        st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,'%s','Shipped',100,'INR')" % dd, (f"O9{i}",))
+        st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-SLOW','B0',30,100,0)", (f"O9{i}", f"I9{i}"))
     st.db.commit()
-    out = _fba_cover(st)   # 40 units, 2/din ki bikri (ek din ka data) = 20 din cover < 21
+    out = _fba_cover(st)   # 40 units, 2/din ki bikri = 20 din cover < 21
     assert "CHETAVNI" in out and "SKU-SLOW" in out, f"asal cover par chetavni aayegi, mila: {out}"
     st.close()
 

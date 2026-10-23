@@ -92,6 +92,11 @@ def test_stock_mapping_and_sellable():
     assert pa["inventory"]["stock_by_channel"]["Amazon"] == 30, "channel hisaab SELLABLE par hoga"
     assert pa["inventory"]["unsellable_by_channel"]["Amazon"] == 10, pa["inventory"]
     assert pa["inventory"]["view_qty"] == 30
+    # V21: availability ka saboot alag — FBA ka sellable VERIFIED, Godown ka stock UNKNOWN
+    assert pa["inventory"]["sellable_verified_by_channel"]["Amazon"] == 30, pa["inventory"]
+    assert pa["inventory"]["unknown_availability_by_channel"]["Flipkart"] == 50, pa["inventory"]
+    fba = [l for l in pa["inventory"]["by_location"] if l["location"] == "Amazon FBA"][0]
+    assert fba["availability"] == "VERIFIED"
     st.close()
 
 def _mk_action(st, owner, kind, platform, payload, key):
@@ -113,8 +118,9 @@ def test_attribution_verified_clean():
     import outcome_engine as OE, auth as A
     st = Store(":memory:"); ensure_v12(st.db)
     A.create_user(st.db, "own", "pass1234", "Owner"); owner = {"username": "own", "role": "Owner"}
-    _o(st, "B1", 10, "SKU-V", 1000); _o(st, "B2", 11, "SKU-V", 500)
-    _o(st, "A1", 3, "SKU-V", 2600); _o(st, "A2", 4, "SKU-V", 400)
+    # V21 VERIFIED threshold: kul >=8 lines + har khidki >=2 order-din — fixture usi ke hisaab se bhara hua
+    _o(st, "B1", 10, "SKU-V", 500); _o(st, "B2", 11, "SKU-V", 500); _o(st, "B3", 12, "SKU-V", 500); _o(st, "B4", 13, "SKU-V", 500)
+    _o(st, "A1", 3, "SKU-V", 750); _o(st, "A2", 4, "SKU-V", 750); _o(st, "A3", 5, "SKU-V", 750); _o(st, "A4", 6, "SKU-V", 750)
     aid = _mk_action(st, owner, "BID_DOWN", "Amazon", {"sku": "SKU-V"}, "v20-clean")
     _backdate(st, aid)
     out = OE.measure_due(st.db, windows=(7,))

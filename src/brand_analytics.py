@@ -76,6 +76,26 @@ def import_brand_analytics(db, path: str, platform: str = "Amazon", account: str
                 "brand_analytics table (V20)")); db.commit()
     return {"ok": True, "duplicate": False, "report_type": rtype, "imported": n, "batch_id": batch}
 
+def import_dropfolder(db, folder: str = None, platform: str = "Amazon", account: str = "default") -> dict:
+    """Scheduled automation (V22): drop-folder me padi Brand Analytics CSV files khud import hongi.
+    Seller Central se SQP/SCP export karke is folder me daalna hi kaam bachega —
+    folder: env NUTRISCALE_BA_INBOX ya <data>/brand_analytics_inbox. Duplicate files SHA se rukengi."""
+    import glob as _glob
+    folder = folder or os.environ.get("NUTRISCALE_BA_INBOX") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "brand_analytics_inbox")
+    if not os.path.isdir(folder):
+        return {"folder": folder, "available": False, "imported_files": 0,
+                "note": "Drop-folder maujud nahi — Seller Central se SQP/SCP export karke yahan daalo: " + folder}
+    results = []
+    for path in sorted(_glob.glob(os.path.join(folder, "*.csv"))):
+        r = import_brand_analytics(db, path, platform, account, imported_by="scheduled-dropfolder")
+        results.append({"file": os.path.basename(path), "ok": r.get("ok", False),
+                        "duplicate": r.get("duplicate", False), "imported": r.get("imported", 0),
+                        "report_type": r.get("report_type")})
+    return {"folder": folder, "available": True, "files_seen": len(results),
+            "imported_files": sum(1 for x in results if x["ok"] and not x["duplicate"]),
+            "rows_imported": sum(x["imported"] for x in results), "files": results}
+
 def summary(db, platform: str = "Amazon", limit: int = 10) -> dict:
     """SQP ki top queries (purchases se) brand-hisse ke saath + SCP ke top ASINs.
     Data na ho to saaf 'uplabdh nahi' — koi andaaz nahi."""

@@ -39,7 +39,7 @@ def test_qa11_scheduler_state_persists():
     seed_jobs(st.db); st.close()
     st2 = Store(DBF)
     jobs = jobs_status(st2.db)
-    assert len(jobs) == 10 and all(j["next_run"] for j in jobs)
+    assert len(jobs) == 11 and all(j["next_run"] for j in jobs)   # V22: 11 jobs (brand_analytics_import juda)
     st2.close()
 
 def test_qa14_backup_restore_and_secret_scan():
@@ -49,7 +49,7 @@ def test_qa14_backup_restore_and_secret_scan():
     assert r["ok"] and r["tables"] >= 10
     import sqlite3
     b = sqlite3.connect("/tmp/qa_backup.db")
-    assert b.execute("SELECT COUNT(*) FROM job_state").fetchone()[0] == 10
+    assert b.execute("SELECT COUNT(*) FROM job_state").fetchone()[0] == 11   # V22: 11 daily jobs
     b.close()
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
     import secret_scan
