@@ -1,5 +1,14 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 11 Nov 2026 (V23 — seekhne wala dimaag + listing/keyword niyam; kul 28 suites pass)_
+_Updated: 11 Nov 2026 (V24 — naya dashboard + market playbooks; kul 29 suites pass)_
+
+## 🚀 V24 — Naya dashboard + market research se agents ke naye playbook (11 Nov 2026)
+(saboot: test_v24_growth.py — 9 tests incl. asal HTTP; kul **29 suites pass**; Chromium me saare 23 screen bina JS error, mobile 390px par koi horizontal scroll nahi)
+- **Dashboard naye sire se** (`dashboard/index.html`): grouped navigation (Aaj / Badhao / Paisa / Dimaag / System), **"Aaj ka kaam" home** (zaroori kaam pehle, setup progress, agla sale event, brain), light + **dark mode**, mobile drawer, **Ctrl+K** se screen dhoondho, browser `alert/prompt` ki jagah toast + modal, khaali screen par "agla kadam" button, har sifarish ke saath **rule chip** (dabao to niyam + source).
+- **Naye screens**: Listing Builder (live akshar/byte ginti, copy button, jaanch score), Keyword Plan (meva chuno → title/highlights/backend/negative), SQP Funnel, Growth Playbook, Agent Brain, Knowledge Base. Purane 16 screen sab maujud.
+- **15 naye research niyam** (kul 42) — sab source ke saath: Amazon ads structure (Auto=khoj, Exact=kamai, harvest chakra, haftawar negatives), **break-even ACOS** formula, launch par TACOS, Vine + review policy, A+ content, Great Indian Festival ki taiyaari (FBA 15-20 din pehle, coupons/deals ~7 din pehle), India dry-fruit bazaar ka aakar, **quick commerce** (Blinkit/Zepto/Instamart), Flipkart PLA.
+- **Growth Playbook engine** (`src/growth_playbook.py`) — niyam tumhare data par: SKU ka break-even/target ACOS, campaign structure score (apni hi bid se ladai, harvest baaki, bekaar kharch), sale calendar countdown (tareekhein ANUMAAN — saaf likha), policy-safe review plan, aur home screen ka `today()`.
+- **Fixes**: (1) manual `run_cycle` ab wahi asal seekh-chakra + backup + Brand Analytics import chalata hai jo 24×7 scheduler; (2) default bullets me bina-saboot dawe the ("nitrogen flush", "FSSAI licensed", "return/replacement niti") — hata diye; (3) Listing Builder ab fact-registry bhi jaanchta hai (NS-P-01) — bina saboot ka dawa pehle hi BLOCK, approve par nahi.
+- **Imaandaari**: Amazon.in ne Box ke browser ko bhi search page nahi diya (bot-rok) — isliye top listings ka asli data nahi liya gaya, sirf research niyam. Brand-wise market share ka koi bharose-layak public source nahi mila. Sale tareekhein anumaan hain.
 
 ## 🧠 V23 — Agents ko listing/keyword ka gyaan + khud seekhna (11 Nov 2026)
 (saboot: test_v23_brain.py — 9 tests incl. asal HTTP; kul **28 suites pass**)

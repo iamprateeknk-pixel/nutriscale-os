@@ -18,7 +18,12 @@ class GovernanceAgent(BaseAgent):
     id = "A09"; name = "Governance Orchestrator"
     def daily_cycle(self) -> dict:
         store = self.store
-        def h_crawl(): return f"{len(daily_crawl_plan())} sources ki crawl yojna taiyaar (asal crawl connectors ke baad)"
+        def h_crawl():
+            # V24: manual cycle bhi wahi asal seekh-chakra chalaye jo 24x7 scheduler chalata hai
+            import agent_brain as AB
+            r = AB.daily_learning_cycle(store)
+            return (f"Playbook +{r['playbook']['added']} naye / {r['playbook']['refreshed']} taaza; nateejo se "
+                    f"{r['outcomes']['applied']} update; apne data se {r['own_data']['lessons_updated']} sabak")
         def h_sync():
             st = cfg.status_all()
             ready = [k for k, v in st.items() if v["configured"]]
@@ -44,6 +49,11 @@ class GovernanceAgent(BaseAgent):
                     "fba_cover_check": lambda: "SKIP: FBA inventory data abhi nahi" if not store.all_inventory() else "Cover check: inventory maujud",
                     "rank_probe": lambda: "SKIP: rank data ke liye roz ka snapshot sync chahiye",
                     "daily_learning_summary": lambda: "Din ka saransh taiyaar"}
+        # V24: jo jobs yahan nahi the (backup, brand analytics import, asal fba/measure) woh 24x7 wale handlers se
+        import job_handlers as JH
+        for k, fn in JH.build_handlers(store).items():
+            if k in ("backup_restore", "brand_analytics_import", "fba_cover_check", "measure_results"):
+                handlers[k] = fn
         jobs = run_jobs(handlers, DAILY_JOBS)
         ads = AdsAgent(store).analyze()
         return {"jobs": jobs, "proposals_created": len(ads["proposals"]),

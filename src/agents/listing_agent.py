@@ -19,14 +19,17 @@ def generate_title(product: str, grade: str, weight: str, keywords: list, use_ca
     return build_title_amazon(brand, product, grade, weight, hero)["title"]
 
 def generate_bullets(facts: dict) -> list:
-    """facts: origin, grade_detail, nutrition_line, pack_line, uses(list).
-    Koi bimari-cure wala dawa jaan-bujh kar nahi — checker iski pushti karega."""
+    """facts: origin, grade_detail, nutrition_line, pack_line, uses(list), fssai(optional licence no.).
+    Koi bimari-cure wala dawa jaan-bujh kar nahi — checker iski pushti karega.
+    V24: default text me koi saboot-maangne wala dawa NAHI (pehle 'nitrogen flush', 'FSSAI licensed' aur
+    'return/replacement niti' khud jud jaate the — bina saboot ke). Aise tathya sirf tab jab facts me diye jaayen."""
     b = [
-        f"Premium {facts.get('grade_detail','quality')} — {facts.get('origin','chuni hui upaj')} se, har dana size aur rang me ek jaisa.",
-        f"Poshak tattvon se bharpur: {facts.get('nutrition_line','protein, fiber aur healthy fats ka achha srot')} — roz ke khane ke liye upyukt.",
-        f"Taazgi pakki: {facts.get('pack_line','food-grade hygienic packing, nitrogen flush ke saath')} — kurkurapan aur swad barkarar.",
-        "Upyog: " + ", ".join(facts.get("uses", SAFE_USES[:3])) + " — poore parivar ke liye.",
-        "Bharosa: FSSAI licensed packing, batch par expiry saaf chhapi — kharab nikle to aasan return/replacement niti.",
+        f"Premium {facts.get('grade_detail') or 'quality'} — {facts.get('origin') or 'chuni hui upaj'} se, saaf aur chhaanta hua.",
+        f"Poshak tattvon se bharpur: {facts.get('nutrition_line') or 'protein, fiber aur healthy fats ka achha srot'} — roz ke khane ke liye upyukt.",
+        f"Packing: {facts.get('pack_line') or 'food-grade hygienic pouch'} — kurkurapan aur swad barkarar rakhne ke liye.",
+        "Upyog: " + ", ".join(facts.get("uses") or SAFE_USES[:3]) + " — poore parivar ke liye.",
+        ("Bharosa: FSSAI lic. " + facts["fssai"] + "; " if facts.get("fssai") else "Bharosa: ")
+        + "har pack par batch, packing date aur expiry saaf chhapi.",
     ]
     return b
 
@@ -50,7 +53,7 @@ class ListingAgent(BaseAgent):
         bullets = generate_bullets(facts)
         backend = LR.pack_backend_terms(plan["HIGHLIGHTS_BULLETS"][2:] + plan["BACKEND"], t["title"], bullets, competitor_brands)
         audit = LR.audit_listing(platform, t["title"], bullets, backend["backend_terms"], hl["item_highlights"],
-                                 images, competitor_brands)
+                                 images, competitor_brands, db=self.store.db, sku=sku)
         AB.record_listing_audit(self.store.db, sku, audit)
         advice = [{"rule_id": a["rule_id"], "confidence": a["confidence"], "action": a["action"] or a["statement"][:140]}
                   for a in AB.advise(self.store.db, agent=self.id, platform=platform)[:6]]

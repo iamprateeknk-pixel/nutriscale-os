@@ -3,214 +3,542 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NutriScale OS — V12 Command Center</title>
+<meta name="color-scheme" content="light dark">
 <style>
-:root{--navy:#102B3F;--teal:#057C81;--pale:#F2F7F9;--amber:#B7791F;--red:#B3261E;--green:#137333;--ink:#1c2b33}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,'Segoe UI',Roboto,sans-serif;background:var(--pale);color:var(--ink);font-size:14px}
-header{background:var(--navy);color:#fff;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-header h1{font-size:18px;margin:0}header .sub{opacity:.75;font-size:12px}
-#killBtn{margin-left:auto;border:0;padding:9px 14px;border-radius:8px;font-weight:700;cursor:pointer;background:#e8f5e9;color:var(--green)}
-#killBtn.on{background:var(--red);color:#fff}
-.wrap{display:flex;min-height:calc(100vh - 52px)}
-nav{width:225px;background:#fff;border-right:1px solid #dde7ec;padding:10px;flex-shrink:0}
-nav button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px}
-nav button:hover{background:var(--pale)}nav button.active{background:var(--teal);color:#fff;font-weight:600}
-main{flex:1;padding:18px;min-width:0}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
-.card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(16,43,63,.08)}
-.card .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}.card .k{font-size:12px;color:#5b7181}
-table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
-th,td{padding:8px 10px;border-bottom:1px solid #edf2f5;text-align:left;font-size:13px}th{background:#eef4f7}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
-.b-ok{background:#e6f4ea;color:var(--green)}.b-warn{background:#fef7e0;color:var(--amber)}.b-bad{background:#fce8e6;color:var(--red)}.b-info{background:#e8f0fe;color:#1a56db}
-.evidence{font-size:11.5px;color:#5b7181;margin-top:8px}
-.empty{background:#fff;border:1.5px dashed #b9cdd6;border-radius:12px;padding:26px;text-align:center;color:#47606e}
-input,select,textarea{padding:8px;border:1px solid #c3d2da;border-radius:8px;font-size:13px}
-.btn{background:var(--teal);color:#fff;border:0;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600}
-.btn.sec{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
-form.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
-h2{font-size:19px;margin:4px 0 10px}h3{font-size:15px;margin:16px 0 6px}
-#login{position:fixed;inset:0;background:var(--navy);display:none;align-items:center;justify-content:center;z-index:9}
-#login .box{background:#fff;padding:26px;border-radius:14px;width:320px}
+/* ---------- Design tokens (V24) ---------- */
+:root{
+  --bg:#f6f4ef;--surface:#ffffff;--surface-2:#faf8f4;--line:#e7e1d6;--line-2:#d9d1c3;
+  --ink:#1f2622;--ink-2:#4d5752;--ink-3:#7a837e;
+  --brand:#2f6b4f;--brand-2:#3f8a66;--brand-ink:#ffffff;--brand-soft:#e5f0ea;
+  --accent:#b8743a;--accent-soft:#f6ebdf;
+  --ok:#1f7a4d;--ok-soft:#e3f3ea;--warn:#a36a00;--warn-soft:#fbf0d9;--bad:#b3261e;--bad-soft:#fbe5e3;--info:#2457a6;--info-soft:#e6eefb;
+  --shadow:0 1px 2px rgba(31,38,34,.05),0 2px 8px rgba(31,38,34,.05);--shadow-lg:0 10px 40px rgba(31,38,34,.18);
+  --r:14px;--r-sm:10px;--nav-w:248px;
+  --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121614;--surface:#1a201d;--surface-2:#1f2622;--line:#2b3430;--line-2:#38433e;
+  --ink:#e8ece9;--ink-2:#b6c0ba;--ink-3:#86918b;
+  --brand:#5fb88a;--brand-2:#79c9a0;--brand-ink:#0d1a13;--brand-soft:#1f3329;
+  --accent:#e0a36a;--accent-soft:#3a2c1f;
+  --ok:#6cc995;--ok-soft:#183126;--warn:#e6b450;--warn-soft:#3a2f17;--bad:#f2867c;--bad-soft:#3d1f1c;--info:#8fb4f2;--info-soft:#1b2840;
+  --shadow:0 1px 2px rgba(0,0,0,.3);--shadow-lg:0 10px 40px rgba(0,0,0,.5);}}
+:root[data-theme="dark"]{
+  --bg:#121614;--surface:#1a201d;--surface-2:#1f2622;--line:#2b3430;--line-2:#38433e;
+  --ink:#e8ece9;--ink-2:#b6c0ba;--ink-3:#86918b;
+  --brand:#5fb88a;--brand-2:#79c9a0;--brand-ink:#0d1a13;--brand-soft:#1f3329;
+  --accent:#e0a36a;--accent-soft:#3a2c1f;
+  --ok:#6cc995;--ok-soft:#183126;--warn:#e6b450;--warn-soft:#3a2f17;--bad:#f2867c;--bad-soft:#3d1f1c;--info:#8fb4f2;--info-soft:#1b2840;
+  --shadow:0 1px 2px rgba(0,0,0,.3);--shadow-lg:0 10px 40px rgba(0,0,0,.5);}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--brand)}button{font-family:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+.num,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- Shell ---------- */
+.app{display:grid;grid-template-columns:var(--nav-w) 1fr;min-height:100vh}
+aside{background:var(--surface);border-right:1px solid var(--line);position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 18px 12px}
+.brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--brand));display:grid;place-items:center;color:#fff;font-size:18px}
+.brand b{display:block;font-size:15px;letter-spacing:-.01em}.brand small{color:var(--ink-3);font-size:11.5px}
+nav{padding:6px 10px 18px;flex:1}
+.nav-group{margin-top:12px}
+.nav-group>span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:6px 10px}
+nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--ink-2);padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13.5px}
+nav button:hover{background:var(--surface-2);color:var(--ink)}
+nav button.active{background:var(--brand-soft);color:var(--brand);font-weight:650}
+nav button .ic{width:20px;text-align:center;flex-shrink:0}
+nav button .pill{margin-left:auto;background:var(--accent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:700;padding:1px 7px}
+.aside-foot{padding:12px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3)}
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:12px 24px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:17px;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .sp{flex:1}
+.iconbtn{background:var(--surface);border:1px solid var(--line);color:var(--ink-2);height:36px;min-width:36px;padding:0 10px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.iconbtn:hover{border-color:var(--line-2);color:var(--ink)}
+.kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-radius:5px;padding:0 5px;color:var(--ink-3)}
+#killBtn{border:1px solid var(--line);background:var(--ok-soft);color:var(--ok);height:36px;padding:0 12px;border-radius:10px;font-weight:700;cursor:pointer;font-size:12.5px;white-space:nowrap}
+#killBtn.on{background:var(--bad);color:#fff;border-color:var(--bad);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 25%,transparent)}}
+#menuBtn{display:none}
+main{padding:22px 24px 60px;max-width:1280px;width:100%}
+.page-sub{color:var(--ink-3);margin:-4px 0 18px;font-size:13px}
+
+/* ---------- Components ---------- */
+.grid{display:grid;gap:14px}.g-main{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card,.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card{padding:14px 16px}
+.card .k{font-size:12px;color:var(--ink-3)}.card .v{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0}
+.panel{padding:16px 18px;margin-bottom:16px}
+.panel h3,h3{font-size:14.5px;margin:0 0 10px;letter-spacing:-.005em}
+.panel>h3+p{margin-top:-6px}
+h2{font-size:20px;margin:0 0 4px;letter-spacing:-.02em}
+.muted{color:var(--ink-3)}.small{font-size:12.5px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.b-ok{background:var(--ok-soft);color:var(--ok)}.b-warn{background:var(--warn-soft);color:var(--warn)}.b-bad{background:var(--bad-soft);color:var(--bad)}.b-info{background:var(--info-soft);color:var(--info)}.b-mute{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.evidence{font-size:11.5px;color:var(--ink-3);margin-top:10px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:top}
+th{background:var(--surface-2);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:700;position:sticky;top:0}
+tr:last-child td{border-bottom:0}tbody tr:hover td{background:var(--surface-2)}
+.empty{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:28px 20px;text-align:center;color:var(--ink-2);background:var(--surface)}
+.empty .e-ic{font-size:26px;display:block;margin-bottom:6px}
+.empty .btn{margin-top:12px}
+input,select,textarea{font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--ink);min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-2);font-weight:600}
+.btn{background:var(--brand);color:var(--brand-ink);border:1px solid var(--brand);padding:9px 15px;border-radius:10px;cursor:pointer;font-weight:650;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.sec{background:var(--surface);color:var(--brand);border-color:var(--line-2)}
+.btn.ghost{background:none;border-color:transparent;color:var(--brand);padding:6px 8px}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+form.row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px;align-items:flex-end}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12.5px}
+.chip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:650}
+.bar{height:8px;background:var(--surface-2);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:var(--brand);border-radius:6px}
+.bar.warn>i{background:var(--warn)}.bar.bad>i{background:var(--bad)}
+.counter{font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink-3)}.counter.over{color:var(--bad);font-weight:700}
+.task{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);margin-bottom:8px}
+.task .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.p1 .dot{background:var(--bad)}.p2 .dot{background:var(--warn)}.p3 .dot{background:var(--info)}
+.task .t{flex:1;min-width:0}.task .t small{display:block;color:var(--ink-3)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line)}
+.check:last-child{border:0}.check .cb{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex-shrink:0;font-size:12px;margin-top:1px}
+.check.done .cb{background:var(--ok);border-color:var(--ok);color:#fff}.check.done b{color:var(--ink-3);text-decoration:line-through}
+.ring{--p:0;width:86px;height:86px;border-radius:50%;background:conic-gradient(var(--brand) calc(var(--p)*1%),var(--surface-2) 0);display:grid;place-items:center;flex-shrink:0}
+.ring>div{width:68px;height:68px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:18px}
+.hero{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.col{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px}
+.col h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+.tag{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px 8px;margin:0 4px 6px 0;font-size:12.5px}
+.tag.neg{border-color:var(--bad-soft);background:var(--bad-soft);color:var(--bad)}
+.issue{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.issue:last-child{border:0}
+.out{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;word-break:break-word;white-space:pre-wrap}
+.copy{float:right}
+.timeline{position:relative;padding-left:18px}.timeline:before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl{position:relative;padding:0 0 14px}.tl:before{content:"";position:absolute;left:-17px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
+.skeleton{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--surface-2),var(--line),var(--surface-2));background-size:200% 100%;animation:sk 1.2s infinite;margin:10px 0}
+@keyframes sk{to{background-position:-200% 0}}
+details.rule{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+details.rule summary{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;list-style:none}
+details.rule summary::-webkit-details-marker{display:none}
+details.rule p{margin:8px 0 0;color:var(--ink-2)}
+
+/* ---------- Overlays ---------- */
+#login{position:fixed;inset:0;background:radial-gradient(1200px 600px at 20% 10%,var(--brand-soft),transparent),var(--bg);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+#login .box{background:var(--surface);border:1px solid var(--line);padding:28px;border-radius:18px;width:100%;max-width:380px;box-shadow:var(--shadow-lg)}
 #login input{width:100%;margin:6px 0}
-.err{color:var(--red);font-size:12.5px;min-height:16px}
-@media(max-width:820px){nav{width:64px}nav button span{display:none}}
+.err{color:var(--bad);font-size:12.5px;min-height:18px}
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:40;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--ink);color:var(--bg);padding:11px 14px;border-radius:12px;box-shadow:var(--shadow-lg);font-size:13px;animation:tin .2s ease-out}
+.toast.bad{background:var(--bad);color:#fff}.toast.ok{background:var(--ok);color:#fff}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+.modal-bg{position:fixed;inset:0;background:rgba(10,14,12,.45);display:flex;align-items:center;justify-content:center;z-index:35;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;width:100%;max-width:440px;box-shadow:var(--shadow-lg)}
+.modal h3{font-size:16px}.modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.modal input{width:100%}
+#palette .modal{max-width:520px;padding:10px}
+#palette input{border:0;box-shadow:none;font-size:15px;padding:12px}
+#palette .res{max-height:50vh;overflow:auto;border-top:1px solid var(--line)}
+#palette .res button{display:flex;gap:10px;width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;color:var(--ink);font-size:14px}
+#palette .res button.sel,#palette .res button:hover{background:var(--brand-soft)}
+.scrim{display:none}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1024px){.cols{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:1fr 1fr}}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  aside{position:fixed;left:0;top:0;bottom:0;width:min(84vw,300px);z-index:20;transform:translateX(-102%);transition:transform .2s ease;box-shadow:var(--shadow-lg)}
+  body.nav-open aside{transform:none}
+  body.nav-open .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:15}
+  #menuBtn{display:inline-flex}
+  .topbar{padding:10px 16px}main{padding:16px 16px 60px}
+  .g2,.g3,.cols,.g-main{grid-template-columns:1fr}
+  .task{flex-wrap:wrap}.task .t{flex-basis:calc(100% - 24px)}.task .btn{margin-left:auto}
+  .hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head>
 <body>
 <div id="login"><div class="box">
-<h2 style="margin-top:0">🌰 NutriScale OS</h2><p style="color:#5b7181;font-size:13px">Dry Fruit Farm — pehle pehchan, phir data. Bina login ke kuch nahi dikhega (V12 niyam).</p>
-<input id="lu" placeholder="Username"><input id="lp" type="password" placeholder="Password">
-<input id="lt" placeholder="MFA code (sirf MFA wale khaate par)" style="display:none">
-<div class="err" id="lerr"></div><button class="btn" style="width:100%" onclick="doLogin()">Login</button>
+  <div class="brand" style="padding:0 0 14px"><div class="logo">🌰</div><div><b>NutriScale OS</b><small>Dry Fruit Farm</small></div></div>
+  <h2 style="font-size:18px">Wapas swagat hai</h2>
+  <p class="muted small" style="margin-top:2px">Pehle pehchan, phir data — bina login ke kuch nahi dikhta.</p>
+  <form onsubmit="doLogin();return false">
+  <input id="lu" placeholder="Username" autocomplete="username"><input id="lp" type="password" placeholder="Password" autocomplete="current-password">
+  <input id="lt" placeholder="MFA code (authenticator app se)" style="display:none" inputmode="numeric" autocomplete="one-time-code">
+  <div class="err" id="lerr"></div><button class="btn" style="width:100%;justify-content:center">Login</button></form>
 </div></div>
-<header><h1>🌰 NutriScale OS</h1><span class="sub">V12 · Dry Fruit Farm · saara data API se live, saboot ke saath</span>
-<span id="who" class="sub"></span>
-<button id="killBtn" onclick="toggleKill()">Kill Switch: …</button></header>
-<div class="wrap"><nav id="sidenav"></nav><main id="main"><p>Load ho raha hai…</p></main></div>
+
+<div class="app">
+  <aside id="aside">
+    <div class="brand"><div class="logo">🌰</div><div><b>NutriScale OS</b><small>Dry Fruit Farm · Amazon + Flipkart</small></div></div>
+    <nav id="sidenav"></nav>
+    <div class="aside-foot"><span id="who">—</span> · <a href="#" onclick="logout();return false">Logout</a></div>
+  </aside>
+  <div class="scrim" onclick="document.body.classList.remove('nav-open')"></div>
+  <div style="min-width:0">
+    <div class="topbar">
+      <button class="iconbtn" id="menuBtn" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <h1 id="pageTitle">Aaj</h1><div class="sp"></div>
+      <button class="iconbtn hide-sm" onclick="openPalette()" aria-label="Screen dhoondho">🔎 Dhoondho <span class="kbd">Ctrl K</span></button>
+      <button class="iconbtn" onclick="toggleTheme()" aria-label="Light/dark theme badlo" title="Light/dark" id="themeBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <button id="killBtn" onclick="toggleKill()">Kill Switch: …</button>
+    </div>
+    <main id="main"><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></main>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
 <script>
 const API=location.protocol.startsWith('http')?location.origin:'http://'+location.hostname+':8765';
-const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-let TOKEN=localStorage.getItem('ns_token')||'', USER=null, KILL=false;
-const SCREENS=[['warroom','🏠 War Room'],['products','📦 Product Intelligence'],['competitors','🔭 Competitor Observatory'],['compare','⚖️ Peer Compare'],['keywords','🔑 Keyword Lab'],['rank','📈 Rank Tracker'],['ads','🎯 Ads Studio'],['listings','📝 Listing Lab'],['creative','🎨 Creative Lab'],['experiments','🧪 Experiments'],['profit','💰 Profit & Settlements'],['inventory','🏭 Inventory & Festival'],['approvals','✅ Approval Inbox'],['integrations','🔌 Integrations'],['agency','🤝 Agency Board'],['ops','🛠️ System Ops']];
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+let TOKEN=localStorage.getItem('ns_token')||'', USER=null, KILL=false, CURRENT='today', KNOW=null;
+/* Screens: [key, label, icon, group] — purane 16 keys wahi hain (bookmarks/tests), V24 me naye jude */
+const SCREENS=[
+ ['today','Aaj ka kaam','🏠','Aaj'],['approvals','Approval Inbox','✅','Aaj'],['warroom','War Room','📊','Aaj'],
+ ['listingbuilder','Listing Builder','✨','Badhao'],['keywordplan','Keyword Plan','🧭','Badhao'],['sqp','SQP Funnel','🔬','Badhao'],
+ ['keywords','Keyword Lab','🔑','Badhao'],['ads','Ads Studio','🎯','Badhao'],['rank','Rank Tracker','📈','Badhao'],
+ ['listings','Listing Versions','📝','Badhao'],['creative','Creative Lab','🎨','Badhao'],['competitors','Competitors','🔭','Badhao'],
+ ['compare','Peer Compare','⚖️','Badhao'],['experiments','Experiments','🧪','Badhao'],
+ ['growth','Growth Playbook','🚀','Paisa'],['profit','Profit & Settlements','💰','Paisa'],['products','Product Intelligence','📦','Paisa'],['inventory','Inventory & Festival','🏭','Paisa'],
+ ['brain','Agent Brain','🧠','Dimaag'],['knowledge','Knowledge Base','📚','Dimaag'],
+ ['integrations','Integrations & Data','🔌','System'],['agency','Agency Board','🤝','System'],['ops','System Ops','🛠️','System']];
+const SUB={today:'Sabse zaroori kaam pehle — har kaam ka saboot aur niyam saath me',approvals:'Agents ke proposals — bina tumhari haan ke kuch live nahi jaata',warroom:'Bikri, ads aur TACOS ek nazar me',
+ listingbuilder:'Amazon 2026 niyam ke andar title, Item Highlights aur backend — poori jaanch ke saath',keywordplan:'Kaunsa keyword kahan: title, highlights, backend ya negative',sqp:'Brand Analytics: har query par tumhara market share kis seedhi par girta hai',
+ keywords:'Apne Ads search terms ka opportunity matrix',ads:'Kharch, harvest aur negatives',rank:'Keyword rank ka itihaas aur parakh',listings:'Har listing ka version — itihaas kabhi nahi mitta',creative:'7-shot image brief',
+ competitors:'Verified peers aur unke dated snapshots',compare:'Apna SKU banam peer — decision packet',experiments:'Tajurbe aur unka imaandaar verdict',
+ growth:'Research ke niyam tumhare data par: break-even ACOS, campaign structure, sale calendar, reviews',profit:'Settlement se mila hisaab hi sach',products:'Action plan, cost aur SKU 360°',inventory:'Stock gate aur festival combos',
+ brain:'Agents kya seekh rahe hain — bharosa sirf VERIFIED nateejo se badalta hai',knowledge:'Har niyam ka source, status aur bharosa — research 11 Nov 2026',
+ integrations:'Connectors, capabilities aur CSV import',agency:'Agency ka kaam — saboot par score',ops:'Jobs aur system ki sehat'};
+const NUTS=[['almond','Badam'],['cashew','Kaju'],['pistachio','Pista'],['walnut','Akhrot'],['raisin','Kishmish'],['fig','Anjeer'],['dates','Khajoor'],['apricot','Khubani']];
+
+/* ---------- Basics ---------- */
 async function api(path,method,body){
   const r=await fetch(API+path,{method:method||'GET',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
   if(r.status===401){showLogin();throw new Error('login chahiye');}
-  const j=await r.json(); return j.data!==undefined?j.data:j;
+  if(r.status===403){throw new Error('is kaam ki ijaazat tumhare role me nahi');}
+  const j=await r.json(); if(!r.ok&&j.error) throw new Error(j.message||j.error); return j.data!==undefined?j.data:j;
 }
-function showLogin(){document.getElementById('login').style.display='flex';}
+function toast(msg,kind){const t=document.createElement('div');t.className='toast '+(kind||'');t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),kind==='bad'?6000:3500);}
+function modal(html){const bg=document.createElement('div');bg.className='modal-bg';bg.innerHTML='<div class="modal" role="dialog" aria-modal="true">'+html+'</div>';document.body.appendChild(bg);bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});return bg;}
+function ask(title,label,opts){opts=opts||{};return new Promise(res=>{const m=modal('<h3>'+esc(title)+'</h3>'+(label?'<p class="muted small">'+esc(label)+'</p>':'')+(opts.noInput?'':'<input id="askIn" placeholder="'+esc(opts.placeholder||'')+'">')+'<div class="acts"><button class="btn sec" data-a="0">Radd</button><button class="btn '+(opts.danger?'danger':'')+'" data-a="1">'+esc(opts.ok||'Theek hai')+'</button></div>');
+  const inp=m.querySelector('#askIn');if(inp){inp.focus();inp.addEventListener('keydown',e=>{if(e.key==='Enter')m.querySelector('[data-a="1"]').click();});}
+  m.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const ok=b.dataset.a==='1';const v=inp?inp.value:true;m.remove();res(ok?(inp?v:true):null);});});}
+function showLogin(){document.getElementById('login').style.display='flex';setTimeout(()=>document.getElementById('lu').focus(),50);}
+function logout(){localStorage.removeItem('ns_token');TOKEN='';location.reload();}
 async function doLogin(){
   const u=document.getElementById('lu').value,p=document.getElementById('lp').value,t=document.getElementById('lt').value;
   const r=await fetch(API+'/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,totp:t||undefined})});
   const j=await r.json();
   if(!r.ok){
-    if(j.error==='MFA_REQUIRED'){document.getElementById('lt').style.display='block';document.getElementById('lerr').textContent='MFA code daalo (authenticator app se) aur phir Login dabao';}
+    if(j.error==='MFA_REQUIRED'){document.getElementById('lt').style.display='block';document.getElementById('lerr').textContent='MFA code daalo aur phir Login dabao';}
+    else if(j.error==='RATE_LIMITED'){document.getElementById('lerr').textContent=j.message||'Bahut galat koshishen — thodi der baad';}
     else document.getElementById('lerr').textContent='Login fail — username/password parkho';
     return;}
-  TOKEN=j.data.token; localStorage.setItem('ns_token',TOKEN); USER=j.data;
+  TOKEN=j.data.token; localStorage.setItem('ns_token',TOKEN); USER=j.data; localStorage.setItem('ns_user',u);
   document.getElementById('login').style.display='none'; boot();
 }
-const inr=n=>n===null||n===undefined?'—':'₹'+Number(n).toLocaleString('en-IN');
-const badge=(t,c)=>'<span class="badge b-'+c+'">'+t+'</span>';
-const ev=(src)=>'<div class="evidence">Source: '+src+' · '+new Date().toLocaleString('en-IN')+'</div>';
-function table(cols,rows,emptyMsg){
-  if(!rows||!rows.length) return '<div class="empty">'+(emptyMsg||'Abhi data nahi hai — pehle import/sync karo. Jhootha number yahan kabhi nahi dikhega.')+'</div>';
-  let h='<table><tr>'+cols.map(c=>'<th class="'+(c.n?'num':'')+'">'+c.t+'</th>').join('')+'</tr>';
+const inr=n=>n===null||n===undefined||n===''?'—':'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
+const pct=n=>n===null||n===undefined?'—':(Math.round(n*1000)/10)+'%';
+const badge=(t,c)=>'<span class="badge b-'+c+'">'+esc(t)+'</span>';
+const sevBadge=s=>badge(s,s==='BLOCK'?'bad':s==='WARN'?'warn':'info');
+const ev=(src)=>'<div class="evidence">Source: '+esc(src)+' · '+new Date().toLocaleString('en-IN')+'</div>';
+function emptyState(msg,cta){return '<div class="empty"><span class="e-ic">🌱</span>'+msg+(cta?'<br><button class="btn" onclick="show(\''+cta[0]+'\')">'+esc(cta[1])+'</button>':'')+'</div>';}
+function table(cols,rows,emptyMsg,cta){
+  if(!rows||!rows.length) return emptyState(emptyMsg||'Abhi data nahi hai — pehle import/sync karo. Jhootha number yahan kabhi nahi dikhega.',cta||['integrations','Data import karo']);
+  let h='<div class="tbl"><table><thead><tr>'+cols.map(c=>'<th class="'+(c.n?'num':'')+'">'+c.t+'</th>').join('')+'</tr></thead><tbody>';
   for(const r of rows) h+='<tr>'+cols.map(c=>'<td class="'+(c.n?'num':'')+'">'+(c.f?c.f(r):esc(r[c.k]??'—'))+'</td>').join('')+'</tr>';
-  return h+'</table>';
+  return h+'</tbody></table></div>';
 }
 function cards(items){return '<div class="cards">'+items.map(i=>'<div class="card"><div class="k">'+i[0]+'</div><div class="v">'+i[1]+'</div><div class="k">'+(i[2]||'')+'</div></div>').join('')+'</div>';}
+const bar=(v,cls)=>'<div class="bar '+(cls||'')+'"><i style="width:'+Math.max(0,Math.min(100,v||0)).toFixed(1)+'%"></i></div>';
+async function ruleLink(id){if(!KNOW){try{KNOW=(await api('/api/v1/knowledge')).rules;}catch(e){KNOW=[];}}const r=KNOW.find(x=>x.id===id);return r;}
+function ruleChip(id){return id?'<a href="#" class="badge b-mute" onclick="showRule(\''+esc(id)+'\');return false" title="Niyam aur source dekho">'+esc(id)+'</a>':'';}
+async function showRule(id){const r=await ruleLink(id);if(!r){toast('Niyam '+id+' mila nahi');return;}
+  const m=modal('<h3>'+esc(r.id)+' · '+esc(r.topic)+'</h3><p>'+esc(r.rule)+'</p>'+(r.action?'<p><b>Kya karein:</b> '+esc(r.action)+'</p>':'')+'<p class="small">'+badge(r.status,r.status==='OFFICIAL'?'ok':r.status==='MULTI_SOURCE'?'info':'warn')+' bharosa '+Math.round(r.reliability*100)+'% · parkha '+esc(r.checked_on)+'</p>'+(r.sources.length?'<p class="small">Sources:<br>'+r.sources.map(s=>'<a href="'+esc(s)+'" target="_blank" rel="noopener">'+esc(s.replace(/^https?:\/\//,'').slice(0,70))+'</a>').join('<br>')+'</p>':'<p class="small muted">Hamara apna tajurba — apne data se pakka hoga</p>')+'<div class="acts"><button class="btn sec">Band karo</button></div>');
+  m.querySelector('.acts button').onclick=()=>m.remove();}
+function copyText(id){const t=document.getElementById(id).textContent;navigator.clipboard.writeText(t).then(()=>toast('Copy ho gaya','ok'),()=>toast('Copy nahi hua','bad'));}
+
+/* ---------- Kill switch / theme ---------- */
 async function refreshKill(){
   try{const k=await api('/api/v1/control/kill');KILL=k.engaged;
-    const b=document.getElementById('killBtn');b.textContent=KILL?'🛑 KILL SWITCH ON — saare writes band':'Kill Switch: OFF';b.className=KILL?'on':'';
+    const b=document.getElementById('killBtn');b.textContent=KILL?'🛑 KILL ON — writes band':'● Writes chalu';b.className=KILL?'on':'';b.title=KILL?'Saare live badlav band hain — dabakar chalu karo':'Emergency: saare live badlav ek tap me band';
   }catch(e){}
 }
 async function toggleKill(){
-  const reason=KILL?'':prompt('Kill switch ON karne ki wajah?');
-  if(!KILL&&reason===null)return;
-  try{await api('/api/v1/control/kill','POST',{engaged:!KILL,reason:reason||''});refreshKill();}catch(e){alert('Sirf Owner kill switch chala sakta hai');}
+  if(!KILL){const reason=await ask('Kill switch ON karein?','Saare live badlav (ads/listing writes) turant band ho jayenge. Wajah likho:',{placeholder:'jaise: ads me galti dikhi',ok:'Band karo',danger:true});if(reason===null)return;
+    try{await api('/api/v1/control/kill','POST',{engaged:true,reason:reason||''});toast('Kill switch ON — saare writes band','bad');}catch(e){toast('Sirf Owner kill switch chala sakta hai','bad');}}
+  else{const ok=await ask('Writes dobara chalu karein?','Approval ke baad wale badlav phir se lag sakenge.',{noInput:true,ok:'Chalu karo'});if(!ok)return;
+    try{await api('/api/v1/control/kill','POST',{engaged:false,reason:''});toast('Writes chalu','ok');}catch(e){toast('Sirf Owner kill switch chala sakta hai','bad');}}
+  refreshKill();
 }
+function applyTheme(t){if(t)document.documentElement.setAttribute('data-theme',t);else document.documentElement.removeAttribute('data-theme');}
+function toggleTheme(){const cur=document.documentElement.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');const n=cur==='dark'?'light':'dark';applyTheme(n);try{localStorage.setItem('ns_theme',n);}catch(e){}}
+try{applyTheme(localStorage.getItem('ns_theme'));}catch(e){}
+
+/* ---------- Views ---------- */
 const VIEWS={
+async today(m){
+  const d=await api('/api/v1/today');buildNav(d.pending_approvals);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.s===CURRENT));
+  const name=esc(localStorage.getItem('ns_user')||'');
+  const hr=new Date().getHours();const greet=hr<12?'Suprabhat':hr<17?'Namaste':'Shubh sandhya';
+  const tasks=d.tasks.length?d.tasks.map(t=>'<div class="task p'+t.priority+'"><span class="dot"></span><div class="t">'+esc(t.title)+'<small>'+esc(t.area)+'</small></div>'+ruleChip(t.rule_id)+'<button class="btn sm sec" onclick="show(\''+esc(t.screen)+'\')">Kholo →</button></div>').join(''):emptyState('Aaj koi zaroori kaam nahi — sab saaf hai ✨');
+  const ck=d.checklist.map(c=>'<div class="check '+(c.done?'done':'')+'"><span class="cb">'+(c.done?'✓':'')+'</span><div><b>'+esc(c.step)+'</b><div class="small muted">'+esc(c.why)+'</div></div></div>').join('');
+  const ne=d.next_event;
+  const ds=d.data;
+  m.innerHTML='<div class="hero" style="margin-bottom:18px"><div><h2>'+greet+(name?', '+name:'')+' 👋</h2><div class="muted">'+new Date().toLocaleDateString('hi-IN',{weekday:'long',day:'numeric',month:'long'})+' · '+(d.pending_approvals?'<b>'+d.pending_approvals+'</b> faisle tumhara intezaar kar rahe hain':'koi approval baaki nahi')+'</div></div></div>'+
+  '<div class="grid g-main">'+
+   '<div><div class="panel"><h3>Aaj ke kaam — zaroori pehle</h3>'+tasks+'</div>'+
+   '<div class="grid g3">'+
+     '<div class="card"><div class="k">Agle sale event tak</div><div class="v">'+(ne?ne.days_to_start+' din':'—')+'</div><div class="k">'+(ne?esc(ne.event)+' · '+esc(ne.phase):'agle 4 mahine me kuch nahi')+'</div></div>'+
+     '<div class="card"><div class="k">Agent Brain</div><div class="v">'+d.brain.rules+'</div><div class="k">niyam · '+d.brain.own_data_lessons+' apne data se</div></div>'+
+     '<div class="card"><div class="k">Aakhri data import</div><div class="v" style="font-size:16px">'+(ds.last_import_at?esc(ds.last_import_at.slice(0,10)):'kabhi nahi')+'</div><div class="k">'+(ds.connectors.length?'API: '+esc(ds.connectors.join(', ')):'API connector nahi — CSV se')+'</div></div>'+
+   '</div></div>'+
+   '<div class="panel"><div class="hero"><div class="ring" style="--p:'+d.setup_pct+'"><div>'+d.setup_pct+'%</div></div><div><h3 style="margin:0">Setup progress</h3><p class="muted small" style="margin:4px 0 0">Jitna data, utna tez seekhega system</p></div></div><div style="margin-top:12px">'+ck+'</div></div>'+
+  '</div>'+ev('today aggregator — approvals, growth playbook, SQP, sale calendar, brain');
+},
 async warroom(m){
   const pf=m.dataset.pf||'';
   const w=await api('/api/warroom'+(pf?'?platform='+pf:'')); const h=await api('/api/v1/system/health');
-  if(!w.connected){m.innerHTML='<h2>War Room</h2><div class="empty">Database me abhi asal data nahi hai.<br>Integrations screen se CSV import karo ya API keys jodo — tab yahan asal numbers aayenge.</div>'+ev('warroom service');return;}
+  const sel='<div class="chips">'+[['','Sab'],['Amazon','Amazon'],['Flipkart','Flipkart']].map(x=>'<button class="chip '+(pf===x[0]?'on':'')+'" onclick="document.getElementById(\'main\').dataset.pf=\''+x[0]+'\';show(\'warroom\')">'+x[1]+'</button>').join('')+'</div>';
+  if(!w.connected){m.innerHTML=sel+emptyState('Database me abhi asal bikri/ads data nahi hai.<br>CSV import karo ya API keys jodo — tab yahan asal numbers aayenge.',['integrations','Data jodo'])+ev('warroom service');return;}
   const k=w.kpis||{};
-  m.innerHTML='<h2>War Room — aaj ki tasveer</h2><p>Platform: <select onchange="document.getElementById(\'main\').dataset.pf=this.value;show(\'warroom\')"><option value=""'+(pf===''?' selected':'')+'>Sab</option><option'+(pf==='Amazon'?' selected':'')+'>Amazon</option><option'+(pf==='Flipkart'?' selected':'')+'>Flipkart</option></select> <span class="evidence">Source: '+esc(k.sales_source||'')+'</span></p>'+cards([['Revenue',inr(k.revenue),'orders: '+(k.orders??'—')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—',''],['TACOS',k.tacos_pct?k.tacos_pct+'%':'—','organic = andaaz (kul − ads-attributed)']])+
-  (h.alerts&&h.alerts.length?'<h3>⚠️ Alerts</h3>'+h.alerts.map(a=>'<p>'+badge('ALERT','warn')+' '+a+'</p>').join(''):'<p>'+badge('Sab theek','ok')+'</p>')+ev('apne imported data se — OBSERVED');
+  m.innerHTML=sel+cards([['Revenue (NET)',inr(k.revenue),'orders: '+(k.orders??'—')+(k.cancelled_orders?' · cancelled '+k.cancelled_orders:'')],['Ad Spend',inr(k.ad_spend),''],['Blended ROAS',k.blended_roas??'—','kul bikri ÷ ad kharch'],['TACOS',k.tacos_pct!=null?k.tacos_pct+'%':'—',esc(k.tacos_status||'')]])+
+  '<div class="panel"><h3>Alerts</h3>'+((h.alerts&&h.alerts.length)?h.alerts.map(a=>'<p>'+badge('ALERT','warn')+' '+esc(a)+'</p>').join(''):'<p>'+badge('Sab theek','ok')+'</p>')+'<p class="small muted">Sales source: '+esc(k.sales_source||'')+' · organic = andaaz (kul − ads-attributed)</p></div>'+ev('apne imported data se — OBSERVED');
+},
+async listingbuilder(m){
+  const prods=(await api('/api/v1/products')).products||[];
+  const opts=prods.map(p=>'<option value="'+esc(p.sku)+'">'+esc(p.sku)+' — '+esc(p.name)+'</option>').join('');
+  m.innerHTML='<div class="panel"><h3>1 · Product batao</h3><form id="lbf" onsubmit="return buildListing(event)"><div class="form-grid">'+
+  '<label class="f">SKU<input name="sku" list="skus" required placeholder="SKU-KAJU-500"><datalist id="skus">'+opts+'</datalist></label>'+
+  '<label class="f">Brand<input name="brand" placeholder="Dry Fruit Farm" value="Dry Fruit Farm"></label>'+
+  '<label class="f">Product naam<input name="product" required placeholder="Cashew Nuts Kaju"></label>'+
+  '<label class="f">Meva<select name="nut">'+NUTS.map(n=>'<option value="'+n[0]+'">'+n[1]+' ('+n[0]+')</option>').join('')+'</select></label>'+
+  '<label class="f">Grade<input name="grade" placeholder="W240 / Mamra / California"></label>'+
+  '<label class="f">Weight<input name="weight" placeholder="500g"></label>'+
+  '<label class="f">Form (optional)<input name="form" placeholder="Raw / Roasted"></label>'+
+  '<label class="f">Competitor brands (comma)<input name="competitors" placeholder="jinke naam kabhi copy me nahi"></label>'+
+  '</div><details><summary class="small muted" style="cursor:pointer">Bullets ke tathya (optional)</summary><div class="form-grid" style="margin-top:10px">'+
+  '<label class="f">Grade detail<input name="grade_detail" placeholder="W240 sabut kaju"></label><label class="f">Origin<input name="origin" placeholder="Goa"></label>'+
+  '<label class="f">Nutrition line<input name="nutrition_line" placeholder="protein aur healthy fats"></label><label class="f">Pack line<input name="pack_line" placeholder="food-grade zip pouch"></label></div></details>'+
+  '<button class="btn" style="margin-top:10px">✨ Listing banao + jaancho</button></form></div><div id="lbout"></div>';
+},
+async keywordplan(m){
+  const nut=m.dataset.nut||'almond';
+  const d=await api('/api/v1/keywords/plan?nut='+nut);
+  const p=d.plan;const col=(t,arr,cls,sub)=>'<div class="col"><h4>'+t+'</h4>'+(sub?'<div class="small muted" style="margin:-4px 0 8px">'+sub+'</div>':'')+(arr.length?arr.map(x=>'<span class="tag '+(cls||'')+'">'+esc(typeof x==='string'?x:x.term)+(x.why?' <span class="muted">· '+esc(x.why)+'</span>':'')+'</span>').join(''):'<span class="muted small">—</span>')+'</div>';
+  m.innerHTML='<div class="chips">'+NUTS.map(n=>'<button class="chip '+(n[0]===nut?'on':'')+'" onclick="document.getElementById(\'main\').dataset.nut=\''+n[0]+'\';show(\'keywordplan\')">'+n[1]+'</button>').join('')+'</div>'+
+  cards([['Terms parkhe',d.terms_considered,''],['Saboot ke saath',d.terms_with_evidence,'Ads ya SQP se'],['Negative',p.NEGATIVE_ADS.length,'ads me band karo']])+
+  '<div class="panel"><p class="small muted" style="margin-top:0">'+esc(d.note)+'</p><div class="cols">'+col('Title',p.TITLE,'','sabse zyada saboot wala 1')+col('Highlights / Bullets',p.HIGHLIGHTS_BULLETS,'','saboot wale agle')+col('Backend',p.BACKEND,'','variants, Hinglish, Hindi')+col('Negative (Ads)',p.NEGATIVE_ADS,'neg','galat irada / bina bikri kharch')+'</div>'+
+  '<div style="margin-top:10px">'+d.rule_ids.map(ruleChip).join(' ')+'</div></div>'+ev('OBSERVED_ADS + BRAND_ANALYTICS + SEED_VOCAB — volume ka koi andaaz nahi');
+},
+async sqp(m){
+  const d=await api('/api/v1/keywords/sqp');
+  if(!d.available){m.innerHTML=emptyState('SQP data nahi hai.<br>Seller Central → Brand Analytics → Search Query Performance export karke <code>data/brand_analytics_inbox/</code> me daalo — roz 06:45 khud import hoga.',['integrations','Import screen'])+'<div class="panel" style="margin-top:14px"><h3>Yeh report kaise padhein</h3><p>'+ruleChip('AMZ-Q-01')+' '+ruleChip('AMZ-Q-02')+' '+ruleChip('AMZ-Q-03')+'</p></div>';return;}
+  const dg={SCALE_OPPORTUNITY:['Scale karo','ok'],NOT_VISIBLE:['Dikhta nahi','bad'],TILE_PROBLEM:['Click nahi','warn'],OFFER_PROBLEM:['Bikri nahi','warn'],HEALTHY:['Theek','info']};
+  const c=d.diagnosis_counts||{};
+  m.innerHTML=cards(Object.keys(dg).map(k=>[dg[k][0],c[k]||0,k.replace('_',' ').toLowerCase()]))+
+  table([{t:'Query',k:'query'},{t:'Search vol.',k:'search_volume',n:1},{t:'Impr. share',f:r=>bar((r.shares.impression||0)*100*5)+'<span class="small">'+pct(r.shares.impression)+'</span>'},{t:'Click',f:r=>'<span class="small">'+pct(r.shares.click)+'</span>'},{t:'Cart',f:r=>'<span class="small">'+pct(r.shares.cart)+'</span>'},{t:'Purchase',f:r=>'<span class="small">'+pct(r.shares.purchase)+'</span>'},{t:'Halat',f:r=>badge((dg[r.diagnosis]||[r.diagnosis])[0],(dg[r.diagnosis]||[0,'info'])[1])},{t:'Kya karein',f:r=>'<span class="small">'+esc(r.action)+'</span> '+ruleChip(r.rule_id)}],d.queries)+ev('Amazon Brand Analytics SQP — share = tumhara hissa ÷ poora market');
 },
 async products(m){
   const plan=await api('/api/action-plan'); const costs=await api('/api/v1/costs');
   const p=plan.plan||{};
-  m.innerHTML='<h2>Product Intelligence</h2>'+cards([['Pause list', (p.pause||[]).length+' campaigns','zero-sale'],['Scale list',(p.scale||[]).length+' campaigns',''],['Andazan bachat',inr(p.savings_est),'/cycle']])+
-  '<h3>SKU Costs (versioned)</h3>'+table([{t:'SKU',k:'sku'},{t:'COGS',k:'cogs',n:1},{t:'Packing',k:'packaging',n:1},{t:'Laagu',k:'effective_from'}],costs.costs,'Cost darj nahi — bina cost ke scale ki sifarish band hai (FIN-01)')+
-  '<h3>SKU 360° — ek SKU ki poori tasveer</h3><form class="row" onsubmit="return load360(event)"><input name="sku" placeholder="SKU daalo (jaise catalog wala)" required><button class="btn">360° dekho</button></form><div id="p360"></div>'+ev('action planner + cost registry + product 360');
+  m.innerHTML=cards([['Pause list',(p.pause||[]).length+' campaigns','zero-sale'],['Scale list',(p.scale||[]).length+' campaigns',''],['Andazan bachat',inr(p.savings_est),'/cycle']])+
+  '<div class="panel"><h3>SKU 360° — ek SKU ki poori tasveer</h3><form class="row" onsubmit="return load360(event)"><input name="sku" placeholder="SKU daalo" required><button class="btn">360° dekho</button></form><div id="p360"></div></div>'+
+  '<h3>SKU Costs (versioned)</h3>'+table([{t:'SKU',k:'sku'},{t:'COGS',n:1,f:r=>inr(r.cogs)},{t:'Packing',n:1,f:r=>inr(r.packaging)},{t:'Laagu',k:'effective_from'}],costs.costs,'Cost darj nahi — bina cost ke scale ki sifarish band hai (FIN-01)',['profit','Cost darj karo'])+ev('action planner + cost registry + product 360');
 },
 async competitors(m){
   const d=await api('/api/v1/competitors');
-  m.innerHTML='<h2>Competitor Observatory</h2>'+table([{t:'Peer',k:'title'},{t:'Grade',k:'grade'},{t:'Pack (g)',k:'pack_g',n:1},{t:'Taaza Price',f:r=>r.latest_snapshot?inr(r.latest_snapshot.price):'unknown'},{t:'Rating',f:r=>r.latest_snapshot?(r.latest_snapshot.rating??'—'):'—'},{t:'Snapshot',f:r=>r.latest_snapshot?r.latest_snapshot.captured_at:'nahi mila'}],d.peers,'Abhi koi peer darj nahi — neeche se verified peer jodo')+
-  '<h3>Naya peer jodo</h3><form class="row" onsubmit="return addPeer(event)"><input name="title" placeholder="Peer ka title" required><input name="peer_ref" placeholder="ASIN/FSN"><input name="nut_type" placeholder="cashew/almond"><input name="grade" placeholder="W320"><input name="pack_g" type="number" placeholder="200"><button class="btn">Jodo</button></form>'+
-  '<h3>Snapshot darj karo (dated observation)</h3><form class="row" onsubmit="return addSnap(event)"><input name="peer_id" type="number" placeholder="Peer ID" required><input name="price" type="number" step="0.01" placeholder="Price ₹"><input name="rating" type="number" step="0.1" placeholder="Rating"><input name="reviews" type="number" placeholder="Reviews"><input name="image_count" type="number" placeholder="Images"><button class="btn">Darj karo</button></form>'+ev('manual verified observation — CMP-01/02');
+  m.innerHTML=table([{t:'ID',k:'id',n:1},{t:'Peer',k:'title'},{t:'Grade',k:'grade'},{t:'Pack (g)',k:'pack_g',n:1},{t:'Taaza price',n:1,f:r=>r.latest_snapshot?inr(r.latest_snapshot.price):'unknown'},{t:'Rating',f:r=>r.latest_snapshot?(r.latest_snapshot.rating??'—'):'—'},{t:'Snapshot',f:r=>r.latest_snapshot?esc(r.latest_snapshot.captured_at):'nahi mila'}],d.peers,'Abhi koi peer darj nahi — neeche se verified peer jodo',['competitors','Neeche jodo'])+
+  '<div class="grid g2" style="margin-top:16px"><div class="panel"><h3>Naya peer jodo</h3><form onsubmit="return addPeer(event)"><div class="form-grid"><label class="f">Title<input name="title" required></label><label class="f">ASIN/FSN<input name="peer_ref"></label><label class="f">Meva<input name="nut_type" placeholder="cashew"></label><label class="f">Grade<input name="grade" placeholder="W320"></label><label class="f">Pack (g)<input name="pack_g" type="number" placeholder="200"></label></div><button class="btn">Jodo</button></form></div>'+
+  '<div class="panel"><h3>Snapshot darj karo</h3><form onsubmit="return addSnap(event)"><div class="form-grid"><label class="f">Peer ID<input name="peer_id" type="number" required></label><label class="f">Price ₹<input name="price" type="number" step="0.01"></label><label class="f">Rating<input name="rating" type="number" step="0.1"></label><label class="f">Reviews<input name="reviews" type="number"></label><label class="f">Images<input name="image_count" type="number"></label></div><button class="btn">Darj karo</button></form></div></div>'+ev('manual verified observation — CMP-01/02');
 },
 async compare(m){
-  m.innerHTML='<h2>Peer Compare — Decision Packet</h2><form class="row" onsubmit="return loadPacket(event)"><input name="sku" placeholder="Apna SKU (catalog wala)" required><input name="peer" type="number" placeholder="Peer ID" required><input name="nut" placeholder="cashew"><input name="grade" placeholder="W320"><input name="pack_g" type="number" placeholder="200"><button class="btn">Packet banao</button></form><div id="packet"></div>'+ev('CMP decision packet — saboot, farq, margin guardrail, tajurba');
+  m.innerHTML='<div class="panel"><form onsubmit="return loadPacket(event)"><div class="form-grid"><label class="f">Apna SKU<input name="sku" required></label><label class="f">Peer ID<input name="peer" type="number" required></label><label class="f">Meva<input name="nut" placeholder="cashew"></label><label class="f">Grade<input name="grade" placeholder="W320"></label><label class="f">Pack (g)<input name="pack_g" type="number" placeholder="200"></label></div><button class="btn">Packet banao</button></form></div><div id="packet"></div>'+ev('CMP decision packet — saboot, farq, margin guardrail, tajurba');
 },
 async keywords(m){
   const d=await api('/api/v1/keywords/matrix');
-  m.innerHTML='<h2>Keyword Lab</h2>'+table([{t:'Term',k:'term'},{t:'Clicks',k:'clicks',n:1},{t:'Orders',k:'orders',n:1},{t:'CVR %',k:'cvr_pct',n:1},{t:'ROAS',k:'roas',n:1},{t:'Search Volume',f:r=>r.search_volume===null?badge('unknown','warn'):r.search_volume},{t:'Score',k:'opportunity_score',n:1}],d.matrix)+ev('apne search-term report se OBSERVED; volume licensed provider bina UNKNOWN (KWD-01)');
+  m.innerHTML=table([{t:'Term',k:'term'},{t:'Clicks',k:'clicks',n:1},{t:'Orders',k:'orders',n:1},{t:'CVR %',k:'cvr_pct',n:1},{t:'ROAS',k:'roas',n:1},{t:'Search volume',f:r=>r.search_volume===null?badge('unknown','mute'):esc(r.search_volume)},{t:'Score',n:1,f:r=>r.excluded?badge('excluded','bad'):esc(r.opportunity_score)}],d.matrix,'Search-term data nahi — Ads report import karo',['integrations','Import karo'])+ev('apne search-term report se OBSERVED; volume licensed provider bina UNKNOWN (KWD-01)');
 },
 async rank(m){
-  m.innerHTML='<h2>Rank Tracker</h2><form class="row" onsubmit="return loadRank(event)"><input name="term" placeholder="brazil nuts" required><input name="sku" placeholder="SKU" required><button class="btn">Trend dekho</button></form><div id="rankout"></div>'+ev('rank observations — kam se kam 3 points bina natija nahi (RNK-01)');
+  m.innerHTML='<div class="panel"><form class="row" onsubmit="return loadRank(event)"><label class="f">Term<input name="term" placeholder="kaju w240" required></label><label class="f">SKU<input name="sku" required></label><button class="btn">Trend dekho</button></form></div><div id="rankout"></div>'+ev('rank observations — kam se kam 3 points bina natija nahi (RNK-01)');
 },
 async ads(m){
-  const d=await api('/api/v1/ads/health');
-  const mx=Math.max(...(d.campaigns||[]).map(c=>c.spend||0),1);
-  const bars=(d.campaigns||[]).slice(0,8).map(c=>'<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="min-width:150px;font-size:12px">'+esc(c.name)+'</span><div style="height:14px;background:#057C81;border-radius:4px;width:'+Math.max(2,(c.spend/mx*55)).toFixed(1)+'%"></div><span style="font-size:12px">'+inr(c.spend)+'</span></div>').join('');
-  m.innerHTML='<h2>Ads Studio</h2><div class="card"><div class="k">Kharch ka bantwara (upar wale 8 campaigns)</div>'+bars+'</div>'+table([{t:'Campaign',k:'name'},{t:'Spend',n:1,f:r=>inr(r.spend)},{t:'Sales',n:1,f:r=>inr(r.sales)},{t:'ROAS',k:'roas',n:1},{t:'ACOS %',k:'acos_pct',n:1}],d.campaigns)+
-  '<h3>Harvest candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'from_campaign'},{t:'Orders',k:'orders',n:1}],(d.harvest||{}).harvest,'—')+
-  '<h3>Negative candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'campaign'},{t:'Barbaad',n:1,f:r=>inr(r.wasted)}],(d.harvest||{}).negatives,'—')+ev('ADS-01..05 — sifarishen proposals se lagu hongi, seedha kabhi nahi');
+  const d=await api('/api/v1/ads/health'); const st=await api('/api/v1/growth/ads-structure');
+  const camps=d.campaigns||[];const mx=Math.max(...camps.map(c=>c.spend||0),1);
+  const bars=camps.slice(0,8).map(c=>'<div style="display:grid;grid-template-columns:minmax(90px,200px) 1fr 80px;gap:10px;align-items:center;margin:6px 0"><span class="small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'+bar(c.spend/mx*100,c.roas!==null&&c.roas<1?'bad':'')+'<span class="small num">'+inr(c.spend)+'</span></div>').join('');
+  const fnd=st.status==='OK'?(st.findings.length?st.findings.map(f=>'<div class="issue">'+sevBadge(f.severity)+'<div style="flex:1"><b>'+esc(f.message)+'</b><div class="small muted">'+esc(f.action)+'</div></div>'+ruleChip(f.rule_id)+'</div>').join(''):'<p>'+badge('Structure saaf','ok')+'</p>'):'<p class="muted">'+esc(st.note)+'</p>';
+  m.innerHTML=(st.status==='OK'?cards([['Structure score',st.structure_score+'/100','research niyam par'],['Bekaar kharch',inr(st.wasted_spend),'bina-bikri terms'],['Harvest baaki',st.harvest_pending,'Exact me daalo'],['Campaigns',st.campaigns.length,Object.entries(st.campaign_types).map(x=>x[0]+' '+x[1]).join(' · ')]]):'')+
+  '<div class="grid g2"><div class="panel"><h3>Campaign structure ki jaanch</h3>'+fnd+'</div><div class="panel"><h3>Kharch ka bantwara (top 8)</h3>'+(bars||'<p class="muted">Campaign data nahi</p>')+'</div></div>'+
+  '<h3>Campaigns</h3>'+table([{t:'Campaign',k:'name'},{t:'Spend',n:1,f:r=>inr(r.spend)},{t:'Sales',n:1,f:r=>inr(r.sales)},{t:'ROAS',k:'roas',n:1},{t:'ACOS %',k:'acos_pct',n:1}],camps,'Campaign data nahi — Ads report import karo')+
+  '<div class="grid g2" style="margin-top:16px"><div><h3>Harvest candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'from_campaign'},{t:'Orders',k:'orders',n:1}],(d.harvest||{}).harvest,'Abhi koi nahi')+'</div>'+
+  '<div><h3>Negative candidates</h3>'+table([{t:'Term',k:'term'},{t:'Campaign',k:'campaign'},{t:'Barbaad',n:1,f:r=>inr(r.wasted)}],(d.harvest||{}).negatives,'Abhi koi nahi')+'</div></div>'+ev('ADS-01..05 + AMZ-A-01..03 — sifarishen proposals se lagu hongi, seedha kabhi nahi');
 },
 async listings(m){
   const d=await api('/api/v1/listings/versions');
-  m.innerHTML='<h2>Listing Lab — Versions</h2>'+table([{t:'SKU',k:'sku'},{t:'Ver',k:'version',n:1},{t:'Title',k:'title'},{t:'Status',f:r=>badge(r.status,r.status==='APPROVED'?'ok':'info')},{t:'Banaya',k:'created_by'},{t:'Publish',f:r=>r.status==='APPROVED'?'<button class="btn" onclick="pubListing('+r.id+',false)">Preview-parkh</button> <button class="btn sec" onclick="pubListing('+r.id+',true)">Live publish</button>':''}],d.versions,'Abhi koi draft nahi')+
-  '<h3>Naya draft</h3><form class="row" onsubmit="return addDraft(event)"><input name="sku" placeholder="SKU" required><input name="title" placeholder="Naya title" size="50" required><button class="btn">Draft banao</button></form><p style="font-size:12.5px;color:#5b7181">Approve karte samay har dawa fact-registry se parkha jayega — saboot na ho to NEEDS_EVIDENCE (POL-01).</p>'+ev('listing versions — itihaas kabhi mit-ta nahi');
+  m.innerHTML=table([{t:'SKU',k:'sku'},{t:'Ver',k:'version',n:1},{t:'Title',f:r=>esc(r.title)+' <span class="counter'+((r.title||'').length>75?' over':'')+'">'+(r.title||'').length+'/75</span>'},{t:'Status',f:r=>badge(r.status,r.status==='APPROVED'?'ok':r.status==='PUBLISHED'?'info':'mute')},{t:'Banaya',k:'created_by'},{t:'Publish',f:r=>r.status==='APPROVED'?'<button class="btn sm" onclick="pubListing('+r.id+',false)">Preview-parkh</button> <button class="btn sm sec" onclick="pubListing('+r.id+',true)">Live</button>':''}],d.versions,'Abhi koi draft nahi — Listing Builder se banao',['listingbuilder','Listing Builder kholo'])+
+  '<div class="panel" style="margin-top:16px"><h3>Naya draft (haath se)</h3><form class="row" onsubmit="return addDraft(event)"><input name="sku" placeholder="SKU" required><input name="title" placeholder="Naya title (≤75)" style="flex:1;min-width:220px" required oninput="this.nextElementSibling.textContent=this.value.length+\'/75\';this.nextElementSibling.className=\'counter\'+(this.value.length>75?\' over\':\'\')"><span class="counter">0/75</span><button class="btn">Draft banao</button></form><p class="small muted">Approve karte samay har dawa fact-registry se parkha jayega — saboot na ho to NEEDS_EVIDENCE (POL-01).</p></div>'+ev('listing versions — itihaas kabhi mit-ta nahi');
 },
 async creative(m){
-  m.innerHTML='<h2>Creative Lab — Image Brief</h2><form class="row" onsubmit="return loadBrief(event)"><input name="product" placeholder="Brazil Nuts" required><input name="grade" placeholder="Grade A++"><input name="weight" placeholder="200g"><button class="btn">Brief banao</button></form><div id="brief"></div>'+ev('7-shot brief — CVR-01/LST-03');
+  m.innerHTML='<div class="panel"><form class="row" onsubmit="return loadBrief(event)"><label class="f">Product<input name="product" placeholder="Cashew Nuts" required></label><label class="f">Grade<input name="grade" placeholder="W240"></label><label class="f">Weight<input name="weight" placeholder="500g"></label><button class="btn">Brief banao</button></form><p class="small muted">Main image: shuddh safed (255,255,255), ~85% bhara, 2000px — '+ruleChip('AMZ-I-01')+' '+ruleChip('AMZ-I-02')+'</p></div><div id="brief"></div>'+ev('7-shot brief — CVR-01/LST-03');
 },
 async experiments(m){
   const d=await api('/api/v1/experiments');
-  m.innerHTML='<h2>Experiment Center</h2>'+table([{t:'Naam',k:'name'},{t:'SKU',k:'sku'},{t:'Parikalpana',k:'hypothesis'},{t:'Status',k:'status'},{t:'Verdict',f:r=>r.verdict?badge(r.verdict,r.verdict==='WIN'?'ok':r.verdict==='LOSS'?'bad':'warn'):'—'}],d.experiments,'Abhi koi tajurba nahi — pehla tajurba Cashew W320 par (UC-01)')+ev('kam sample = INCONCLUSIVE, jeet ka jhootha elaan kabhi nahi');
+  m.innerHTML=table([{t:'Naam',k:'name'},{t:'SKU',k:'sku'},{t:'Parikalpana',k:'hypothesis'},{t:'Status',k:'status'},{t:'Verdict',f:r=>r.verdict?badge(r.verdict,r.verdict==='WIN'?'ok':r.verdict==='LOSS'?'bad':'warn'):'—'}],d.experiments,'Abhi koi tajurba nahi',['listingbuilder','Listing se shuru karo'])+ev('kam sample = INCONCLUSIVE, jeet ka jhootha elaan kabhi nahi');
+},
+async growth(m){
+  const evs=await api('/api/v1/growth/events'); const rv=await api('/api/v1/growth/reviews');
+  const tl=evs.events.length?'<div class="timeline">'+evs.events.map(e=>'<div class="tl"><b>'+esc(e.event)+'</b> '+badge(e.phase,e.phase==='CHAL RAHA HAI'?'ok':e.phase==='YOJANA BANAO'?'mute':'warn')+'<div class="small muted">'+esc(e.start)+' se · '+e.days_to_start+' din · FBA stock '+esc(e.fba_stock_by)+' tak · taiyaari '+esc(e.ready_by)+' tak</div><div class="small">Focus: '+esc(e.focus)+'</div></div>').join('')+'</div>':'<p class="muted">Agle 4 mahine me koi event nahi</p>';
+  m.innerHTML='<div class="grid g2"><div class="panel"><h3>Sale calendar '+ruleChip('IN-E-01')+' '+ruleChip('IN-E-02')+'</h3><p class="small muted">'+esc(evs.note)+'</p>'+tl+'</div>'+
+  '<div class="panel"><h3>Break-even ACOS '+ruleChip('AMZ-A-04')+'</h3><p class="small muted">Ads se pehle ka munafa ÷ price. Isse upar ACOS = har ad-bikri par ghaata.</p><form class="row" onsubmit="return loadBE(event)"><input name="sku" placeholder="SKU" required><input name="price" type="number" step="0.01" placeholder="Price ₹ (optional)"><button class="btn">Nikalo</button></form><div id="beout"></div></div></div>'+
+  '<div class="panel"><h3>Review plan '+ruleChip('AMZ-R-01')+' '+ruleChip('AMZ-R-02')+'</h3><p class="small muted">'+esc(rv.policy||'')+'</p>'+table([{t:'SKU',k:'sku'},{t:'Naam',k:'name'},{t:'Reviews',k:'reviews',n:1},{t:'Rating',k:'rating',n:1},{t:'Kya karein',k:'action'}],rv.items,rv.note||'Abhi koi kaam nahi',['products','Products dekho'])+'</div>'+ev('growth playbook — research niyam (marketplace_knowledge) tumhare data par');
 },
 async profit(m){
   const rec=await api('/api/v1/finance/reconciliation');
-  m.innerHTML='<h2>Profit & Settlements</h2>'+cards([['Order GMV',inr(rec.order_gmv),rec.order_lines+' lines'],['Settlement Net',inr(rec.settlement_net_payout),''],['Farq',inr(rec.difference),rec.status]]) +
-  '<p>'+(rec.status==='MATCHED'?badge('MATCHED','ok'):badge('EXCEPTION','warn'))+' '+rec.note+'</p>'+
-  '<h3>Cost darj karo</h3><form class="row" onsubmit="return addCost(event)"><input name="sku" placeholder="SKU" required><input name="cogs" type="number" step="0.01" placeholder="COGS ₹" required><input name="packaging" type="number" step="0.01" placeholder="Packing ₹"><button class="btn">Darj karo</button></form>'+ev('FIN-01/02 — settlement se mila hua hisaab hi sach');
+  m.innerHTML=cards([['Order GMV',inr(rec.order_gmv),(rec.order_lines??0)+' lines'],['Settlement Net',inr(rec.settlement_net_payout),''],['Farq',inr(rec.difference),esc(rec.status||'')]])+
+  '<div class="panel"><p style="margin-top:0">'+(rec.status==='MATCHED'?badge('MATCHED','ok'):badge('EXCEPTION','warn'))+' '+esc(rec.note)+'</p></div>'+
+  '<div class="panel"><h3>Cost darj karo</h3><p class="small muted">Iske bina break-even ACOS aur munafa nahi banta.</p><form class="row" onsubmit="return addCost(event)"><input name="sku" placeholder="SKU" required><input name="cogs" type="number" step="0.01" placeholder="COGS ₹" required><input name="packaging" type="number" step="0.01" placeholder="Packing ₹"><button class="btn">Darj karo</button></form></div>'+ev('FIN-01/02 — settlement se mila hua hisaab hi sach');
 },
 async inventory(m){
   const sp=await api('/api/season-pack');
-  m.innerHTML='<h2>Inventory & Festival</h2><form class="row" onsubmit="return loadGate(event)"><input name="sku" placeholder="SKU ka stock gate" required><button class="btn">Parkho</button></form><div id="gate"></div>'+
-  '<h3>Season Combos</h3>'+table([{t:'Combo',k:'name'},{t:'Gift Price',n:1,f:r=>inr(r.gift_price)},{t:'AOV x',k:'aov_multiple',n:1}],sp.combos||[],'Catalog khaali hai')+ev('INV-01 stock gate + CVR-04 festival lab');
+  m.innerHTML='<div class="panel"><h3>Stock gate</h3><form class="row" onsubmit="return loadGate(event)"><input name="sku" placeholder="SKU" required><button class="btn">Parkho</button></form><div id="gate"></div></div>'+
+  '<h3>Season combos</h3>'+table([{t:'Combo',k:'name'},{t:'Gift price',n:1,f:r=>inr(r.gift_price)},{t:'AOV ×',k:'aov_multiple',n:1}],sp.combos||[],'Catalog khaali hai',['integrations','Catalog import'])+ev('INV-01 stock gate + CVR-04 festival lab');
 },
 async approvals(m){
   const pv=await api('/api/v1/proposals'); const legacy=await api('/api/approvals');
-  m.innerHTML='<h2>Approval Inbox</h2><h3>V12 Proposals (state machine)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Prakar',k:'kind'},{t:'Platform',k:'platform'},{t:'Tier',k:'tier'},{t:'State',f:r=>badge(r.state,'info')},{t:'Banaya',k:'created_by'},{t:'Action',f:r=>r.state==='APPROVAL_PENDING'?'<button class="btn" onclick="propAct('+r.id+',\'approve\')">Approve</button>':r.state==='APPROVED'?'<button class="btn" onclick="propAct('+r.id+',\'queue\')">Queue</button>':r.state==='QUEUED'?'<button class="btn" onclick="propExec('+r.id+')">Execute (saboot ke saath)</button>':''}],pv.proposals,'Koi proposal nahi')+
-  '<h3>Agent Proposals (purani kataar)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Agent',k:'agent'},{t:'Prakar',k:'action_type'},{t:'Vivaran',k:'description'},{t:'Tier',k:'tier'},{t:'Status',k:'status'},{t:'Action',f:r=>'<button class="btn" onclick="legacyAct('+r.id+',\'approve\')">Approve</button> <button class="btn sec" onclick="legacyAct('+r.id+',\'reject\')">Reject</button>'}],legacy.approvals,'Koi intezaar wala proposal nahi')+ev('SEC-03 — APPLIED_VERIFIED sirf pushti par');
+  m.innerHTML='<h3>Proposals (state machine)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Prakar',k:'kind'},{t:'Platform',k:'platform'},{t:'Tier',k:'tier'},{t:'State',f:r=>badge(r.state,r.state==='APPLIED_VERIFIED'?'ok':r.state==='APPROVAL_PENDING'?'warn':'info')},{t:'Banaya',k:'created_by'},{t:'',f:r=>'<button class="btn sm ghost" onclick="viewProp('+r.id+')">Dekho</button>'+(r.state==='APPROVAL_PENDING'?'<button class="btn sm" onclick="propAct('+r.id+',\'approve\')">Approve</button>':r.state==='APPROVED'?'<button class="btn sm" onclick="propAct('+r.id+',\'queue\')">Queue</button>':r.state==='QUEUED'?'<button class="btn sm" onclick="propExec('+r.id+')">Execute</button>':'')}],pv.proposals,'Koi proposal nahi — sab saaf ✨',['today','Aaj par wapas'])+
+  '<h3 style="margin-top:18px">Agent proposals (purani kataar)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Agent',k:'agent'},{t:'Prakar',k:'action_type'},{t:'Vivaran',k:'description'},{t:'Tier',k:'tier'},{t:'',f:r=>'<button class="btn sm" onclick="legacyAct('+r.id+',\'approve\')">Approve</button> <button class="btn sm sec" onclick="legacyAct('+r.id+',\'reject\')">Reject</button>'}],legacy.approvals,'Koi intezaar wala proposal nahi',['today','Aaj par wapas'])+ev('SEC-03 — APPLIED_VERIFIED sirf pushti par');
+},
+async brain(m){
+  const d=await api('/api/v1/brain'); const r=d.report;
+  const agents=Object.entries(r.per_agent).sort((a,b)=>b[1].rules-a[1].rules);
+  const AG={A01:'Market',A03:'Keyword',A04:'Listing',A05:'Creative',A06:'Ads',A07:'Pricing',A08:'Review',A09:'Governance'};
+  m.innerHTML=cards([['Kul niyam',r.total_rules,''],['Active',r.by_status.ACTIVE||0,'agents inhe maante hain'],['Probation',r.by_status.PROBATION||0,'bharosa kam — sirf salah'],['Disabled',r.by_status.DISABLED||0,'3 baar haare'],['Apne data se',r.own_data_lessons,'khud seekhe sabak']])+
+  '<div class="grid g2"><div class="panel"><h3>Agents ki taakat</h3>'+(agents.length?agents.map(([a,s])=>'<div style="display:grid;grid-template-columns:110px 1fr 70px;gap:10px;align-items:center;margin:8px 0"><b class="small">'+esc(a)+' '+(AG[a]||'')+'</b>'+bar(s.strength)+'<span class="small num">'+s.rules+' niyam</span></div>').join(''):'<p class="muted">—</p>')+'<p class="small muted">Taakat = jeet-dar (VERIFIED nateeje) + tajurba + gyaan. Nateeje aate hi badhegi.</p></div>'+
+  '<div class="panel"><h3>Nateejo ne kya badla</h3>'+(r.rules_moved_by_results.length?table([{t:'Niyam',f:x=>ruleChip(x.rule_id)},{t:'Pehle',n:1,f:x=>Math.round(x.prior*100)+'%'},{t:'Ab',n:1,f:x=>Math.round(x.confidence*100)+'%'},{t:'Jeet/Haar',n:1,f:x=>x.wins+'/'+x.losses}],r.rules_moved_by_results):emptyState('Abhi koi VERIFIED nateeja nahi aaya — pehla proposal approve + execute hone ke 7/14 din baad yahan dikhega'))+
+  (r.stale_research_rules.length?'<p>'+badge('DOBARA RESEARCH','warn')+' '+r.stale_research_rules.map(ruleChip).join(' ')+'</p>':'')+'</div></div>'+
+  '<h3>Bharose wale niyam (sabse upar sabse pakke)</h3>'+table([{t:'Niyam',f:x=>ruleChip(x.rule_id)},{t:'Vishay',k:'topic'},{t:'Kya kehta hai',f:x=>'<span class="small">'+esc((x.action||x.statement||'').slice(0,160))+'</span>'},{t:'Kahan se',f:x=>badge(x.origin==='OWN_DATA'?'APNA DATA':x.source_status,x.origin==='OWN_DATA'?'ok':x.source_status==='OFFICIAL'?'ok':x.source_status==='MULTI_SOURCE'?'info':'warn')},{t:'Bharosa',f:x=>bar(x.confidence*100)+'<span class="small">'+Math.round(x.confidence*100)+'%</span>'}],d.advice,'Brain khaali hai — ek baar daily cycle chalao')+ev('agent_brain — Bayesian: (prior×4 + jeet) ÷ (4 + kul nateeje)');
+},
+async knowledge(m){
+  const tp=m.dataset.tp||'';const d=await api('/api/v1/knowledge');KNOW=d.rules;
+  const topics=[...new Set(d.rules.map(r=>r.topic))].sort();
+  const rules=d.rules.filter(r=>!tp||r.topic===tp);
+  m.innerHTML='<div class="chips"><button class="chip '+(!tp?'on':'')+'" onclick="document.getElementById(\'main\').dataset.tp=\'\';show(\'knowledge\')">Sab ('+d.rules.length+')</button>'+topics.map(t=>'<button class="chip '+(t===tp?'on':'')+'" onclick="document.getElementById(\'main\').dataset.tp=\''+esc(t)+'\';show(\'knowledge\')">'+esc(t)+'</button>').join('')+'</div>'+
+  rules.map(r=>'<details class="rule"><summary><b>'+esc(r.id)+'</b>'+badge(r.platform,'mute')+badge(r.status,r.status==='OFFICIAL'?'ok':r.status==='MULTI_SOURCE'?'info':'warn')+'<span style="flex:1;min-width:200px">'+esc(r.rule.slice(0,120))+(r.rule.length>120?'…':'')+'</span><span class="small muted">'+Math.round(r.reliability*100)+'%</span></summary><p>'+esc(r.rule)+'</p>'+(r.action?'<p><b>Kya karein:</b> '+esc(r.action)+'</p>':'')+(r.sources.length?'<p class="small">'+r.sources.map(s=>'<a href="'+esc(s)+'" target="_blank" rel="noopener">'+esc(s.replace(/^https?:\/\//,'').slice(0,60))+'</a>').join(' · ')+'</p>':'<p class="small muted">Hamara tajurba — data se pakka hoga</p>')+'</details>').join('')+
+  (d.stale.length?'<p>'+badge('Purane niyam — dobara parkho','warn')+' '+esc(d.stale.join(', '))+'</p>':'')+ev('marketplace_knowledge — research '+d.checked_on+'; Amazon/Flipkart ranking formula publish nahi karte');
 },
 async integrations(m){
   const cs=await api('/api/connectors/status'); const caps=await api('/api/v1/capabilities');
   const connRows=Object.entries(cs.connectors).map(([k,v])=>({name:k,...v}));
-  m.innerHTML='<h2>Integrations & Data Quality</h2><h3>Connectors</h3>'+table([{t:'Connector',k:'name'},{t:'Halat',f:r=>r.configured?badge('CONFIGURED','ok'):badge('baki: '+(r.missing||[]).join(','),'warn')}],connRows)+
-  '<h3>Capabilities (jo certified nahi, woh band)</h3>'+table([{t:'Platform',k:'platform'},{t:'Capability',k:'capability'},{t:'Status',f:r=>badge(r.status,r.status==='unavailable'?'bad':r.status==='report_only'?'warn':'info')},{t:'Wajah',k:'reason'}],caps.capabilities)+
-  '<h3>CSV Wizard — pehle preview</h3><form class="row" onsubmit="return wizPreview(event)"><input name="path" placeholder="Server par file ka path" size="46" required><button class="btn sec">Preview</button></form><form class="row" onsubmit="return wizCommit(event)"><button class="btn">Preview ke baad Commit</button></form><div id="wiz"></div>'+ev('INT-04 — duplicate file dobara import nahi hogi');
+  m.innerHTML='<div class="grid g2"><div><h3>Connectors</h3>'+table([{t:'Connector',k:'name'},{t:'Halat',f:r=>r.configured?badge('CONFIGURED','ok'):badge('baaki: '+(r.missing||[]).join(', '),'warn')}],connRows)+'<p class="small muted">Keys kaise bharein: CONNECTORS_SETUP.md — keys kabhi chat/GitHub par mat bhejo.</p></div>'+
+  '<div class="panel"><h3>CSV Wizard — pehle preview, phir commit</h3><p class="small muted">Server par file ka poora path do (Search Term, Campaign, Orders, Inventory, Brand Analytics).</p><form class="row" onsubmit="return wizPreview(event)"><input name="path" placeholder="/home/user/Downloads/report.csv" style="flex:1;min-width:200px" required><button class="btn sec">Preview</button></form><div id="wiz"></div><form class="row" onsubmit="return wizCommit(event)"><button class="btn">Commit karo</button></form></div></div>'+
+  '<h3>Capabilities (jo certified nahi, woh band)</h3>'+table([{t:'Platform',k:'platform'},{t:'Capability',k:'capability'},{t:'Status',f:r=>badge(r.status,r.status==='unavailable'?'bad':r.status==='report_only'?'warn':r.status==='certified'?'ok':'info')},{t:'Wajah',k:'reason'}],caps.capabilities)+ev('INT-04 — duplicate file dobara import nahi hogi');
 },
 async agency(m){
   const a=await api('/api/v1/agency/scorecard');
-  m.innerHTML='<h2>Agency Performance Board</h2>'+cards([['Kul Tasks',a.tasks_total,''],['Saboot ke saath Done',a.tasks_done_with_evidence,''],['Fees (kul)',inr(a.fees_total),''],['Vendor-Verified Badlav',a.vendor_verified_changes,'']])+'<p>'+a.note+'</p>'+ev('AGY-01 — dave par nahi, saboot par score');
+  m.innerHTML=cards([['Kul tasks',a.tasks_total,''],['Saboot ke saath done',a.tasks_done_with_evidence,''],['Fees (kul)',inr(a.fees_total),''],['Vendor-verified badlav',a.vendor_verified_changes,'']])+'<div class="panel"><p style="margin:0">'+esc(a.note)+'</p></div>'+ev('AGY-01 — dave par nahi, saboot par score');
 },
 async ops(m){
   const j=await api('/api/v1/jobs/status'); const h=await api('/api/v1/system/health');
-  m.innerHTML='<h2>System Operations & Audit</h2>'+cards([['Kill Switch',h.kill_switch.engaged?'ON 🛑':'OFF',''],['Jobs Kul',h.jobs_total,''],['Aakhiri Import',h.last_import_at||'kabhi nahi','']])+
-  '<h3>Jobs (durable, IST)</h3>'+table([{t:'Job',k:'job'},{t:'Agla Run',k:'next_run'},{t:'Aakhiri',k:'last_status'},{t:'Koshishen',k:'attempts',n:1}],j.jobs)+ev('JOB-01/OPS-01 — restart ke baad bhi state yaad');
+  m.innerHTML=cards([['Kill switch',h.kill_switch.engaged?'ON 🛑':'OFF',''],['Jobs',h.jobs_total,(h.jobs_failed||[]).length+' failed'],['Aakhri import',h.last_import_at?esc(h.last_import_at.slice(0,16)):'kabhi nahi','']])+
+  table([{t:'Job',k:'job'},{t:'Agla run',k:'next_run'},{t:'Aakhri',f:r=>r.last_status?badge(r.last_status,r.last_status==='DONE'?'ok':r.last_status==='FAILED'?'bad':'mute'):'—'},{t:'Koshishen',k:'attempts',n:1}],j.jobs,'Scheduler ne abhi koi job nahi chalaya')+ev('JOB-01/OPS-01 — restart ke baad bhi state yaad');
 }};
-async function addPeer(e){e.preventDefault();const f=new FormData(e.target);await api('/api/v1/competitors/peers','POST',Object.fromEntries(f));show('competitors');return false;}
-async function addSnap(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));for(const k of['peer_id','price','rating','reviews','image_count'])if(f[k])f[k]=Number(f[k]);await api('/api/v1/competitors/snapshots','POST',f);show('competitors');return false;}
-async function loadPacket(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/competitors/packet?sku='+encodeURIComponent(f.sku)+'&peer='+f.peer+'&nut='+encodeURIComponent(f.nut)+'&grade='+encodeURIComponent(f.grade)+'&pack_g='+f.pack_g);document.getElementById('packet').innerHTML='<div class="card"><p><b>Match:</b> '+(d.match?d.match.class:'—')+'</p><p><b>Farq:</b> apna '+(d.gap?d.gap.own_per_100g:'—')+'/100g vs peer '+(d.gap?d.gap.peer_per_100g:'—')+'/100g ('+(d.gap?d.gap.gap_pct:'—')+'%)</p><p><b>Playbook:</b> '+(d.playbook||'')+'</p><p><b>Sifarish:</b> '+(d.recommended_action||d.note||'')+'</p><p class="evidence">'+(d.do_not_claim||'')+'</p></div>';return false;}
+
+/* ---------- Actions ---------- */
+async function buildListing(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const out=document.getElementById('lbout');out.innerHTML='<div class="skeleton"></div><div class="skeleton" style="width:70%"></div>';
+  const body={sku:f.sku,brand:f.brand,product:f.product,nut:f.nut,grade:f.grade,weight:f.weight,form:f.form,competitor_brands:(f.competitors||'').split(',').map(x=>x.trim()).filter(Boolean),
+    facts:{grade_detail:f.grade_detail||undefined,origin:f.origin||undefined,nutrition_line:f.nutrition_line||undefined,pack_line:f.pack_line||undefined}};
+  try{const r=await api('/api/v1/listings/build','POST',body);const a=r.audit;
+    const cnt=(n,mx,unit)=>'<span class="counter'+(n>mx?' over':'')+'">'+n+'/'+mx+' '+(unit||'akshar')+'</span>';
+    const sc=a.compliance_score;
+    out.innerHTML='<div class="grid g-main"><div class="panel"><h3>2 · Taiyaar listing</h3>'+
+    '<p class="small muted" style="margin:0 0 4px">Title '+cnt(r.title_chars,75)+' '+ruleChip('AMZ-T-01')+'<button class="btn sm ghost copy" onclick="copyText(\'o-title\')">Copy</button></p><div class="out" id="o-title">'+esc(r.title)+'</div>'+
+    '<p class="small muted" style="margin:12px 0 4px">Item Highlights '+cnt(r.item_highlights.length,125)+' '+ruleChip('AMZ-T-02')+'<button class="btn sm ghost copy" onclick="copyText(\'o-hl\')">Copy</button></p><div class="out" id="o-hl">'+esc(r.item_highlights||'—')+'</div>'+
+    '<p class="small muted" style="margin:12px 0 4px">Bullets ('+r.bullets.length+') '+ruleChip('AMZ-B-03')+'<button class="btn sm ghost copy" onclick="copyText(\'o-bl\')">Copy</button></p><div class="out" id="o-bl">'+r.bullets.map(esc).join('\n')+'</div>'+
+    '<p class="small muted" style="margin:12px 0 4px">Backend search terms '+cnt(r.backend_bytes,200,'bytes')+' '+ruleChip('AMZ-K-01')+'<button class="btn sm ghost copy" onclick="copyText(\'o-be\')">Copy</button></p><div class="out" id="o-be">'+esc(r.backend_terms||'—')+'</div></div>'+
+    '<div><div class="panel"><h3>3 · Jaanch</h3><div class="hero"><div class="ring" style="--p:'+sc+'"><div>'+sc+'</div></div><div>'+(a.can_publish?badge('Publish-yogya','ok'):badge(a.blocks+' BLOCK','bad'))+'<div class="small muted" style="margin-top:4px">'+a.warnings+' chetaavni · niyam '+esc(a.rules_checked_on)+'</div></div></div>'+
+    (a.issues.length?'<div style="margin-top:10px">'+a.issues.map(i=>'<div class="issue">'+sevBadge(i.severity)+'<div style="flex:1"><div class="small">'+esc(i.message)+'</div>'+(i.fix?'<div class="small muted">'+esc(i.fix)+'</div>':'')+'</div>'+ruleChip(i.rule_id)+'</div>').join('')+'</div>':'<p class="small" style="margin-top:10px">Koi issue nahi ✨</p>')+'</div>'+
+    '<div class="panel"><h3>4 · Aage</h3>'+(r.proposal?'<p class="small">Proposal #'+r.proposal.id+' '+(r.proposal.duplicate?'(pehle se bana hai)':'ban gaya')+' — approve karke Amazon par lagao. Nateeja 7/14 din me maapa jaayega aur upar ke niyamo ka bharosa badlega.</p><button class="btn" onclick="show(\'approvals\')">Approval Inbox →</button>':'<p class="small">BLOCK theek karo — tab proposal banega.</p>')+
+    '<p class="small muted" style="margin-top:10px">Keyword plan: '+r.keyword_plan.terms_with_evidence+' saboot-wale terms · '+esc(r.keyword_plan.note)+'</p></div></div></div>';
+  }catch(err){out.innerHTML=emptyState('Listing nahi bani: '+esc(err.message));}
+  return false;}
+async function loadBE(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/growth/break-even?sku='+encodeURIComponent(f.sku)+(f.price?'&price='+f.price:''));const el=document.getElementById('beout');
+  if(d.status!=='OK'){el.innerHTML='<p>'+badge('DATA CHAHIYE','warn')+' '+esc(d.note)+'</p>';return false;}
+  el.innerHTML=cards([['Break-even ACOS',d.break_even_acos_pct+'%','isse upar = ghaata'],['Target ACOS',d.target_acos_pct!=null?d.target_acos_pct+'%':'—','10% munafa ke saath'],['Break-even ROAS',d.break_even_roas??'—','']])+'<p class="small">'+esc(d.note)+'</p><p class="small muted">Fee: '+esc(d.fee_source||'')+'</p>';return false;}
+async function addPeer(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));try{await api('/api/v1/competitors/peers','POST',f);toast('Peer jud gaya','ok');}catch(err){toast(err.message,'bad');}show('competitors');return false;}
+async function addSnap(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));for(const k of['peer_id','price','rating','reviews','image_count'])if(f[k])f[k]=Number(f[k]);try{await api('/api/v1/competitors/snapshots','POST',f);toast('Snapshot darj','ok');}catch(err){toast(err.message,'bad');}show('competitors');return false;}
+async function loadPacket(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/competitors/packet?sku='+encodeURIComponent(f.sku)+'&peer='+f.peer+'&nut='+encodeURIComponent(f.nut)+'&grade='+encodeURIComponent(f.grade)+'&pack_g='+f.pack_g);document.getElementById('packet').innerHTML='<div class="panel"><p><b>Match:</b> '+esc(d.match?d.match.class:'—')+'</p><p><b>Farq:</b> apna '+esc(d.gap?d.gap.own_per_100g:'—')+'/100g vs peer '+esc(d.gap?d.gap.peer_per_100g:'—')+'/100g ('+esc(d.gap?d.gap.gap_pct:'—')+'%)</p><p><b>Playbook:</b> '+esc(d.playbook||'')+'</p><p><b>Sifarish:</b> '+esc(d.recommended_action||d.note||'')+'</p><p class="evidence">'+esc(d.do_not_claim||'')+'</p></div>';return false;}
 function sparkSVG(vals,invert){
   if(!vals||vals.length<2)return '';
   const w=560,h=90,mn=Math.min(...vals),mx=Math.max(...vals),rg=(mx-mn)||1;
   const pts=vals.map((v,i)=>((i/(vals.length-1))*w).toFixed(1)+','+(invert?((v-mn)/rg*(h-16)+8):(h-8-(v-mn)/rg*(h-16))).toFixed(1)).join(' ');
-  return '<svg width="100%" viewBox="0 0 '+w+' '+h+'" style="background:#fff;border-radius:10px;margin-top:8px"><polyline points="'+pts+'" fill="none" stroke="#057C81" stroke-width="2.5"/></svg>';
+  return '<svg width="100%" viewBox="0 0 '+w+' '+h+'" style="background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-top:8px" role="img" aria-label="rank trend"><polyline points="'+pts+'" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round"/></svg>';
 }
 async function loadRank(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/rank?term='+encodeURIComponent(f.term)+'&sku='+encodeURIComponent(f.sku));const dg=await api('/api/v1/rank/diagnostic?term='+encodeURIComponent(f.term)+'&sku='+encodeURIComponent(f.sku));let g='';if(d.history&&d.history.length>1)g=sparkSVG(d.history.map(x=>x.position),true);
-  let hy='';if(dg.hypotheses&&dg.hypotheses.length)hy='<h3>Rank parakh (parikalpana — siddh kaaran nahi)</h3>'+dg.hypotheses.map(x=>'<p>'+badge('HYPOTHESIS','warn')+' '+esc(x.hypothesis)+'<br><span class="evidence">Saboot: '+esc(x.evidence)+' · Kaam: '+esc(x.action)+'</span></p>').join('');
-  document.getElementById('rankout').innerHTML='<div class="card"><b>'+esc(d.term)+'</b> — points: '+d.points+' · '+(d.status==='OK'?('taaza position '+d.latest+', badlav '+d.delta):esc(d.note))+'</div>'+g+hy;return false;}
-async function addDraft(e){e.preventDefault();const f=new FormData(e.target);await api('/api/v1/listings/draft','POST',{sku:f.get('sku'),title:f.get('title'),bullets:[]});show('listings');return false;}
+  let hy='';if(dg.hypotheses&&dg.hypotheses.length)hy='<h3 style="margin-top:14px">Rank parakh (parikalpana — siddh kaaran nahi)</h3>'+dg.hypotheses.map(x=>'<div class="issue">'+badge('HYPOTHESIS','warn')+'<div><b>'+esc(x.hypothesis)+'</b><div class="small muted">Saboot: '+esc(x.evidence)+' · Kaam: '+esc(x.action)+'</div></div></div>').join('');
+  document.getElementById('rankout').innerHTML='<div class="panel"><b>'+esc(d.term)+'</b> — points: '+esc(d.points)+' · '+(d.status==='OK'?('taaza position '+esc(d.latest)+', badlav '+esc(d.delta)):esc(d.note))+g+hy+'</div>';return false;}
+async function addDraft(e){e.preventDefault();const f=new FormData(e.target);try{await api('/api/v1/listings/draft','POST',{sku:f.get('sku'),title:f.get('title'),bullets:[]});toast('Draft bana','ok');}catch(err){toast(err.message,'bad');}show('listings');return false;}
 async function loadBrief(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/creative/brief?product='+encodeURIComponent(f.product)+'&grade='+encodeURIComponent(f.grade||'')+'&weight='+encodeURIComponent(f.weight||''));document.getElementById('brief').innerHTML=table([{t:'#',k:'shot'},{t:'Prakar',k:'type'},{t:'Brief',k:'brief'}],d.shots);return false;}
-async function addCost(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));await api('/api/v1/costs','POST',{sku:f.sku,cogs:Number(f.cogs),packaging:Number(f.packaging||0)});show('profit');return false;}
-async function loadGate(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/inventory/gate?sku='+encodeURIComponent(f.sku));document.getElementById('gate').innerHTML='<div class="card"><b>'+d.sku+'</b> — stock: '+d.qty+' · '+badge(d.status,d.status==='OK'?'ok':d.status==='LOW'?'warn':'bad')+' '+(d.note||'')+'</div>';return false;}
-async function pubListing(id,live){if(live&&!confirm('LIVE publish — Amazon par asal badlav jayega (sirf certified capability par chalega). Pakka?'))return;try{const r=await api('/api/v1/listings/publish','POST',{id:id,product_type:'FOOD',live:live});alert(r.ok?('Mode: '+r.mode+' · vendor: '+(r.vendor_status||'')+(r.issues&&r.issues.length?' · issues: '+JSON.stringify(r.issues):'')):('Nahi hua: '+(r.error||'')));}catch(e){alert(e.message);}show('listings');}
+async function addCost(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));try{await api('/api/v1/costs','POST',{sku:f.sku,cogs:Number(f.cogs),packaging:Number(f.packaging||0)});toast('Cost darj — ab break-even ACOS nikal sakte ho','ok');}catch(err){toast(err.message,'bad');}show('profit');return false;}
+async function loadGate(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/inventory/gate?sku='+encodeURIComponent(f.sku));document.getElementById('gate').innerHTML='<p><b>'+esc(d.sku)+'</b> — stock: '+esc(d.qty)+' · '+badge(d.status,d.status==='OK'?'ok':d.status==='LOW'?'warn':'bad')+' '+esc(d.note||'')+'</p>';return false;}
+async function pubListing(id,live){if(live){const ok=await ask('LIVE publish?','Amazon par asal badlav jayega — sirf certified capability par chalega.',{noInput:true,ok:'Haan, live karo',danger:true});if(!ok)return;}
+  try{const r=await api('/api/v1/listings/publish','POST',{id:id,product_type:'FOOD',live:live});r.ok?toast('Mode: '+r.mode+' · vendor: '+(r.vendor_status||'')+(r.issues&&r.issues.length?' · '+r.issues.length+' issues':''),'ok'):toast('Nahi hua: '+(r.error||''),'bad');}catch(e){toast(e.message,'bad');}show('listings');}
 async function load360(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await api('/api/v1/products/'+encodeURIComponent(f.sku)+'/360');const el=document.getElementById('p360');
-  if(!d.found){el.innerHTML='<div class="empty">'+esc(d.error||'SKU nahi mila')+'</div>';return false;}
+  if(!d.found){el.innerHTML=emptyState(esc(d.error||'SKU nahi mila'));return false;}
   const fin=d.finance||{};
-  el.innerHTML='<div class="card"><b>'+esc(d.name)+'</b> · '+esc(d.platform)+' · '+inr(d.price)+' · ⭐ '+(d.rating??'—')+' ('+(d.reviews??0)+')<br>'+
-  'Bikri: '+(d.sales.units||0)+' units · '+inr(d.sales.revenue||0)+'<br>'+
-  'Munafa: '+(fin.known?('contribution '+inr(fin.contribution)+' · margin '+fin.margin_pct+'% · fee: '+esc(fin.fee_source||'')):'cost uplabdh nahi — margin ka number nahi banta')+'<br>'+
-  'Stock: '+d.inventory.total_qty+' units · raftaar '+d.inventory.velocity_per_day+'/din · cover: '+(d.inventory.days_of_cover==null?'bikri data nahi':Math.round(d.inventory.days_of_cover)+' din')+'<br>'+
-  'Listing versions: '+(d.listing_versions.length?d.listing_versions.map(v=>'v'+v.version+' ('+v.status+')').join(', '):'koi nahi')+'</div>';return false;}
-async function propAct(id,op){try{const r=await api('/api/v1/proposals/'+id+'/'+op,'POST',{});alert(r.state?(op==='approve'&&r.needed?'Pushti darj — '+(r.approvals||1)+'/'+r.needed:'State: '+r.state):(r.error||'ho gaya'));}catch(e){alert('Nahi ho paya: '+e.message);}show('approvals');}
-async function propExec(id){const ref=prompt('Vendor console me badlav karke uska ref/saboot do (bina saboot ke APPLIED nahi likha jayega):');if(!ref)return;try{const r=await api('/api/v1/proposals/'+id+'/execute','POST',{manual_ref:ref});alert(r.state==='APPLIED_VERIFIED'?'✔ APPLIED_VERIFIED — saboot: '+ref:('Nahi hua: '+(r.error||r.state)));}catch(e){alert(e.message);}show('approvals');}
-async function legacyAct(id,op){try{await api('/api/approvals/'+id+'/'+op,'POST',{});}catch(e){alert(e.message);}show('approvals');}
+  el.innerHTML=cards([['Product',esc(d.name),esc(d.platform)+' · '+inr(d.price)+' · ⭐ '+esc(d.rating??'—')+' ('+esc(d.reviews??0)+')'],['Bikri',inr(d.sales.revenue||0),(d.sales.units||0)+' units'],['Munafa',fin.known?inr(fin.contribution):'—',fin.known?('margin '+fin.margin_pct+'% · '+esc(fin.fee_precision||'')):'cost nahi'],['Stock',esc(d.inventory.total_qty),'cover: '+(d.inventory.days_of_cover==null?'bikri data nahi':Math.round(d.inventory.days_of_cover)+' din')]])+
+  '<p class="small muted">Listing versions: '+(d.listing_versions.length?d.listing_versions.map(v=>'v'+v.version+' ('+esc(v.status)+')').join(', '):'koi nahi')+'</p>';return false;}
+async function viewProp(id){try{const d=await api('/api/v1/actions/'+id);const a=d.action;let p={};try{p=JSON.parse(a.payload||'{}');}catch(e){}
+  const m=modal('<h3>#'+a.id+' · '+esc(a.kind)+'</h3><p class="small muted">'+esc(a.platform)+' · '+esc(a.state)+' · '+esc(a.created_by)+'</p>'+(p.title?'<p><b>Title:</b> '+esc(p.title)+'</p>':'')+(p.rule_ids?'<p>'+p.rule_ids.map(ruleChip).join(' ')+'</p>':'')+'<div class="out" style="max-height:240px;overflow:auto">'+esc(JSON.stringify(p,null,2))+'</div><p class="small muted">'+esc(a.predicted||'')+'</p><div class="acts"><button class="btn sec">Band karo</button></div>');m.querySelector('.acts button').onclick=()=>m.remove();}catch(e){toast(e.message,'bad');}}
+async function propAct(id,op){try{const r=await api('/api/v1/proposals/'+id+'/'+op,'POST',{});toast(r.state?(op==='approve'&&r.needed?'Pushti darj — '+(r.approvals||1)+'/'+r.needed:'State: '+r.state):(r.error||'ho gaya'),r.error?'bad':'ok');}catch(e){toast('Nahi ho paya: '+e.message,'bad');}show('approvals');}
+async function propExec(id){const ref=await ask('Execute ka saboot','Vendor console me badlav karke uska ref/saboot do — bina saboot ke APPLIED nahi likha jayega.',{placeholder:'jaise: campaign change id / screenshot ref',ok:'Darj karo'});if(!ref)return;try{const r=await api('/api/v1/proposals/'+id+'/execute','POST',{manual_ref:ref});r.state==='APPLIED_VERIFIED'?toast('✔ APPLIED_VERIFIED','ok'):toast('Nahi hua: '+(r.error||r.state),'bad');}catch(e){toast(e.message,'bad');}show('approvals');}
+async function legacyAct(id,op){try{await api('/api/approvals/'+id+'/'+op,'POST',{});toast(op==='approve'?'Approve ho gaya':'Reject ho gaya','ok');}catch(e){toast(e.message,'bad');}show('approvals');}
 let WIZPATH='';
-async function wizPreview(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));WIZPATH=f.path;const d=await api('/api/v1/imports/preview','POST',{path:f.path});document.getElementById('wiz').innerHTML='<div class="card">Prakar: <b>'+d.kind+'</b> · Rows: '+d.rows+' · Duplicate: '+(d.duplicate?'HAAN (commit rukega)':'nahi')+'<br><span class="evidence">'+d.note+'</span></div>';return false;}
-async function wizCommit(e){e.preventDefault();if(!WIZPATH){alert('Pehle preview karo');return false;}const d=await api('/api/v1/imports/commit','POST',{path:WIZPATH});alert(d.duplicate?'Duplicate — import nahi hua':('Import ho gaya: '+(d.imported??0)+' rows'));return false;}
-async function show(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.s===name));
-  const m=document.getElementById('main');m.innerHTML='<p>Load ho raha hai…</p>';
-  try{await VIEWS[name](m);}catch(e){m.innerHTML='<div class="empty">Data laane me dikkat: '+e.message+'<br>Backend chal raha hai na? (python3 backend/app.py)</div>';}}
-function boot(){
-  const nav=document.getElementById('sidenav');
-  nav.innerHTML=SCREENS.map(s=>'<button data-s="'+s[0]+'" onclick="show(\''+s[0]+'\')">'+s[1]+'</button>').join('');
-  refreshKill(); show('warroom');
+async function wizPreview(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));WIZPATH=f.path;try{const d=await api('/api/v1/imports/preview','POST',{path:f.path});document.getElementById('wiz').innerHTML='<p>Prakar: <b>'+esc(d.kind)+'</b> · Rows: '+esc(d.rows)+' · '+(d.duplicate?badge('DUPLICATE — commit rukega','warn'):badge('naya','ok'))+'<br><span class="small muted">'+esc(d.note)+'</span></p>';}catch(err){toast(err.message,'bad');}return false;}
+async function wizCommit(e){e.preventDefault();if(!WIZPATH){toast('Pehle preview karo','bad');return false;}try{const d=await api('/api/v1/imports/commit','POST',{path:WIZPATH});d.duplicate?toast('Duplicate — import nahi hua','bad'):toast('Import ho gaya: '+(d.imported??0)+' rows','ok');}catch(err){toast(err.message,'bad');}return false;}
+
+/* ---------- Navigation ---------- */
+async function show(name){if(!VIEWS[name])name='today';CURRENT=name;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.s===name));
+  const sc=SCREENS.find(s=>s[0]===name);document.getElementById('pageTitle').textContent=sc?sc[1]:'';
+  document.title=(sc?sc[1]+' · ':'')+'NutriScale OS';
+  document.body.classList.remove('nav-open');
+  if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
+  const m=document.getElementById('main');m.innerHTML='<p class="page-sub">'+esc(SUB[name]||'')+'</p><div id="view"><div class="skeleton"></div><div class="skeleton" style="width:72%"></div><div class="skeleton" style="width:48%"></div></div>';
+  const v=document.getElementById('view');Object.assign(v.dataset,m.dataset);
+  try{await VIEWS[name](v);}catch(e){const vv=document.getElementById('view');if(vv)vv.innerHTML=emptyState('Data laane me dikkat: '+esc(e.message)+'<br><span class="small muted">Backend chal raha hai na?</span>',[name,'Dobara koshish']);}
+}
+function buildNav(pending){
+  const groups=[...new Set(SCREENS.map(s=>s[3]))];
+  document.getElementById('sidenav').innerHTML=groups.map(g=>'<div class="nav-group"><span>'+g+'</span>'+SCREENS.filter(s=>s[3]===g).map(s=>'<button data-s="'+s[0]+'" onclick="show(\''+s[0]+'\')"><span class="ic">'+s[2]+'</span>'+s[1]+(s[0]==='approvals'&&pending?'<span class="pill">'+pending+'</span>':'')+'</button>').join('')+'</div>').join('');
+}
+function openPalette(){
+  const m=modal('<input id="palIn" placeholder="Screen ka naam likho… (jaise listing, ads, brain)" autocomplete="off"><div class="res" id="palRes"></div>');m.id='palette';
+  const inp=m.querySelector('#palIn'),res=m.querySelector('#palRes');let sel=0,list=[];
+  const draw=()=>{const q=inp.value.toLowerCase();list=SCREENS.filter(s=>(s[1]+' '+s[0]+' '+s[3]).toLowerCase().includes(q));sel=Math.min(sel,Math.max(0,list.length-1));
+    res.innerHTML=list.map((s,i)=>'<button class="'+(i===sel?'sel':'')+'" data-k="'+s[0]+'"><span>'+s[2]+'</span>'+s[1]+'<span class="muted small" style="margin-left:auto">'+s[3]+'</span></button>').join('')||'<p class="muted small" style="padding:10px">Kuch nahi mila</p>';
+    res.querySelectorAll('button').forEach(b=>b.onclick=()=>{m.remove();show(b.dataset.k);});};
+  inp.addEventListener('input',()=>{sel=0;draw();});
+  inp.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){sel=Math.min(sel+1,list.length-1);draw();e.preventDefault();}else if(e.key==='ArrowUp'){sel=Math.max(sel-1,0);draw();e.preventDefault();}else if(e.key==='Enter'&&list[sel]){m.remove();show(list[sel][0]);}else if(e.key==='Escape')m.remove();});
+  draw();inp.focus();
+}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();if(!document.getElementById('palette'))openPalette();}
+  if(e.key==='Escape'){document.querySelectorAll('.modal-bg').forEach(x=>x.remove());document.body.classList.remove('nav-open');}});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h&&h!==CURRENT&&VIEWS[h])show(h);});
+async function boot(){
+  document.getElementById('who').textContent=localStorage.getItem('ns_user')||'Owner';
+  buildNav(0); refreshKill();
+  const h=location.hash.slice(1);show(VIEWS[h]?h:'today');
+  try{const t=await api('/api/v1/today');buildNav(t.pending_approvals);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.s===CURRENT));}catch(e){}
 }
 if(TOKEN){fetch(API+'/api/v1/control/kill',{headers:{'Authorization':'Bearer '+TOKEN}}).then(r=>{if(r.ok){boot();}else showLogin();}).catch(()=>showLogin());}
 else showLogin();

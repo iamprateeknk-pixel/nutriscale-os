@@ -149,8 +149,17 @@ def audit_images(images: list, platform: str = "Amazon") -> list:
                 out.append(_issue("WARN", "main_image", "AMZ-I-01", f"Product sirf {im['fill_pct']}% frame me — ~85% bharo"))
     return out
 
+def audit_evidence(db, sku: str, text: str) -> list:
+    """NS-P-01: copy ke har saboot-maangne wale dawe (nitrogen, organic, FSSAI, origin, grade...) ka saboot fact registry me.
+    Approve ke waqt yahi jaanch rokti hai — builder ab pehle hi bata deta hai."""
+    import fact_registry as FR
+    chk = FR.check_copy(db, sku, text)
+    return [_issue("BLOCK", "copy", "NS-P-01", f"'{ft}' ka saboot fact registry me nahi — approve par rukega",
+                   "Saboot (lab report/certificate/invoice) darj karo ya ye dawa copy se hatao") for ft in chk["needs_evidence"]]
+
 def audit_listing(platform: str = "Amazon", title: str = "", bullets=(), backend_terms: str = "",
-                  item_highlights: str = None, images=None, competitor_brands=(), verified_conditions=()) -> dict:
+                  item_highlights: str = None, images=None, competitor_brands=(), verified_conditions=(),
+                  db=None, sku: str = None) -> dict:
     issues = audit_title(title, platform, competitor_brands) + audit_bullets(list(bullets), platform)
     if platform == "Amazon":
         issues += audit_backend(backend_terms, title, bullets, competitor_brands)
@@ -162,6 +171,8 @@ def audit_listing(platform: str = "Amazon", title: str = "", bullets=(), backend
                 issues.append(_issue("WARN", "item_highlights", "AMZ-T-02", "Item Highlights tabhi milta hai jab title <=75 ho"))
     issues += audit_fssai(" ".join([title or "", item_highlights or ""] + list(bullets)), verified_conditions)
     issues += audit_images(images, platform)
+    if db is not None and sku:
+        issues += audit_evidence(db, sku, " ".join([title or "", item_highlights or ""] + list(bullets)))
     blocks = [i for i in issues if i["severity"] == "BLOCK"]
     warns = [i for i in issues if i["severity"] == "WARN"]
     score = max(0, 100 - 20 * len(blocks) - 5 * len(warns) - sum(1 for i in issues if i["severity"] == "TIP"))

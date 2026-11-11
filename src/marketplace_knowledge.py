@@ -44,6 +44,34 @@ _S = {  # source shorthand -> URL
     "fssai_natural_fresh": "https://fssai.gov.in/upload/media/FSSAI_News_Labels_FNB_03_12_2018.pdf",
     "fssai_misleading": "https://fssai.gov.in/upload/media/fssaimisleading.pdf",
     "fssai_digest": "https://fssai-digest.fssai.gov.in/research-and-innovations/claims.php",
+    # V24 research (11 Nov 2026)
+    "ppc_channable": "https://www.channable.com/blog/amazon-ppc-campaign-structure",
+    "ppc_sellersprite": "https://www.sellersprite.com/en/blog/Amazon-PPC-Campaign-Structure-Setup-for-Scalability",
+    "ppc_novadata": "https://novadata.io/resources/blog/amazon-sponsored-products",
+    "ppc_jobs": "https://www.sellersprite.com/en/blog/amazon-advertising-and-ppc-strategies",
+    "acos_sellerboard": "https://blog.sellerboard.com/?p=3500",
+    "acos_eightx": "https://eightx.co/blog/average-tacos-benchmarks",
+    "acos_evanik": "https://www.evanik.ai/blog/amazon-acos-formula",
+    "acos_cm": "https://ecommercefastlane.com/acos-misleading-contribution-margin-framework-amazon/",
+    "vine_myamazonguy": "https://myamazonguy.com/reviews/amazon-vine-on-seller-central/",
+    "vine_sellerlabs": "https://www.sellerlabs.com/knowledge-base/amazon-vine-is-it-worth-it-for-your-product/",
+    "vine_shulex": "https://www.shulex.com/blog/amazon-vine-program",
+    "aplus_neato": "https://neato.com/blog/amazon-a-plus-content-for-cpg-brands",
+    "aplus_estore": "https://www.estorefactory.com/blog/does-amazon-a-content-really-increase-sales-the-data-and-what-to-do-about-it/",
+    "aplus_premium": "https://www.sellersprite.com/en/blog/Is-It-Worth-the-Investment",
+    "gif_official": "https://sell.amazon.in/events/great-indian-festival",
+    "gif_forum": "https://sellercentral.amazon.com/seller-forums/discussions/t/ab9c3a53-0e40-463f-a349-8789124d9034",
+    "gif_fibre2fashion": "https://emerge.fibre2fashion.com/blogs/10896/how-to-prepare-for-big-billion-days-or-great-indian-festival-inventory-coupons-and-ads-playbook",
+    "gif_gonukkad": "https://www.gonukkad.com/blog/how-to-win-amazon-great-indian-festival-sale-2026",
+    "qc_afaqs": "https://www.afaqs.com/news/mktg/indias-festive-buying-goes-instant-the-rise-of-q-commerce-over-kiranas-10601521",
+    "qc_thirdeyesight": "https://www.thirdeyesight.in/quick-commerce-becomes-fmcgs-biggest-online-sales-channel-in-india/",
+    "qc_fynd": "https://www.fynd.com/blog/what-instamarts-market-share-drop-reveals-about-quick-commerce",
+    "fk_ads_gonukkad": "https://www.gonukkad.com/blog/flipkart-ads-optimization-for-sellers",
+    "fk_ads_paxcom": "https://paxcom.ai/blog/how-to-get-started-with-flipkart-ads/",
+    "fk_ads_swc": "https://swcybernetics.in/knowledge-base/flipkart-advertising-guide-2026",
+    "mkt_credence": "https://www.credenceresearch.com/report/india-dry-fruits-market",
+    "mkt_bonafide": "https://www.bonafideresearch.com/product/6212296106/india-dried-fruits-market",
+    "mkt_gifting": "https://www.credenceresearch.com/report/india-dry-fruit-gifting-market",
 }
 
 def _k(rid, platform, topic, agents, rule, status, reliability, sources, value=None, action=None):
@@ -154,7 +182,80 @@ KNOWLEDGE = [
        "(jaise 'natural food' nahi, 'made from natural ingredients' composite food ke liye). Bina shart poori kiye mat likho.",
        "OFFICIAL", 0.85, ["fssai_natural_fresh", "fssai_digest"],
        value={"conditional_words": ["natural", "fresh", "original", "traditional", "authentic", "pure", "genuine", "real"]}),
+    # ---------------- AMAZON: ADS (V24) ----------------
+    _k("AMZ-A-01", "Amazon", "ads", ["A06"],
+       "Campaign ka ek hi KAAM ho: Auto (khoj), Broad/Phrase (khoj), Exact (kamai), Product targeting (competitor ASIN), Brand-defense. "
+       "Exact, phrase, broad aur auto ek hi campaign/budget me hon to tay nahi kar sakte ki paisa kis par jaaye.",
+       "MULTI_SOURCE", 0.8, ["ppc_jobs", "ppc_sellersprite", "ppc_channable"],
+       action="Har SKU ke liye alag Auto + Exact campaign; jeetne wale terms Exact me, wahi term Auto/Broad me negative"),
+    _k("AMZ-A-02", "Amazon", "ads", ["A06", "A03"],
+       "Harvest chakra: Auto 2-4 hafte chalao → jo search term orders de (2+), use Exact campaign me daalo aur Auto me "
+       "negative exact karo (dono jagah apni hi bid se ladai na ho).",
+       "MULTI_SOURCE", 0.8, ["ppc_novadata", "ppc_sellersprite", "ppc_channable"], value={"discovery_weeks": [2, 4], "harvest_min_orders": 2}),
+    _k("AMZ-A-03", "Amazon", "ads", ["A06"],
+       "Search Term Report har hafte dekho; kharch ho raha hai par bikri nahi aur irada galat hai to turant negative. "
+       "Shuruaat me manual campaign me 5-10 hi bahut relevant keywords.",
+       "MULTI_SOURCE", 0.8, ["ppc_novadata", "ppc_channable", "ppc_sellersprite"], value={"review_cadence_days": 7, "seed_keywords": [5, 10]}),
+    _k("AMZ-A-04", "Amazon", "ads", ["A06", "A07"],
+       "Break-even ACOS = ads se pehle ka munafa ÷ selling price. ACOS isse upar = har ad-bikri par ghaata. "
+       "Target ACOS = break-even − chaha gaya net margin. Grocery me margin patla hai, isliye break-even ACOS neeche hota hai.",
+       "MULTI_SOURCE", 0.9, ["acos_sellerboard", "acos_evanik", "acos_eightx", "acos_cm"],
+       action="Har SKU ka break-even ACOS cost + fee se nikalo; bid wahi se tay karo, category ausat se nahi"),
+    _k("AMZ-A-05", "Amazon", "ads", ["A06", "A01"],
+       "Launch par rank/hissa jeetne ke liye ACOS kuch samay break-even se upar chal sakta hai — par TACOS (kul ad kharch ÷ kul bikri) "
+       "par nazar rakho; TACOS girna = organic bikri badh rahi hai (flywheel chal raha hai).",
+       "MULTI_SOURCE", 0.75, ["acos_eightx", "acos_sellerboard", "acos_evanik"]),
+    _k("AMZ-A-06", "Amazon", "ads", ["A06"],
+       "Top-of-search placement par bid +50-100% aam shuruaat hai — par yeh ek hi source ki salah hai; apne placement report se "
+       "ACOS dekh kar hi badhao.", "SINGLE_SOURCE", 0.5, ["ppc_novadata"], value={"tos_bid_adj_pct": [50, 100]}),
+    # ---------------- AMAZON: REVIEWS / CONTENT (V24) ----------------
+    _k("AMZ-R-01", "Amazon", "reviews", ["A08"],
+       "Amazon Vine: Brand Registry + Professional account, product par 30 se kam reviews, FBA offer — tab Vine reviewers se "
+       "shuruaati reviews. Fees/India me uplabdhta Seller Central par khud dekho (sources me matbhed).",
+       "MULTI_SOURCE", 0.7, ["vine_myamazonguy", "vine_sellerlabs", "vine_shulex"], value={"max_reviews": 30}),
+    _k("AMZ-R-02", "Amazon", "reviews", ["A08", "A09"],
+       "Review ke badle muft product/paisa/discount, sirf khush grahak se review maangna, ya rating ke hisaab se follow-up — "
+       "Amazon policy ke khilaf (account suspend ho sakta hai). 'Request a Review' button aur Vine hi surakshit raaste hain.",
+       "HEURISTIC", 0.85, [], action="Review agent sirf Request-a-Review aur Vine ki salah dega; incentive wali koi yojana kabhi nahi"),
+    _k("AMZ-C-01", "Amazon", "a_plus", ["A04", "A05"],
+       "A+ Content (Brand Registry): Amazon ke hawale se Basic A+ se 'up to 8%' aur Premium A+ se 'up to 20%' bikri-badhat batai "
+       "jaati hai (blogs se, Amazon ka mool page nahi mila). Comparison chart (apne pack-sizes/variants) sabse kaam ka module mana jaata hai.",
+       "MULTI_SOURCE", 0.65, ["aplus_neato", "aplus_estore", "aplus_premium"], value={"basic_lift_pct": 8, "premium_lift_pct": 20},
+       action="A+ me: grade/size ka close-up, origin, nutrition table, pack-size comparison chart, storage tips — dawe sirf saboot wale"),
+    # ---------------- INDIA: SALE EVENTS (V24) ----------------
+    _k("IN-E-01", "Amazon", "events", ["A01", "A06", "A07"],
+       "Bade sale (Great Indian Festival) ke liye Amazon khud kehta hai: stock taiyaar, seller coupons, Sale Event Planner se deal "
+       "opt-in. Agencies: FBA stock sale se 15-20 din pehle pahunche; listing/coupon/ads ~7 din pehle taiyaar.",
+       "MULTI_SOURCE", 0.8, ["gif_official", "gif_forum", "gif_fibre2fashion", "gif_gonukkad"],
+       value={"fba_lead_days": [15, 20], "ready_lead_days": 7}),
+    _k("IN-E-02", "Amazon", "events", ["A07", "A06"],
+       "Deal ke prakar: roz ke liye green coupon; Lightning Deal jaldi zyada units (100+) nikaalne ke liye; sale ke baad bacha stock "
+       "clearance/removal. Deal ka discount margin ke andar hi — break-even ACOS ke saath milakar dekho.",
+       "SINGLE_SOURCE", 0.6, ["gif_gonukkad", "gif_official"]),
+    # ---------------- INDIA: MARKET (V24) ----------------
+    _k("IN-M-01", "ALL", "market", ["A01"],
+       "India dry fruits bazaar ~USD 2.2 billion (2025), anumaan 6-10% saalana badhat (research firms me matbhed); online "
+       "(Amazon/Flipkart) ka hissa tezi se badh raha hai; gifting alag bada segment hai.",
+       "MULTI_SOURCE", 0.6, ["mkt_credence", "mkt_bonafide", "mkt_gifting"], value={"size_usd_bn_2025": 2.23}),
+    _k("IN-Q-01", "ALL", "channels", ["A01", "A07"],
+       "Quick commerce (Blinkit, Zepto, Instamart) kai FMCG companies ki online bikri ka sabse bada channel ban gaya hai "
+       "(kuch ke liye 58-75%); festive season me dry fruits top bikne wali shreniyon me. Amazon ke saath yeh channel bhi parkho.",
+       "MULTI_SOURCE", 0.65, ["qc_afaqs", "qc_thirdeyesight", "qc_fynd"],
+       action="Q-commerce ke liye chhote pack (100-250g) aur gift box; daam Amazon se takraaye nahi (channel conflict)"),
+    # ---------------- FLIPKART ADS (V24) ----------------
+    _k("FK-A-01", "Flipkart", "ads", ["A06"],
+       "Flipkart PLA (Product Listing Ads) CPC par chalte hain; PLA me sirf KUL budget hota hai (daily nahi) — kharch ki raftaar "
+       "khud dekhni padti hai. Shuruaat PLA se, phir Brand Ads.",
+       "MULTI_SOURCE", 0.7, ["fk_ads_paxcom", "fk_ads_gonukkad", "fk_ads_swc"]),
+    _k("FK-A-02", "Flipkart", "ads", ["A06", "A04"],
+       "Flipkart khud kehta hai ads tabhi achhe chalte hain jab listing (images, price, stock) theek ho; keyword targeting sirf "
+       "search page par. Na chalne wale keywords hatao; 'Smart ROI' campaign target ROAS par khud bid karta hai.",
+       "MULTI_SOURCE", 0.65, ["fk_ads_gonukkad", "fk_ads_paxcom", "fk_ads_swc"]),
     # ---------------- HAMARA TAJURBA (HEURISTIC — data se pakka hoga) ----------------
+    _k("NS-P-01", "ALL", "compliance", ["A04", "A09"],
+       "Listing ka har saboot-maangne wala tathya (nitrogen flush, organic, FSSAI licence, origin, grade, lab-tested, no added sugar) "
+       "tabhi copy me jaaye jab uska saboot fact registry me darj ho — warna approve/publish ruk jaata hai.",
+       "HEURISTIC", 0.95, [], action="Pehle saboot darj karo (certificate/lab report/invoice), phir copy me dawa likho"),
     _k("NS-H-01", "Amazon", "keyword_research", ["A03"],
        "Dry fruits me kharidaar Hinglish/Hindi (badam, kaju, kishmish) aur English dono me khojte hain — ek roop title me, "
        "doosra backend me.", "HEURISTIC", 0.6, []),

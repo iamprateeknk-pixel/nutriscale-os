@@ -99,9 +99,16 @@ def test_placement_plan_and_listing_build():
     neg = [n["term"] for n in plan["NEGATIVE_ADS"]]
     assert "almonds wholesale" in neg and "roasted almonds" in neg
     assert "badaam" in plan["BACKEND"], "shabdkosh ke Hinglish roop backend me"
-    r = ListingAgent(st).build_listing("SKU-ALM-500", "Dry Fruit Farm", "California Almonds", "almond", "Jumbo", "500g",
-                                       facts={"grade_detail": "Jumbo size badam", "origin": "California",
-                                              "nutrition_line": "protein aur fiber", "pack_line": "food-grade zip pouch"})
+    facts = {"grade_detail": "Jumbo size badam", "origin": "California",
+             "nutrition_line": "protein aur fiber", "pack_line": "food-grade zip pouch"}
+    # V24 NS-P-01: 'California' (origin) aur 'mamra' (grade) ke dawe bina saboot ke builder me hi BLOCK
+    nofacts = ListingAgent(st).build_listing("SKU-ALM-500", "Dry Fruit Farm", "California Almonds", "almond", "Jumbo", "500g", facts=facts)
+    assert nofacts["blocked"] and nofacts["proposal"] is None
+    assert {"NS-P-01"} == {i["rule_id"] for i in nofacts["audit"]["issues"] if i["severity"] == "BLOCK"}
+    import fact_registry as FR
+    FR.add_fact(st.db, "SKU-ALM-500", "ORIGIN", "California", "supplier-invoice-123", "owner")
+    FR.add_fact(st.db, "SKU-ALM-500", "ORIGIN_GRADE", "Mamra", "supplier-invoice-123", "owner")
+    r = ListingAgent(st).build_listing("SKU-ALM-500", "Dry Fruit Farm", "California Almonds", "almond", "Jumbo", "500g", facts=facts)
     assert r["title_chars"] <= 75 and len(r["item_highlights"]) <= 125 and r["backend_bytes"] <= 200
     assert not r["blocked"], r["audit"]["issues"]
     a = st.db.execute("SELECT payload FROM action_v12 WHERE id=?", (r["proposal"]["id"],)).fetchone()

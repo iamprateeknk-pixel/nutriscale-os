@@ -113,6 +113,26 @@ class H(BaseHTTPRequestHandler):
                                                          FROM search_terms GROUP BY term ORDER BY spend DESC LIMIT 200""")]
                 return self._env(200, {"keywords": rows, "search_volume": None,
                                         "note": "Search volume koi licensed provider nahi — 'unknown' hai, andaaz nahi dikhaya jayega"})
+            # V24: aaj ka kaam + growth playbook (research niyam tumhare data par)
+            if p == "/api/v1/today":
+                import growth_playbook as GP
+                return self._env(200, GP.today(s))
+            if p == "/api/v1/growth/ads-structure":
+                import growth_playbook as GP
+                return self._env(200, GP.ads_structure(s))
+            if p == "/api/v1/growth/events":
+                import growth_playbook as GP
+                return self._env(200, GP.event_calendar())
+            if p == "/api/v1/growth/reviews":
+                import growth_playbook as GP
+                return self._env(200, GP.review_plan(s.db))
+            if p == "/api/v1/growth/break-even":
+                import growth_playbook as GP
+                pr = _q.get("price")
+                return self._env(200, GP.break_even(s.db, _q.get("sku", ""), float(pr) if pr else None, _q.get("platform") or "Amazon"))
+            if p == "/api/v1/products":
+                rows = [dict(r) for r in s.db.execute("SELECT sku, name, platform, price, rating, reviews FROM products ORDER BY sku LIMIT 500")]
+                return self._env(200, {"products": rows})
             # V23: seekhne wala dimaag + marketplace niyam + keyword plan
             if p == "/api/v1/knowledge":
                 import marketplace_knowledge as MK
