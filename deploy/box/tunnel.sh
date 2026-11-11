@@ -10,7 +10,8 @@ while true; do
       -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
       -R 80:127.0.0.1:8765 serveo.net 2>&1 | while IFS= read -r line; do
         echo "$(date -Is) $line" >> logs/tunnel.log
-        u=$(echo "$line" | grep -o 'https://[a-z0-9.-]*serveousercontent\.com\|https://[a-z0-9.-]*serveo\.net' | head -1)
+        # Sirf 'Forwarding' wali line — Serveo ke tip/console links (console.serveo.net) link nahi hain
+        u=$(echo "$line" | grep 'Forwarding' | grep -o 'https://[a-z0-9.-]*' | head -1)
         [ -n "$u" ] && echo "$u" > PUBLIC_URL.txt
       done
   echo "$(date -Is) tunnel toota — 10 sec me dobara" >> logs/tunnel.log; sleep 10
