@@ -4,8 +4,8 @@ Dry fruits par galat health claim = listing band + FSSAI ki karwai. Koi listing 
 import re
 
 BANNED = [  # bimari theek karne ke daave — bilkul mana hai
-    (r"\b(cure|theek kar\w*|ilaaj)\b.*\b(diabetes|cancer|bp|blood pressure|thyroid|heart)\b", "Bimari theek karne ka dawa — FSSAI/Ads Code ke khilaf, listing turant band ho sakti hai"),
-    (r"\b(diabetes|cancer|sugar)\b.*\b(cure|control|reverse|theek)\b", "Bimari ke saath cure/control ka dawa mana hai"),
+    (r"\b(cur(e|es|ed|ing)|heal(s|ed|ing)?|treat(s|ed|ing|ment)|prevent(s|ed|ing)?|theek kar\w*|ilaaj)\b.*\b(diabet\w*|cancer|bp|blood pressure|thyroid|heart|cholesterol)\b", "Bimari theek karne ka dawa — FSSAI/Ads Code ke khilaf, listing turant band ho sakti hai"),
+    (r"\b(diabet\w*|cancer|sugar|cholesterol)\b.*\b(cur(e|es|ed|ing)|control\w*|revers\w*|theek)\b", "Bimari ke saath cure/control ka dawa mana hai"),
     (r"\b(weight loss|vajan ghat\w*)\b.*\b(guarantee|pakka|\d+\s*(din|days?)\s*me)\b", "Guaranteed weight-loss dawa mana hai"),
     (r"\b100%\s*(pure|natural|organic)\b", "'100%' ya bina certificate ke 'organic' likhna mana hai — certificate ho to hi chalega"),
 ]

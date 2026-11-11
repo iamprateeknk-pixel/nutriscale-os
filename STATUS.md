@@ -1,5 +1,27 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 23 Oct 2026 (V21+V22 — audit-9 closure + marketplace data automation)_
+_Updated: 11 Nov 2026 (V23 — seekhne wala dimaag + listing/keyword niyam; kul 28 suites pass)_
+
+## 🧠 V23 — Agents ko listing/keyword ka gyaan + khud seekhna (11 Nov 2026)
+(saboot: test_v23_brain.py — 9 tests incl. asal HTTP; kul **28 suites pass**)
+- **Marketplace Knowledge Base** (`src/marketplace_knowledge.py`): web research (11 Nov 2026) se 26 niyam, **har niyam ke saath source URL + status** (OFFICIAL / MULTI_SOURCE / SINGLE_SOURCE / HEURISTIC) + bharosa. Mukhya:
+  - Amazon **title ab 75 akshar** (27 Jul 2026 se, media chhod sab category) — lamba title Amazon ka AI khud badal deta hai; naya **Item Highlights** field 125 akshar
+  - Title me koi shabd 2 se zyada nahi (plural bhi gina), `! $ ? _ { } ^` mana
+  - Amazon.in backend **200 BYTES** (Hindi akshar = 3 byte), spaces, title ke shabd dohrao mat, competitor brand/ASIN mana
+  - Bullets me emoji, ™ ®, refund/guarantee vaade, website mana
+  - Main image shuddh safed 255, ~85% bharo, 1000px+ (zoom ke liye 2000)
+  - SQP funnel padhne ka tareeka (dikhta nahi / click nahi / bikri nahi / scale karo)
+  - FSSAI 2018: bimari-dawa mana; natural/fresh/pure/traditional/authentic shart-wale shabd
+  - Dry-fruit shabdkosh: 8 meve, Hinglish + Hindi + grades (W240, Mamra...) — **search volume jaan-bujh kar nahi** (sirf SQP/licensed se)
+- **Listing Rules Engine** (`src/listing_rules.py`): title/highlights/bullets/backend/images/FSSAI ka audit (BLOCK/WARN/TIP + rule_id), aur builders jo niyam ke andar title (≤75), highlights (≤125), backend (≤200 bytes, dohraav-rahit, sirf usi grade/weight ke shabd) banate hain.
+- **Keyword Intelligence** (`src/keyword_intel.py`): Ads search terms + Brand Analytics SQP + shabdkosh ek suchi me, har term ka saboot-label; **placement plan** (TITLE / HIGHLIGHTS / BACKEND / NEGATIVE).
+- **Agent Brain** (`src/agent_brain.py`) — asal self-learning:
+  - Research niyam `playbook_rules` me; bharosa **sirf VERIFIED nateejo** se Bayesian tareeke se badalta hai; lagatar 3 haar = DISABLED (insaan hi chalu kare)
+  - Apne data se khud sabak: kaunse terms bechte hain (OWN-KW-WINNERS), kaunse paisa khaate hain (OWN-KW-WASTE), SQP ki bimariyan — roz update, dohraav nahi
+  - Roz ka `learning_crawl` job ab placeholder nahi, asal seekh-chakra chalata hai; `measure_results` ke baad playbook turant update
+  - ListingAgent ka naya `build_listing()` proposal `action_v12` me **rule_ids** ke saath daalta hai — 7/14 din ka nateeja seedha un niyamo ke bharose ko badalta hai
+- **API**: GET `/api/v1/knowledge`, `/api/v1/brain`, `/api/v1/keywords/plan?nut=`, `/api/v1/keywords/sqp`; POST `/api/v1/listings/audit`, `/api/v1/listings/build`
+- **Bug fixes**: (1) `claim_checker` "cure" pakadta tha par "cures/cured/heals/prevents" nahi — ab pakadta hai; (2) purana `generate_title` 200-akshar + "Fresh" wala title banata tha — ab 75 ke andar; (3) `test_v14` ki hardcoded dates purani pad gayi thi (velocity khidki aaj se bandhi hai) — dates ab relative; (4) in-memory DB par backup job repo me `backups/` bana deta tha — ab SKIP.
+- **Imaandaari**: Amazon/Flipkart ka ranking formula publish nahi hota — niyam disha hain, formula nahi. Zyadatar niyam seller-guides se hain (Seller Central help login ke peeche hai, is session se nahi khula) — isliye har niyam ka status saaf likha hai, aur 90 din purane niyam `stale` dikhte hain. Asal sales/search data Google par nahi milta — woh tumhare Seller Central (SQP/Ads reports) se hi aayega.
 
 ## 🔧 V21 — Naven audit ke 5 calculation/data issues band (23 Oct 2026)
 (saboot: test_v21_v22_fixes.py + purane suites naye basis par update; kul 27 suites pass)

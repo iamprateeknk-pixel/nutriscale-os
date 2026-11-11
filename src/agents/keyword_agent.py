@@ -40,3 +40,18 @@ class KeywordAgent(BaseAgent):
         if heroes:
             self.file_proposal("ALERT", f"Keyword bank taiyaar: {len(heroes)} HERO keywords Rank-Push ke liye — {', '.join(h['term'] for h in heroes[:3])}")
         return {"bank": bank, "heroes": heroes, "note": f"{len(bank)} terms parkhe gaye, {len(heroes)} HERO mile"}
+
+    def placement_plan(self, nut: str, platform: str = "Amazon") -> dict:
+        """V23: kaunsa keyword title / highlights / backend / negative me — saboot ke label ke saath."""
+        import keyword_intel as KI
+        return KI.placement_plan(self.store, nut, platform=platform)
+
+    def sqp_diagnosis(self, platform: str = "Amazon") -> dict:
+        """V23: Brand Analytics SQP funnel — har query ki bimari (dikhta nahi / click nahi / bikri nahi / scale karo)."""
+        import keyword_intel as KI
+        f = KI.sqp_funnel(self.store.db, platform)
+        scale = [q for q in f["queries"] if q["diagnosis"] == "SCALE_OPPORTUNITY"]
+        if scale:
+            self.file_proposal("ALERT", f"SQP: {len(scale)} query convert karti hain par dikhti nahi — "
+                                        + ", ".join(q["query"] for q in scale[:3]))
+        return f
