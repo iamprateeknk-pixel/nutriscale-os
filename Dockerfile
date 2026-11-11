@@ -6,6 +6,7 @@ COPY src/ ./src/
 COPY backend/ ./backend/
 COPY dashboard/ ./dashboard/
 COPY config/ ./config/
+COPY scripts/ ./scripts/
 COPY CONNECTORS_SETUP.md ./
 ENV PORT=8765
 EXPOSE 8765
