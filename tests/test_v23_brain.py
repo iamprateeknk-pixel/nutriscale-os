@@ -190,9 +190,23 @@ def test_v23_http_endpoints():
         p.terminate(); p.wait(5)
         if os.path.exists(dbf): os.remove(dbf)
 
+def test_change_password_revokes_sessions():
+    import auth
+    st = Store(":memory:")
+    auth.create_user(st.db, "malik", "oldpass123", "Owner")
+    tok = auth.verify_login(st.db, "malik", "oldpass123")["token"]
+    assert not auth.change_password(st.db, "malik", "short")["ok"], "8 se chhota password mana"
+    assert auth.change_password(st.db, "malik", "NewPass!2026")["ok"]
+    assert auth.verify_login(st.db, "malik", "oldpass123") is None, "purana password ab nahi chalega"
+    assert auth.verify_login(st.db, "malik", "NewPass!2026")["token"]
+    assert auth.user_from_token(st.db, tok) is None, "purana login token band"
+    assert not auth.change_password(st.db, "nobody", "NewPass!2026")["ok"]
+    st.close()
+
 if __name__ == "__main__":
     for t in [test_knowledge_has_sources_and_status, test_title_rules, test_backend_packing_bytes_and_dedup,
               test_bullets_fssai_images, test_sqp_funnel_diagnosis, test_placement_plan_and_listing_build,
-              test_brain_learns_from_verified_outcomes_only, test_brain_learns_from_own_data_and_job, test_v23_http_endpoints]:
+              test_brain_learns_from_verified_outcomes_only, test_brain_learns_from_own_data_and_job, test_v23_http_endpoints,
+              test_change_password_revokes_sessions]:
         t(); print(f"PASS {t.__name__}")
     print("ALL V23 TESTS PASS")
