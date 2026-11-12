@@ -139,8 +139,27 @@ def _brand_analytics_import(store):
     if not r["available"]: return r["note"]
     return f"Brand Analytics: {r['files_seen']} file(s) dekhi, {r['imported_files']} nayi import ({r['rows_imported']} rows)"
 
+def _growth_autopilot(store):
+    """V25: playbook ki kamiyon se approval-wale proposals — khud kuch live nahi."""
+    import growth_autopilot as GA
+    r = GA.run(store)
+    return (f"Autopilot: {len(r['created'])} naye proposals, {r['already_proposed_this_week']} is hafte pehle se"
+            + (f", {r['capped']} agle run ke liye" if r["capped"] else "")
+            + (f", {len(r['skipped_disabled_rules'])} disabled niyam ki wajah se chhode" if r["skipped_disabled_rules"] else ""))
+
+def _weekly_report(store, today=None):
+    """V25: scheduler sirf daily jobs chalata hai — haftawar report Sunday (IST) ko hi banti hai."""
+    import datetime
+    t = today or (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).date()
+    if t.weekday() != 6: return "SKIP: aaj Sunday nahi — report Sunday ko banegi"
+    import growth_autopilot as GA
+    r = GA.weekly_report(store, t)
+    return f"Haftawar report bani: {r['saved_to'] or 'in-memory'}"
+
 def build_handlers(store) -> dict:
     return {
+        "growth_autopilot": lambda: _growth_autopilot(store),
+        "weekly_report": lambda: _weekly_report(store),
         "brand_analytics_import": lambda: _brand_analytics_import(store),
         "backup_restore": lambda: _backup(store),
         "learning_crawl": lambda: _learning_crawl(store),

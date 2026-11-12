@@ -10,9 +10,11 @@ DAILY_JOBS = [
     {"time": "07:00", "job": "measure_results",       "owner": "A09 Governance", "desc": "Kal/7-din/14-din purane actions ke results — confidence up/down"},
     {"time": "07:15", "job": "seller_health_check",   "owner": "F10 Health",     "desc": "ODR/cancellation/late dispatch — limit ke paas laal alert"},
     {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock milaan — mismatch = oversell rokna"},
+    {"time": "07:45", "job": "growth_autopilot",      "owner": "A06/A03",        "desc": "Playbook ki kamiyan -> approval-wale proposals (negatives, harvest, SQP scale, stock-out pause)"},
     {"time": "08:00", "job": "war_room_report",        "owner": "F8 Report",      "desc": "Roz ki 1-page report tumhe (dashboard + WhatsApp)"},
     {"time": "12:00", "job": "fba_cover_check",        "owner": "F3 Inventory",   "desc": "Days-of-cover — 15 din se kam par replenishment proposal"},
     {"time": "18:00", "job": "rank_probe",             "owner": "A03/A09",        "desc": "Hero keywords ki rank + CTR/CVR record (algorithm seekh)"},
+    {"time": "21:00", "job": "weekly_report",          "owner": "A09 Governance", "desc": "Sirf Sunday: haftawar growth report (data/reports/)"},
     {"time": "23:00", "job": "daily_learning_summary", "owner": "A09 Governance", "desc": "Aaj kya seekha, kal kya hoga — summary"},
     {"time": "23:30", "job": "backup_restore",       "owner": "OPS-01",         "desc": "Roz raat ka DB backup (data/backups/) restore-parikshan ke saath"},
 ]

@@ -194,6 +194,14 @@ def today(store) -> dict:
         tasks.append({"priority": 2 if nxt["days_to_start"] > 14 else 1, "area": "events",
                       "title": f"{nxt['event']}: {nxt['phase']} — FBA stock {nxt['fba_stock_by']} tak, taiyaari {nxt['ready_by']} tak",
                       "screen": "growth", "rule_id": "IN-E-01"})
+    try:
+        import growth_autopilot as GA
+        ap = GA.run(store, dry_run=True)
+        if ap["created"]:
+            tasks.append({"priority": 2, "area": "autopilot", "title": f"Autopilot ke paas {len(ap['created'])} naye proposals taiyaar — Growth screen se banao, phir approve",
+                          "screen": "growth"})
+    except Exception:
+        pass
     for i, c in enumerate(checklist):
         if not c["done"]:
             tasks.append({"priority": 3, "area": "setup", "title": c["step"] + " — " + c["why"], "screen": "integrations"})

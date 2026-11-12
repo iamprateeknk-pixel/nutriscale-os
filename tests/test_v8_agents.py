@@ -44,7 +44,7 @@ def test_ads_agent_real_data_only():
 def test_governance_cycle():
     st = Store(":memory:")
     rep = GovernanceAgent(st).daily_cycle()
-    assert len(rep["jobs"]) == 11 and rep["warroom_connected"] is False   # V22: 11 jobs
+    assert len(rep["jobs"]) == 13 and rep["warroom_connected"] is False   # V25: 13 jobs (growth_autopilot, weekly_report jude)
     st.add_search_term("waste term", "Broad", 900, 0, 50, 0, "test")
     rep2 = GovernanceAgent(st).daily_cycle()
     assert rep2["proposals_created"] >= 1

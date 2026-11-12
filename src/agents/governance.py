@@ -52,7 +52,8 @@ class GovernanceAgent(BaseAgent):
         # V24: jo jobs yahan nahi the (backup, brand analytics import, asal fba/measure) woh 24x7 wale handlers se
         import job_handlers as JH
         for k, fn in JH.build_handlers(store).items():
-            if k in ("backup_restore", "brand_analytics_import", "fba_cover_check", "measure_results"):
+            if k in ("backup_restore", "brand_analytics_import", "fba_cover_check", "measure_results",
+                     "growth_autopilot", "weekly_report"):
                 handlers[k] = fn
         jobs = run_jobs(handlers, DAILY_JOBS)
         ads = AdsAgent(store).analyze()

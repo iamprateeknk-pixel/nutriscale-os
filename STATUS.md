@@ -1,5 +1,13 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 11 Nov 2026 (V24 — naya dashboard + market playbooks; kul 29 suites pass)_
+_Updated: 12 Nov 2026 (V25 — Growth Autopilot: seekh ka chakra poora; kul 30 suites pass)_
+
+## 🤖 V25 — Growth Autopilot: kamiyaan khud proposals bante hain, chakra poora (12 Nov 2026)
+(saboot: test_v25_autopilot.py — 7 tests; kul **30 suites pass**; browser me Autopilot → Approval Inbox flow chala)
+- **Pehle**: playbook kamiyaan *dikhata* tha, par proposals nahi banata — isliye ads ke niyamo ka bharosa kabhi asli nateejo se nahi badal sakta tha.
+- **Ab** (`src/growth_autopilot.py`, roz **07:45** — nateeje maapne ke baad): bekaar kharch wale terms → negative-exact; jeetne wale terms → Exact me harvest; apni hi bid se ladai → Auto/Broad me negative; SQP "scale karo" / "click nahi" queries; stock 0 wale SKU ke ads pause — sab **approval-wale proposals** (`rule_ids` + `campaign` ke saath) → approve → 7/14 din me maap → brain me us niyam ka bharosa upar/neeche.
+- **Suraksha**: khud kuch live nahi (ONE_TAP + kill switch); ek kaam ek hafte me ek hi baar (idempotent); ek run me max 15, aur seema me har prakar ko baari-baari jagah (negatives kamai wale harvest ko nahi dabaate); brain me DISABLED niyam par proposal nahi; jo term kahin bhi convert hua uspar negative kabhi nahi; stock-out pause sirf tab jab campaign naam me SKU ho.
+- **Haftawar report** — har Sunday 21:00 IST, `data/reports/weekly-<date>.md` (proposals, nateeje, brain ka badlav, ads structure, agle 45 din ke events); API `/api/v1/reports/weekly`. (Pehle scheduler haftawar jobs chalata hi nahi tha.)
+- **Dashboard**: Growth screen par Autopilot panel (preview + "proposals banao"), Approval Inbox me har proposal ka **"kya aur kyun"** + rule chips, Aaj screen par autopilot ka kaam.
 
 ## 🚀 V24 — Naya dashboard + market research se agents ke naye playbook (11 Nov 2026)
 (saboot: test_v24_growth.py — 9 tests incl. asal HTTP; kul **29 suites pass**; Chromium me saare 23 screen bina JS error, mobile 390px par koi horizontal scroll nahi)

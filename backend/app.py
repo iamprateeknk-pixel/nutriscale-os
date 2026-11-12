@@ -98,7 +98,16 @@ class H(BaseHTTPRequestHandler):
                 from jobrunner import jobs_status
                 return self._env(200, {"jobs": jobs_status(s.db)})
             if p == "/api/v1/proposals":
-                rows = [dict(r) for r in s.db.execute("SELECT id,kind,platform,tier,state,created_by,created_at,vendor_ref FROM action_v12 ORDER BY id DESC LIMIT 100")]
+                rows = []
+                for r in s.db.execute("SELECT id,kind,platform,tier,state,created_by,created_at,vendor_ref,payload,predicted FROM action_v12 ORDER BY id DESC LIMIT 100"):
+                    d = dict(r)
+                    try: pl = json.loads(d.pop("payload") or "{}")
+                    except Exception: pl = {}
+                    # V25: inbox me seedha 'kya aur kyun' — payload kholne ki zaroorat nahi
+                    what = pl.get("term") or pl.get("query") or pl.get("title") or pl.get("campaign") or ""
+                    d["summary"] = (f"{what} — {pl['why']}" if pl.get("why") else what)[:180]
+                    d["rule_ids"] = pl.get("rule_ids", [])
+                    rows.append(d)
                 return self._env(200, {"proposals": rows})
             if p.startswith("/api/v1/actions/"):
                 aid = int(p.split("/")[-1])
@@ -130,6 +139,12 @@ class H(BaseHTTPRequestHandler):
                 import growth_playbook as GP
                 pr = _q.get("price")
                 return self._env(200, GP.break_even(s.db, _q.get("sku", ""), float(pr) if pr else None, _q.get("platform") or "Amazon"))
+            if p == "/api/v1/autopilot/preview":
+                import growth_autopilot as GA
+                return self._env(200, GA.run(s, dry_run=True))
+            if p == "/api/v1/reports/weekly":
+                import growth_autopilot as GA
+                return self._env(200, GA.weekly_report(s))
             if p == "/api/v1/products":
                 rows = [dict(r) for r in s.db.execute("SELECT sku, name, platform, price, rating, reviews FROM products ORDER BY sku LIMIT 500")]
                 return self._env(200, {"products": rows})
@@ -252,6 +267,13 @@ class H(BaseHTTPRequestHandler):
             try:
                 b = self._body()
                 return self._env(200, act.set_kill(s.db, bool(b.get("engaged")), user["username"], b.get("reason", "")))
+            finally: s.close()
+        if p == "/api/v1/autopilot/run":
+            s, user, err = self._auth("propose")
+            if err: s.close(); return
+            try:
+                import growth_autopilot as GA
+                return self._env(200, GA.run(s))
             finally: s.close()
         if p == "/api/v1/stock/channel-map":
             s, user, err = self._auth("propose")
