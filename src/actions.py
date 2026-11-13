@@ -30,13 +30,13 @@ def writes_allowed(db) -> bool:
 TRANSITIONS = {
     "DRAFT": {"PROPOSED", "CANCELLED"},
     "PROPOSED": {"APPROVAL_PENDING", "CANCELLED"},
-    "APPROVAL_PENDING": {"APPROVED", "CANCELLED"},
+    "APPROVAL_PENDING": {"APPROVED", "CANCELLED", "EXPIRED"},
     "APPROVED": {"QUEUED", "CANCELLED"},
     "QUEUED": {"EXECUTING", "CANCELLED"},
     "EXECUTING": {"APPLIED_VERIFIED", "FAILED"},
     "FAILED": {"QUEUED", "ROLLED_BACK", "CANCELLED"},
     "APPLIED_VERIFIED": {"ROLLED_BACK"},
-    "CANCELLED": set(), "ROLLED_BACK": set(),
+    "CANCELLED": set(), "ROLLED_BACK": set(), "EXPIRED": set(),
 }
 
 def _event(db, aid, frm, to, actor, note=""):
@@ -65,6 +65,15 @@ def _move(db, aid, to, actor, note="") -> dict:
     db.execute("UPDATE action_v12 SET state=? WHERE id=?", (to, aid))
     _event(db, aid, r["state"], to, actor, note); db.commit()
     return {"ok": True, "id": aid, "state": to}
+
+def expire_stale(db, now: str = None) -> dict:
+    """V26: miyad (7 din) khatm hue APPROVAL_PENDING proposals EXPIRED — inbox me purane faisle nahi
+    latakte, aur purane data par bana proposal galti se approve nahi hota. Itihaas (events) bana rehta hai."""
+    ensure_v12(db)
+    now = now or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ids = [r["id"] for r in db.execute("SELECT id FROM action_v12 WHERE state='APPROVAL_PENDING' AND expires_at IS NOT NULL AND expires_at<?", (now,))]
+    for aid in ids: _move(db, aid, "EXPIRED", "system", "7 din me faisla nahi hua — miyad khatm")
+    return {"expired": len(ids), "ids": ids}
 
 def approve(db, aid: int, user: dict) -> dict:
     """Tier-2 (DOUBLE) par DO ALAG Owner pushtiyaan lazmi; Tier-1 ek sahi-role pushti."""

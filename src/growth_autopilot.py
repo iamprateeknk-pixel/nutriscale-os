@@ -29,21 +29,45 @@ def _rule_ok(db, rule_id) -> bool:
     r = db.execute("SELECT status FROM playbook_rules WHERE rule_id=?", (rule_id,)).fetchone()
     return not r or r["status"] != "DISABLED"
 
+STALE_ADS_DAYS = 21   # isse purane ads data par negative/harvest proposal nahi
+
+def ads_data_age(db, today=None):
+    """Ads data kitna purana hai: search_terms ki aakhri period_end ya ads import ki tareekh — jo bhi naya.
+    Kuch pata na ho to None (CLI se bina-tareekh import) — tab proposal banta hai par 'AGE_UNKNOWN' label ke saath."""
+    t = today or datetime.date.today()
+    cands = []
+    r = db.execute("SELECT MAX(period_end) m FROM search_terms WHERE period_end IS NOT NULL AND period_end<>''").fetchone()
+    if r and r["m"]: cands.append(str(r["m"])[:10])
+    r = db.execute("""SELECT MAX(imported_at) m FROM import_batches
+                      WHERE report_type IN ('search_terms','ads_search_terms','campaigns')""").fetchone()
+    if r and r["m"]: cands.append(str(r["m"])[:10])
+    if not cands: return None
+    try: return (t - datetime.date.fromisoformat(max(cands))).days
+    except ValueError: return None
+
 def run(store, today=None, dry_run: bool = False) -> dict:
     """Roz ka autopilot. dry_run=True: sirf batata hai kya banega (dashboard preview)."""
     import actions as ACT, growth_playbook as GP, keyword_intel as KI, agent_brain as AB, ads_studio as AS
     db = store.db; ensure_v12(db); AB.ensure_brain(db)
     week = _week(today)
     plans, skipped = [], []
+    expired = {"expired": 0} if dry_run else ACT.expire_stale(db)
+    age = ads_data_age(db, today)
+    ads_fresh = age is None or age <= STALE_ADS_DAYS
+    freshness = ("AGE_UNKNOWN" if age is None else f"{age} din purana")
 
     def plan(kind, ident, payload, rule_id, why, predicted):
         if not _rule_ok(db, rule_id):
             skipped.append({"kind": kind, "ident": ident, "why": f"niyam {rule_id} brain me DISABLED hai (3 baar haara)"}); return
-        payload = {**payload, "rule_ids": [rule_id], "source": "growth_autopilot", "week": week, "why": why}
+        payload = {**payload, "rule_ids": [rule_id], "source": "growth_autopilot", "week": week, "why": why,
+                   "data_freshness": freshness}
         plans.append({"kind": kind, "ident": ident, "payload": payload, "key": _key(kind, ident, week), "predicted": predicted})
 
     st = GP.ads_structure(store)
-    if st["status"] == "OK":
+    if st["status"] == "OK" and not ads_fresh:
+        skipped.append({"kind": "ADS_ALL", "ident": "-", "why": f"Ads data {age} din purana (seema {STALE_ADS_DAYS}) — "
+                                                                "purane data par negative/harvest khatarnak; taaza Search Term report daalo"})
+    if st["status"] == "OK" and ads_fresh:
         hv = AS.harvest_candidates(store)
         # 1) Negatives — sirf woh terms jo kahin convert nahi hue (AMZ-A-03)
         for n in sorted(hv["negatives"], key=lambda x: -x["wasted"]):
@@ -112,7 +136,9 @@ def run(store, today=None, dry_run: bool = False) -> dict:
         else: created.append({"id": r["id"], "kind": p["kind"], "ident": p["ident"]})
     return {"week": week, "dry_run": dry_run, "candidates": len(plans), "created": created,
             "already_proposed_this_week": dup, "capped": max(0, len(plans) - MAX_PER_RUN),
-            "skipped_disabled_rules": skipped,
+            "skipped_disabled_rules": [x for x in skipped if x["kind"] != "ADS_ALL"],
+            "skipped_stale_data": [x for x in skipped if x["kind"] == "ADS_ALL"],
+            "ads_data_age_days": age, "expired_old_proposals": expired["expired"],
             "note": "Autopilot sirf proposals banata hai — live badlav approval + kill switch ke peeche"}
 
 def weekly_report(store, today=None) -> dict:
