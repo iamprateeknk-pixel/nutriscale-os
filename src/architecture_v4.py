@@ -1,40 +1,40 @@
-"""V4 Architecture Registry — Agent sirf wahan jahan judgment chahiye, baaki FLOW.
-Flow = deterministic code, zero LLM cost, 100% repeatable. Agent = bhatak sakta hai, isiliye mehenga aur audit-heavy hai.
+"""V4 Architecture Registry — agents only where judgment is needed, everything else is a FLOW.
+Flow = deterministic code, zero LLM cost, 100% repeatable. Agent = can drift, so it is expensive and audit-heavy.
 """
 
 AGENTS = {
-    "A01": ("Market Research", "Trend/news se matlab nikalna — judgment"),
-    "A02": ("Competitor Intelligence", "Competitor ke move ki niyat samajhna — judgment"),
+    "A01": ("Market Research", "Making sense of trends/news — judgment"),
+    "A02": ("Competitor Intelligence", "Understanding the intent behind competitor moves — judgment"),
     "A03": ("Keyword Domination", "Khareed-intent pehchanna — language judgment"),
-    "A04": ("Listing Optimization", "Bechne wali copy likhna — creativity"),
+    "A04": ("Listing Optimization", "Writing copy that sells — creativity"),
     "A05": ("Creative", "Image/video design judgment"),
     "A06": ("Ads Manager", "Rank-Push vs Harvest — paisa + strategy judgment"),
     "A07": ("Pricing Strategist", "Calculator F4 use karke ran-neeti — judgment"),
-    "A08": ("Review / Customer Voice", "Shikayat ki bhasha se asal samasya — language judgment"),
-    "A09": ("Governance (Orchestrator+Approval+Learning+Algo Impact)", "System ka malik — coordination judgment"),
+    "A08": ("Review / Customer Voice", "Real problems from the language of complaints — language judgment"),
+    "A09": ("Governance (Orchestrator+Approval+Learning+Algo Impact)", "Owner of the system — coordination judgment"),
 }
 
 FLOWS = {
-    "F1":  ("Data Sync Flow", "Purana agent nahi tha — G1 gap", "Schedule par API sync, retry, fail alert"),
-    "F2":  ("Unicommerce Ops Flow", "purana A13 Agent", "Order sync, stock reconciliation, allocation — sab formula"),
-    "F3":  ("Inventory & FBA Flow", "purana A09 Agent", "Days-of-cover, reorder point, shipment checklist — formula/calendar"),
-    "F4":  ("Profit Calculation Flow", "A07 ka math hissa", "Margin/fee hisaab — calculator ko agent nahi banate"),
-    "F5":  ("Offer & Festival Flow", "purana A10 Agent", "Festival calendar, deal eligibility, coupon template — fixed niyam"),
-    "F6":  ("Retention Flow", "purana A11 Agent", "Day-25/30 refill reminder triggers — automation, soch nahi"),
-    "F7":  ("Guardrail & Alert Flow", "A12 ka hissa", "Stock zero -> ads pause type if-then rules"),
-    "F8":  ("War-Room Report Flow", "naya", "Roz data compile — agents ki insights isme plug hongi"),
-    "F9":  ("Algorithm Watch Flow", "naya — G5 gap", "Official announcements crawl + diff pakadna (impact analysis A09 karega)"),
-    "F10": ("Seller Health Flow", "naya — G8 gap", "ODR/cancellation/late-dispatch roz check, limit ke paas laal alert"),
+    "F1":  ("Data Sync Flow", "No previous agent — G1 gap", "Scheduled API sync, retry, failure alert"),
+    "F2":  ("Unicommerce Ops Flow", "formerly agent A13", "Order sync, stock reconciliation, allocation — all formulas"),
+    "F3":  ("Inventory & FBA Flow", "formerly agent A09", "Days of cover, reorder point, shipment checklist — formula/calendar"),
+    "F4":  ("Profit Calculation Flow", "the math part of A07", "Margin/fee calculation — a calculator is not made into an agent"),
+    "F5":  ("Offer & Festival Flow", "formerly agent A10", "Festival calendar, deal eligibility, coupon templates — fixed rules"),
+    "F6":  ("Retention Flow", "formerly agent A11", "Day-25/30 refill reminder triggers — automation, no thinking"),
+    "F7":  ("Guardrail & Alert Flow", "part of A12", "If-then rules like stock zero -> pause ads"),
+    "F8":  ("War-Room Report Flow", "new", "Daily data compilation — agent insights plug in here"),
+    "F9":  ("Algorithm Watch Flow", "new — G5 gap", "Crawl official announcements + catch diffs (A09 does impact analysis)"),
+    "F10": ("Seller Health Flow", "new — G8 gap", "Daily ODR/cancellation/late-dispatch check, red alert near limits"),
 }
 
 def classify(task_type: str) -> str:
-    """Naya kaam aaye to pehle ye poochho: isme judgment hai ya formula?"""
+    """When new work arrives, ask first: does it need judgment or a formula?"""
     judgment_tasks = {"trend_analysis", "copy_writing", "strategy", "sentiment", "competitor_intent", "pricing_strategy"}
     return "AGENT" if task_type in judgment_tasks else "FLOW"
 
 def summary() -> dict:
     return {"agents": len(AGENTS), "flows": len(FLOWS),
-            "note": "V3 me 14 agents the. V4: 9 agents + 10 flows — AI kharcha ~aadha, reliability dugni."}
+            "note": "V3 had 14 agents. V4: 9 agents + 10 flows — about half the AI cost, double the reliability."}
 
 if __name__ == "__main__":
     print(summary())

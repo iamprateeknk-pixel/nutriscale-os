@@ -1,6 +1,6 @@
-"""FIN-01 Finance — versioned costs + contribution. Niyam (QA-07):
-cost UNKNOWN ho to woh ZERO nahi mana jayega, aur us SKU par ad SCALE ki sifarish band hogi.
-Cost purani (stale > 90 din) ho to bhi chetaavni ke saath scale roka jayega.
+"""FIN-01 Finance — versioned costs + contribution. Rules (QA-07):
+an UNKNOWN cost is never treated as ZERO, and ad SCALE recommendations are blocked for that SKU.
+An old cost (stale > 90 days) also blocks scaling, with a warning.
 """
 import os, sys, datetime
 sys.path.insert(0, os.path.dirname(__file__))
@@ -21,17 +21,17 @@ def get_cost(db, sku: str, on_date: str = None) -> dict:
     d = on_date or datetime.date.today().isoformat()
     r = db.execute("""SELECT * FROM cost_versions WHERE sku=? AND effective_from<=? ORDER BY effective_from DESC, id DESC LIMIT 1""",
                    (sku, d)).fetchone()
-    if not r: return {"known": False, "reason": "Is SKU ki cost darj nahi — scale ki sifarish band hai", "sku": sku}
+    if not r: return {"known": False, "reason": "No cost recorded for this SKU — scale recommendations are blocked", "sku": sku}
     age = (datetime.date.fromisoformat(d) - datetime.date.fromisoformat(r["effective_from"])).days
     unit = r["cogs"] + r["packaging"] + r["other_variable"]
     return {"known": True, "sku": sku, "unit_cost": unit, "cogs": r["cogs"], "packaging": r["packaging"],
             "other_variable": r["other_variable"], "effective_from": r["effective_from"],
             "stale": age > STALE_DAYS, "age_days": age,
-            "reason": "Cost 90 din se purani hai — nayi cost daalo, scale roka gaya" if age > STALE_DAYS else "Cost taaza hai"}
+            "reason": "Cost is older than 90 days — enter a new cost; scaling blocked" if age > STALE_DAYS else "Cost is fresh"}
 
 def _fee_event_id(platform: str, account: str, r: dict) -> str:
-    """Event ki pakki pehchan — vendor ne transaction-id diya to wahi, warna content-hash
-    (ek hi event dobara sync ho to pehchan takrayegi aur dohari ginati nahi hogi)."""
+    """Stable event identity — the vendor transaction id if given, otherwise a content hash
+    (the same event synced twice gets the same identity, so it is never double-counted)."""
     import hashlib
     if r.get("event_id"): return str(r["event_id"])
     basis = "|".join([platform, account, str(r.get("order_id")), str(r.get("sku")),
@@ -41,10 +41,10 @@ def _fee_event_id(platform: str, account: str, r: dict) -> str:
     return "h:" + hashlib.sha1(basis.encode()).hexdigest()[:24]
 
 def import_order_fees(db, rows: list, platform: str = "Amazon", seller_account: str = "default") -> dict:
-    """SP Finances fees — V20: pehle har financial EVENT alag darj hota hai (order_fee_events),
-    phir order_fees usi ka YOG banta hai. Purana INSERT OR REPLACE ek hi order+SKU ke dusre
-    shipment-event ko pehle wale se OVERWRITE kar deta tha — ab rakam judti hai, mit-ti nahi.
-    Har row apna seller_account la sakti hai; na laaye to function-wala account lagega."""
+    """SP Finances fees — V20: every financial EVENT is first recorded separately (order_fee_events),
+    then order_fees becomes their SUM. The old INSERT OR REPLACE overwrote a second shipment event for the
+    same order+SKU with the first one — now amounts add up instead of being erased.
+    Each row may carry its own seller_account; otherwise the function's account is used."""
     ensure_v12(db); new_events, touched = 0, set()
     for r in rows:
         if not r.get("sku"): continue
@@ -68,13 +68,13 @@ def import_order_fees(db, rows: list, platform: str = "Amazon", seller_account: 
     return {"imported": new_events, "events_total_seen": len(rows), "orders_updated": len(touched)}
 
 def record_refunds(db, rows: list, platform: str = "Amazon", seller_account: str = "default") -> dict:
-    """Refund rakam order_items.refund me — revenue ab hamesha NET (gross - refund) ginega (V15).
-    V21 P0 FIX: pehle har call line ki refund ko SET (overwrite) kar deta tha — ek hi line par
-    dusra partial refund aate hi pehla MIT jata tha. Ab har refund pehle refund_events LEDGER me
-    darj hota hai (event-id/content-hash pehchan, scope = platform+seller_account+order+line),
-    aur line ki refund uske saare events ka YOG hoti hai — partial refunds JUDTE hain, mitte nahi.
-    Line-id wala event seedha usi line par; bina line-id wala SKU-ke-kul par gross-anupaat me
-    banta hai (V17 ka niyam, par ab CUMULATIVE kul par, har call ke tukde par nahi)."""
+    """Refund amount in order_items.refund — revenue is always NET (gross - refund) (V15).
+    V21 P0 FIX: each call used to SET (overwrite) the line refund — a second partial refund on the same line
+    ERASED the first. Now every refund is first recorded in the refund_events LEDGER
+    (event-id/content-hash identity, scope = platform+seller_account+order+line),
+    and the line refund is the SUM of all its events — partial refunds ADD UP instead of being erased.
+    Events with a line id go straight to that line; events without one are spread over the SKU total
+    in proportion to gross (the V17 rule, but on the CUMULATIVE total, not per call)."""
     import hashlib
     ensure_v12(db); new_events, touched = 0, set()
     for r in rows:
@@ -94,12 +94,12 @@ def record_refunds(db, rows: list, platform: str = "Amazon", seller_account: str
         touched.add((platform, acct, r["order_id"]))
     n = 0
     for (pf, acct, oid) in touched:
-        # exact-line events ka yog line-war
+        # per-line sum of exact-line events
         exact = {row["line_id"]: row["s"] for row in db.execute(
             """SELECT line_id, SUM(amount) s FROM refund_events
                WHERE platform=? AND seller_account=? AND external_order_id=? AND line_id<>''
                GROUP BY line_id""", (pf, acct, oid))}
-        # bina-line events SKU-war kul — gross-anupaat me bantenge
+        # events without a line, per SKU total — spread in proportion to gross
         sku_totals = {row["sku"]: row["s"] for row in db.execute(
             """SELECT sku, SUM(amount) s FROM refund_events
                WHERE platform=? AND seller_account=? AND external_order_id=? AND line_id=''
@@ -128,8 +128,8 @@ def record_refunds(db, rows: list, platform: str = "Amazon", seller_account: str
     db.commit(); return {"updated_lines": n, "new_refund_events": new_events}
 
 def sku_fee_rate(db, sku: str, platform: str = "Amazon", seller_account: str = None) -> dict:
-    """order_fees se is SKU ki asal fee-dar (paryapt gross ho tabhi SKU_EXACT).
-    V20: seller_account diya to sirf usi khaate ki dar — khaate mix nahi honge."""
+    """This SKU's real fee rate from order_fees (SKU_EXACT only with enough gross).
+    V20: with a seller_account, only that account's rate — accounts are never mixed."""
     ensure_v12(db)
     r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f FROM order_fees WHERE sku=? AND platform=? AND (? IS NULL OR seller_account=?)",
                    (sku, platform, seller_account, seller_account)).fetchone()
@@ -138,7 +138,7 @@ def sku_fee_rate(db, sku: str, platform: str = "Amazon", seller_account: str = N
     return {"rate": None, "gross_basis": r["g"] if r else 0, "precision": None}
 
 def realized_fee_rate(db, platform: str = "Amazon") -> dict:
-    """Settlements se asal fee-dar — andaaz ki jagah asal, jab paryapt settlement data ho (V12.1)."""
+    """Real fee rate from settlements — real numbers instead of estimates when there is enough settlement data (V12.1)."""
     ensure_v12(db)
     r = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(fees),0) f, COALESCE(SUM(taxes),0) t FROM settlements WHERE platform=?",
                    (platform,)).fetchone()
@@ -147,11 +147,11 @@ def realized_fee_rate(db, platform: str = "Amazon") -> dict:
     return {"rate": None, "gross_basis": r["g"] if r else 0, "source": "ESTIMATE_ONLY"}
 
 def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spend_per_unit: float = 0.0) -> dict:
-    """Versioned cost + fees (settlements se asal mile to wahi, warna labelled estimate)."""
+    """Versioned cost + fees (real ones from settlements when available, otherwise a labelled estimate)."""
     c = get_cost(db, sku)
     if not c["known"]:
         return {"sku": sku, "known": False, "scale_allowed": False, "reason": c["reason"],
-                "note": "Cost bina margin ka andaaz jhooth hoga — isiliye number nahi diya gaya"}
+                "note": "A margin without cost would be a lie — so no number is given"}
     from profit_calculator import SKU as PricedSKU, contribution
     from flipkart_calculator import flipkart_profit
     rf = realized_fee_rate(db, platform)
@@ -159,27 +159,27 @@ def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spe
     sf = sku_fee_rate(db, sku, platform)
     if sf["rate"] is not None:
         fees = round(price * sf["rate"], 2); fee_precision = "SKU_EXACT"
-        fee_source = f"SKU_EXACT — SP Finances ke ₹{sf['gross_basis']:,.0f} gross par is SKU ki asal fee-dar {sf['rate']*100:.1f}%"
+        fee_source = f"SKU_EXACT — this SKU's real fee rate {sf['rate']*100:.1f}% on ₹{sf['gross_basis']:,.0f} gross from SP Finances"
     elif rf["rate"] is not None:
-        # V12.2 fee precision: settlements kul bikri ka kitna hissa dhakte hain, usi hisaab se bharosa
+        # V12.2 fee precision: confidence depends on how much of total sales the settlements cover
         import analytics as AN
         gmv = AN.sales_totals(db)["revenue"] or 0
-        # Orders ka koi record hi na ho to settlement hi bikri ka ekmatra saboot hai — coverage poori mano
+        # With no order records at all, settlements are the only evidence of sales — treat coverage as full
         coverage = 1.0 if not gmv else min(1.0, rf["gross_basis"] / gmv)
         realized_fees = price * rf["rate"]
         if coverage >= 0.8:
             fees, fee_precision = realized_fees, "HIGH"
-            fee_source = f"REALIZED — settlements bikri ka {coverage*100:.0f}% dhakte hain; fee-dar {rf['rate']*100:.1f}% (SKU-wise vibhajan settlement detail bina sambhav nahi)"
+            fee_source = f"REALIZED — settlements cover {coverage*100:.0f}% of sales; fee rate {rf['rate']*100:.1f}% (SKU-level split impossible without settlement detail)"
         elif coverage >= 0.3:
             fees, fee_precision = realized_fees * coverage + est_fees * (1 - coverage), "MEDIUM"
-            fee_source = f"BLENDED — settlement coverage {coverage*100:.0f}%: asal dar aur fee-table andaaz ka bojh-daar mishran"
+            fee_source = f"BLENDED — settlement coverage {coverage*100:.0f}%: weighted mix of the real rate and the fee-table estimate"
         else:
             fees, fee_precision = est_fees, "LOW"
-            fee_source = f"ESTIMATE — settlement coverage sirf {coverage*100:.0f}%; fee-table andaaz hi bacha"
+            fee_source = f"ESTIMATE — settlement coverage only {coverage*100:.0f}%; only the fee-table estimate is left"
         fees = round(fees, 2)
     else:
         fees, fee_precision = est_fees, "LOW"
-        fee_source = "ESTIMATE — fee-table andaaz (settlement data paryapt nahi)"
+        fee_source = "ESTIMATE — fee-table estimate (not enough settlement data)"
     net = price - fees - c["unit_cost"] - ad_spend_per_unit
     margin_pct = round(net / price * 100, 1) if price else 0.0
     scale_allowed = (not c["stale"]) and margin_pct > 0
@@ -188,4 +188,4 @@ def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spe
             "contribution": round(net, 2), "margin_pct": margin_pct,
             "break_even_roas": round(price / net, 2) if net > 0 else None,
             "scale_allowed": scale_allowed,
-            "reason": c["reason"] if c["stale"] else ("Margin ghate me hai — scale nahi" if margin_pct <= 0 else "Theek hai")}
+            "reason": c["reason"] if c["stale"] else ("Margin is negative — do not scale" if margin_pct <= 0 else "OK")}

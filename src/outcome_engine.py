@@ -1,10 +1,10 @@
-"""Outcome Engine (V13) — Self-learning ko asal sales se jodna.
-Ab tak seekh aadhi thi: action lagta tha, par uska nateeja khud maapa nahi jata tha.
-Ab: execute hote hi BASELINE tasveer banti hai; 7 aur 14 din par wahi metric dobara
-maapi jati hai; behtari + guardrail (bikri zyada na giri ho) se success tay hota hai;
-nateeje outcomes table me aur rule-confidence inhi asal nateejo se banti hai.
-Note: campaigns table current-state rakhti hai — isiliye baseline execute ke samay lena hi
-ekmatra imaandaar tareeka hai; purane actions (bina baseline) ko SKIP kiya jayega, guess nahi.
+"""Outcome Engine (V13) — connects self-learning to real sales.
+Until now learning was half done: an action was applied, but its outcome was never measured.
+Now: a BASELINE snapshot is taken at execution; the same metric is measured again after 7 and 14 days;
+improvement + a guardrail (sales did not drop too much) decide success;
+outcomes go into the outcomes table and rule confidence is built only from these real outcomes.
+Note: the campaigns table holds current state — so taking the baseline at execution time is the only
+honest method; older actions (without a baseline) are SKIPPED, never guessed.
 """
 import os, sys, json, datetime
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,7 +16,7 @@ def _campaign_metrics(db, payload: dict) -> dict:
     if name:
         r = db.execute("SELECT spend, sales FROM campaigns WHERE name=?", (name,)).fetchone()
         if r: return {"spend": r["spend"] or 0, "sales": r["sales"] or 0}
-    return {"spend": 0.0, "sales": 0.0, "note": "campaign snapshot nahi mila"}
+    return {"spend": 0.0, "sales": 0.0, "note": "campaign snapshot not found"}
 
 def _sku_metrics(db, payload: dict) -> dict:
     import analytics as AN
@@ -41,9 +41,9 @@ def capture_baseline(db, action_id: int):
                (json.dumps(snapshot(db, payload)), action_id)); db.commit()
 
 def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> dict:
-    """[d0, d1) khidki ka ASAL dated data — V14 khidki-maap, V15 me ID-resolution + coverage gate.
-    Campaign sirf tab maapa jayega jab period-coverage khidki ke >=70% din dhake;
-    SKU sirf tab jab dono khidkiyon me milakar kam-se-kam 4 order-lines hon (warna INSUFFICIENT)."""
+    """REAL dated data for the [d0, d1) window — V14 window measurement, V15 adds ID resolution + a coverage gate.
+    A campaign is measured only when period coverage spans >=70% of the window's days;
+    a SKU only when both windows together have at least 4 order lines (otherwise INSUFFICIENT)."""
     out = {"campaign": None, "sku_revenue": None, "total_revenue": None}
     camp = payload.get("campaign") or payload.get("campaign_name")
     if not camp and payload.get("campaign_id"):
@@ -72,7 +72,7 @@ def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> d
     sku = payload.get("sku")
     plat = payload.get("platform")
     if sku:
-        # V20: SKU maap ab usi platform tak seemit — dusre channel ki bikri is action ke naam nahi lagegi
+        # V20: SKU measurement is limited to the action's own platform — other channels' sales are not attributed to it
         r = db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g FROM order_items oi JOIN order_headers oh
                           ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                           WHERE oi.sku=? AND (? IS NULL OR oi.platform=?) AND oh.order_date>=? AND oh.order_date<? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""",
@@ -88,14 +88,14 @@ def _window_data(db, payload: dict, d0: str, d1: str, window_days: int = 7) -> d
     return out
 
 def _min_order_days(window_days: int) -> int:
-    """VERIFIED ke liye har khidki me kam-se-kam itne order-din (V21 threshold)."""
+    """Minimum order-days per window for VERIFIED (V21 threshold)."""
     import math
     return max(2, math.ceil(0.25 * window_days))
 
 def _contamination(db, action_id: int, payload: dict, applied, window_days: int) -> list:
-    """Cross-channel / same-target contamination (V20): isi SKU ya campaign par koi AUR
-    APPLIED_VERIFIED action is maap-khidki ke aas-paas laga ho to nateeja kisi ek ke naam
-    nahi lag sakta — uplift ka dawa wahin ruk jayega, seekh usse nahi bane gi."""
+    """Cross-channel / same-target contamination (V20): if ANOTHER APPLIED_VERIFIED action on the same SKU or
+    campaign landed around this measurement window, the outcome cannot be attributed to a single one —
+    the uplift claim stops there and no learning is drawn from it."""
     import datetime as _dt
     sku, camp = payload.get("sku"), payload.get("campaign") or payload.get("campaign_name")
     cid = payload.get("campaign_id")
@@ -116,7 +116,7 @@ def _contamination(db, action_id: int, payload: dict, applied, window_days: int)
     return hits
 
 def _judge_windows(kind: str, b: dict, a: dict):
-    """(metric, before, after, success, guardrail_ok) ya None jab dated data hi na ho."""
+    """(metric, before, after, success, guardrail_ok) or None when there is no dated data."""
     if b["campaign"] and a["campaign"]:
         broas = b["campaign"]["sales"] / b["campaign"]["spend"] if b["campaign"]["spend"] else 0.0
         aroas = a["campaign"]["sales"] / a["campaign"]["spend"] if a["campaign"]["spend"] else 0.0
@@ -130,8 +130,8 @@ def _judge_windows(kind: str, b: dict, a: dict):
     return None
 
 def measure_due(db, windows=(7, 14)) -> dict:
-    """APPLIED_VERIFIED actions: [lagne se pehle ke w din] banam [lagne ke baad ke w din] — asal khidki-tulna.
-    Dated data na mile to jhootha nateeja NAHI banta: 2x khidki tak intezaar, phir INSUFFICIENT_DATA darj."""
+    """APPLIED_VERIFIED actions: [w days before applying] vs [w days after] — a real window comparison.
+    Without dated data no fake outcome is created: wait up to 2x the window, then record INSUFFICIENT_DATA."""
     ensure_v12(db)
     now = datetime.datetime.now(datetime.timezone.utc)
     done, insufficient = 0, 0
@@ -149,7 +149,7 @@ def measure_due(db, windows=(7, 14)) -> dict:
             d = lambda dt: dt.date().isoformat()
             b = _window_data(db, payload, d(applied - datetime.timedelta(days=w)), d(applied), w)
             a = _window_data(db, payload, d(applied), d(applied + datetime.timedelta(days=w)), w)
-            # V15 coverage gate: SKU-raah par kul order-lines bahut kam hon to nateeja andaza hoga — rokho
+            # V15 coverage gate: if the SKU path has very few order lines the outcome would be a guess — stop
             if not (b["campaign"] and a["campaign"]) and (b["_lines"] + a["_lines"]) < 4:
                 b["sku_revenue"] = a["sku_revenue"] = None
             judged = _judge_windows(r["kind"], b, a)
@@ -159,7 +159,7 @@ def measure_due(db, windows=(7, 14)) -> dict:
                                (r["id"], r["kind"], w, now_utc(), "INSUFFICIENT_DATA")); db.commit(); insufficient += 1
                 continue
             metric, bv, av, success, guard = judged
-            # V20 attribution: pehle contamination, phir source-coverage — tabhi VERIFIED
+            # V20 attribution: contamination first, then source coverage — only then VERIFIED
             contam = _contamination(db, r["id"], payload, applied, w)
             if metric == "campaign_roas_window":
                 coverage = min(b.get("_campaign_coverage") or 0, a.get("_campaign_coverage") or 0)
@@ -168,10 +168,10 @@ def measure_due(db, windows=(7, 14)) -> dict:
             if contam:
                 attribution, succ_val = "CONTAMINATED", None
             elif metric == "campaign_roas_window":
-                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # campaign raah 70% coverage gate pehle se lazmi hai
+                attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0   # the campaign path already requires the 70% coverage gate
             elif (b["_lines"] + a["_lines"]) >= 8 and b["_order_days"] >= _min_order_days(w) and a["_order_days"] >= _min_order_days(w):
-                # V21: VERIFIED ke liye asal namuna chahiye — kul >=8 order-lines aur har khidki me
-                # kam-se-kam max(2, khidki ke 25%) order-din. Ek-ek din ke data par 'verified' jhooth tha.
+                # V21: VERIFIED needs a real sample — >=8 order lines in total and in each window
+                # at least max(2, 25% of the window) order days. 'Verified' on one day of data was a lie.
                 attribution, succ_val = "VERIFIED", 1 if (success and guard) else 0
             else:
                 attribution, succ_val = "LOW_COVERAGE", 1 if (success and guard) else 0
@@ -181,9 +181,9 @@ def measure_due(db, windows=(7, 14)) -> dict:
     return {"measured": done, "insufficient_data": insufficient}
 
 def rule_confidence(db) -> list:
-    """Action-kind ke hisaab se asal jeet-dar — V20: seekh SIRF VERIFIED nateejo se banti hai.
-    CONTAMINATED / LOW_COVERAGE / purane bina-attribution wale nateeje ginati me dikhenge
-    par jeet-dar nahi banayenge — jhootha uplift seekh ko zeher deta hai."""
+    """Real win rate per action kind — V20: learning comes ONLY from VERIFIED outcomes.
+    CONTAMINATED / LOW_COVERAGE / old outcomes without attribution are counted
+    but never form a win rate — a fake uplift poisons learning."""
     ensure_v12(db)
     out = []
     for r in db.execute("""SELECT kind, COUNT(*) total,
@@ -196,6 +196,6 @@ def rule_confidence(db) -> list:
                     "win_rate": round(vw / vn, 2) if vn else None,
                     "total_outcomes": r["total"], "contaminated": r["cn"] or 0,
                     "verdict": "BHAROSA" if vn >= 3 and vw / vn >= 0.6 else (
-                        "KAMZOR — naye proposals par sakhti" if vn >= 3 and vw / vn < 0.4 else
-                        "DATA JAMA HO RAHA HAI (sirf VERIFIED nateeje hi seekh banate hain)")})
+                        "WEAK — stricter on new proposals" if vn >= 3 and vw / vn < 0.4 else
+                        "COLLECTING DATA (only VERIFIED outcomes drive learning)")})
     return out

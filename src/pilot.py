@@ -1,9 +1,9 @@
-"""Acceptance Gates Kit (V16) — bahari audit ne jo 5 live gates ginaye the, unhe chalane yogya banana.
-Code-side aakhri taiyaari: keys aate hi EK command se —
-  1) preflight: connectors/capabilities/owner/kill-switch/backup/HTTPS pack ki taiyaari report
-  2) reconciliation: orders ↔ settlements ↔ ads ka milaan (asal numbers par)
-  3) controlled drill: ek asal campaign par approve → execute → vendor-pushti → rollback, poora saboot ke saath
-Drill bina 'certified' capability aur bina live=True ke KABHI asal badlav nahi karega."""
+"""Acceptance Gates Kit (V16) — makes the 5 live gates listed by the external audit runnable.
+Final code-side preparation: ONE command once keys arrive —
+  1) preflight: readiness report for connectors/capabilities/owner/kill switch/backup/HTTPS pack
+  2) reconciliation: orders ↔ settlements ↔ ads matching (on real numbers)
+  3) controlled drill: approve → execute → vendor confirmation → rollback on one real campaign, fully evidenced
+The drill NEVER makes a real change without a 'certified' capability and live=True."""
 import os, sys, json, glob
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12, now_utc
@@ -20,44 +20,44 @@ def preflight(db) -> dict:
         for name, s in st.items():
             add(f"connector:{name}", s.get("configured"), s.get("detail", ""))
     except Exception as e:
-        add("connector:config", False, f"config padh nahi paya: {e}")
+        add("connector:config", False, f"could not read config: {e}")
     import capabilities as caps
     for plat, cap in (("Amazon", "write_ads"), ("Amazon", "write_listings"), ("Flipkart", "read_orders")):
         c = caps.capability(db, plat, cap)
         add(f"capability:{plat}:{cap}", c["status"] == "certified",
-            f"halat={c['status']}" + (" — pilot sign-off baki hai" if c["status"] != "certified" else ""))
+            f"status={c['status']}" + (" — pilot sign-off pending" if c["status"] != "certified" else ""))
     owners = db.execute("SELECT COUNT(*) c FROM users WHERE role='Owner'").fetchone()["c"]
-    add("owner_user", owners > 0, f"{owners} Owner khata maujud" if owners else "NUTRISCALE_OWNER_USER/PASSWORD se pehla Owner banao")
+    add("owner_user", owners > 0, f"{owners} Owner account(s) present" if owners else "Create the first Owner via NUTRISCALE_OWNER_USER/PASSWORD")
     import actions as act
     ks = act.kill_status(db)
-    add("kill_switch_off", not ks["engaged"], "ON hai — drill nahi chalega" if ks["engaged"] else "band hai, theek")
+    add("kill_switch_off", not ks["engaged"], "ON — the drill will not run" if ks["engaged"] else "off, OK")
     from db_store import DEFAULT_PATH
     _dd = os.path.dirname(DEFAULT_PATH)
     backs = glob.glob(os.path.join(_dd, "backups", "*.db")) + glob.glob(os.path.join(_dd, "*backup*.db"))
-    add("backup_exists", len(backs) > 0, f"{len(backs)} backup file(s)" if backs else "koi backup nahi mila — backup_restore job chalao (data/backups/)")
+    add("backup_exists", len(backs) > 0, f"{len(backs)} backup file(s)" if backs else "no backup found — run the backup_restore job (data/backups/)")
     add("https_pack", os.path.exists(os.path.join(ROOT, "deploy", "Caddyfile")) and
         os.path.exists(os.path.join(ROOT, "docker-compose.prod.yml")), "Caddy + prod compose maujud")
-    add("llm_key", bool(os.environ.get("GOS_LLM_API_KEY")), "LLM key mili" if os.environ.get("GOS_LLM_API_KEY") else "LLM key nahi — system rules par chalega (chalega, par AI-copy band)")
+    add("llm_key", bool(os.environ.get("GOS_LLM_API_KEY")), "LLM key found" if os.environ.get("GOS_LLM_API_KEY") else "no LLM key — the system runs on rules (works, but AI copy is off)")
     ready = all(c["ok"] for c in checks if not c["check"].startswith("llm"))
     return {"ready_for_pilot": ready, "checks": checks, "at": now_utc(),
-            "note": "ready_for_pilot = sirf takneeki taiyaari; asal pilot ke liye keys + sign-off + hosting chahiye"}
+            "note": "ready_for_pilot = technical readiness only; a real pilot needs keys + sign-off + hosting"}
 
 def finance_grade_matching(db, platform: str = "Amazon", days: int = 30) -> dict:
-    """Finance-grade milaan (V18): har order alag se — canonical bikri banam Finances ki darj fees/gross.
-    Har order ek shreni me: MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH. Settlements me order-key
-    hota hi nahi, isiliye order-stariya milaan Finances se hoga; settlement khidki-stariya rahega."""
+    """Finance-grade matching (V18): each order separately — canonical sales vs the fees/gross recorded in Finances.
+    Every order lands in one class: MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH. Settlements have no order key,
+    so order-level matching uses Finances; settlements stay window-level."""
     import datetime as _dt
     ensure_v12(db)
     ws = (_dt.date.today() - _dt.timedelta(days=days - 1)).isoformat()
-    # V20: milaan ki key (seller_account, order_id) hai — sirf order-id par group karna do khaaton
-    # ke ek-jaise order-id ko ek bana deta tha aur fees galat khaate se mil jati thi
+    # V20: the matching key is (seller_account, order_id) — grouping by order id alone merged identical order ids
+    # from two accounts and attached fees to the wrong account
     orders = db.execute("""SELECT oh.seller_account acct, oh.external_order_id oid, COALESCE(SUM(oi.gross),0) gross,
                                   COALESCE(SUM(COALESCE(oi.refund,0)),0) refund
                            FROM order_headers oh JOIN order_items oi
                              ON oi.platform=oh.platform AND oi.seller_account=oh.seller_account AND oi.external_order_id=oh.external_order_id
                            WHERE oh.platform=? AND oh.order_date>=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'
                            GROUP BY oh.seller_account, oh.external_order_id""", (platform, ws)).fetchall()
-    # V19 P0: milaan GROSS-se-GROSS aur REFUND-se-REFUND alag-alag — NET ko GROSS se parkhna galat tha
+    # V19 P0: match GROSS-to-GROSS and REFUND-to-REFUND separately — comparing NET with GROSS was wrong
     matched, missing, mismatch, exceptions = 0, 0, 0, []
     for o in orders:
         f = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(COALESCE(refund,0)),0) rf, COUNT(*) n FROM order_fees WHERE platform=? AND seller_account=? AND external_order_id=?",
@@ -79,10 +79,10 @@ def finance_grade_matching(db, platform: str = "Amazon", days: int = 30) -> dict
             "match_rate_pct": round(100.0 * matched / total, 1) if total else None,
             "basis": "gross-vs-gross + refund-vs-refund, key=(seller_account, order_id) (V20)",
             "verdict": "FINANCE_GRADE_OK" if total and missing == 0 and mismatch == 0 else
-                       ("DATA_APARYAPT" if total == 0 else "EXCEPTIONS_HAIN — upar ki suchi parkho")}
+                       ("INSUFFICIENT_DATA" if total == 0 else "EXCEPTIONS — review the list above")}
 
 def reporting_completeness(db, platform: str = "Amazon", days: int = 30) -> dict:
-    """Reporting sampurnata (V18): khidki ke kitne din ka data asal me maujud hai — teen taraf se."""
+    """Reporting completeness (V18): how many days of the window actually have data — from three sides."""
     import datetime as _dt
     ensure_v12(db)
     end = _dt.date.today(); start = end - _dt.timedelta(days=days - 1)
@@ -102,14 +102,14 @@ def reporting_completeness(db, platform: str = "Amazon", days: int = 30) -> dict
                           ON of2.platform=oh.platform AND of2.seller_account=oh.seller_account AND of2.external_order_id=oh.external_order_id
                         WHERE oh.platform=? AND oh.order_date>=?""", (platform, start.isoformat())).fetchone()
     return {"window_days": days,
-            "order_days_present": od, "order_days_note": "orders har din hona lazmi nahi — ye sirf maujudgi ki jaankari hai",
+            "order_days_present": od, "order_days_note": "orders need not exist every day — this only shows presence",
             "ads_period_coverage_pct": round(100.0 * len(covered) / days, 1),
             "orders_total": fee["tot"], "orders_with_fee_data": fee["with_fees"],
             "fee_coverage_pct": round(100.0 * fee["with_fees"] / fee["tot"], 1) if fee["tot"] else None}
 
 def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> dict:
-    """V17: scoped milaan — platform + a/c + ek hi samay-khidki (30 din) ke andar teeno taraf.
-    Settlements ka apna period hota hai: khidki se takraane wale hi gine jayenge."""
+    """V17: scoped matching — platform + account + one time window (30 days) on all three sides.
+    Settlements have their own period: only those overlapping the window are counted."""
     import datetime as _dt
     import ops_finance as OF
     import analytics as AN
@@ -123,8 +123,8 @@ def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> di
                     (platform, ws, we)).fetchone()
     sw = db.execute("""SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(net),0) n FROM settlements
                        WHERE platform=? AND period_start<=? AND period_end>=?""", (platform, we, ws)).fetchone()
-    # V19: overlap wale settlement ki POORI rakam khidki ki nahi hoti — din-anupaat anumaan alag se,
-    # aur sthiti saaf taur par NON-FINAL (transaction-level data aane tak final milaan dawa nahi)
+    # V19: an overlapping settlement's FULL amount does not belong to the window — a day-pro-rata estimate is shown
+    # separately, and the status is clearly NON-FINAL (no final-match claim until transaction-level data arrives)
     _pro = db.execute("""SELECT gross, period_start, period_end FROM settlements
                          WHERE platform=? AND period_start<=? AND period_end>=?""", (platform, we, ws)).fetchall()
     _ws_d, _we_d = _dt.date.fromisoformat(ws), _dt.date.fromisoformat(we)
@@ -143,7 +143,7 @@ def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> di
             "orders_in_window": {"net_revenue": ow["g"], "lines": ow["n"]},
             "settlements_overlapping_window": {"gross_full": sw["g"], "net_payout": sw["n"],
                                                "gross_prorated_estimate": round(prorated, 2),
-                                               "comparison_status": "NON_FINAL — settlement period khidki se bada ho sakta hai; poori rakam khidki ki nahi. Final milaan transaction-level settlement data se hoga"},
+                                               "comparison_status": "NON_FINAL — a settlement period can be larger than the window; its full amount is not the window's. The final match comes from transaction-level settlement data"},
             "window_difference_full_amounts": wdiff,
             "window_status": "MATCHED" if sw["g"] and abs(wdiff) <= max(ow["g"] * 0.02, 100) else "EXCEPTION",
             "search_terms_spend_in_window": terms["sp"],
@@ -151,29 +151,29 @@ def reconciliation_report(store, platform: str = "Amazon", days: int = 30) -> di
             "completeness": reporting_completeness(db, platform, days),
             "lifetime_reference": {"orders_vs_settlements_all": rec_all,
                                    "sales_totals": AN.sales_totals(db, platform)},
-            "note": "Khidki ke bahar ke settlements/orders is milaan me NAHI hain — farq pehle khidki se parkho"}
+            "note": "Settlements/orders outside the window are NOT in this match — check gaps against the window first"}
 
 def controlled_drill(db, payload: dict, actor: dict, live: bool = False, adapter=None, store=None) -> dict:
-    """Audit gate #3 ka astra: approve → execute → vendor pushti → rollback — poora saboot sahit.
-    live=False par sirf YOJANA banti hai (koi badlav nahi). live=True par bhi pehle:
-    kill-switch band + write_ads certified — warna BLOCKED with wajah."""
+    """Weapon for audit gate #3: approve → execute → vendor confirmation → rollback — fully evidenced.
+    With live=False only a PLAN is produced (no change). Even with live=True it first requires:
+    kill switch off + write_ads certified — otherwise BLOCKED with a reason."""
     import actions as act
     steps = []
     def step(name, ok, detail): steps.append({"step": name, "ok": bool(ok), "detail": detail})
     ks = act.kill_status(db)
     if ks["engaged"]:
-        step("kill_switch", False, "Kill switch ON hai — drill roka gaya")
+        step("kill_switch", False, "Kill switch is ON — drill blocked")
         return {"verdict": "BLOCKED", "steps": steps}
-    step("kill_switch", True, "band hai")
+    step("kill_switch", True, "off")
     if not live:
-        step("plan", True, "Yojana: proposal -> Owner approve -> queue -> adapter execute (refetch pushti) -> rollback (purani halat pushti). "
-                           "Asal chalane ke liye live=True + write_ads certified + asal campaign payload chahiye")
+        step("plan", True, "Plan: proposal -> Owner approval -> queue -> adapter execute (refetch confirmation) -> rollback (previous-state confirmation). "
+                           "Running it for real needs live=True + write_ads certified + a real campaign payload")
         return {"verdict": "PLAN_ONLY", "steps": steps,
-                "note": "Koi badlav NAHI hua — ye sirf taiyaari ki report hai"}
+                "note": "NOTHING was changed — this is only a readiness report"}
     import capabilities as caps
     c = caps.capability(db, payload.get("platform", "Amazon"), "write_ads")
     if c["status"] != "certified":
-        step("capability_gate", False, f"write_ads halat={c['status']} — pehle pilot sign-off se certified karo")
+        step("capability_gate", False, f"write_ads status={c['status']} — certify it via pilot sign-off first")
         return {"verdict": "BLOCKED", "steps": steps}
     step("capability_gate", True, "certified")
     if adapter is None:
@@ -194,4 +194,4 @@ def controlled_drill(db, payload: dict, actor: dict, live: bool = False, adapter
     step("rollback+verify", rb.get("ok"), rb.get("note") or rb.get("error", ""))
     return {"verdict": "DRILL_PASS" if rb.get("ok") else "ROLLBACK_FAILED",
             "action_id": p["id"], "steps": steps,
-            "note": "Campaign apni purani halat par wapas hai — ye saboot GATE-D pilot sign-off ke kaam aayega"}
+            "note": "The campaign is back in its previous state — this evidence supports the GATE-D pilot sign-off"}
