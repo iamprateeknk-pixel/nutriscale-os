@@ -31,7 +31,8 @@ def create_user(db, username: str, password: str, role: str) -> dict:
     if role not in ROLES: return {"ok": False, "error": f"Invalid role: {role}"}
     if len(password) < 8: return {"ok": False, "error": "Password must be at least 8 characters"}
     salt = secrets.token_bytes(16)
-    db.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,1,?)",
+    # Named columns: the MFA migration adds totp_secret, so a positional insert breaks on such databases
+    db.execute("INSERT OR REPLACE INTO users(username, pass_hash, salt, role, active, created_at) VALUES (?,?,?,?,1,?)",
                (username, _hash(password, salt), salt.hex(), role, now_utc())); db.commit()
     return {"ok": True, "username": username, "role": role}
 
