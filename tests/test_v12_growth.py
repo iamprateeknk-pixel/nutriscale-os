@@ -122,7 +122,7 @@ def test_settlements_bom_agency_llm_ops():
 def test_rank_diagnostic_and_funnel():
     from keyword_lab import rank_diagnostic, rank_funnel
     st = Store(":memory:")
-    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-R','Rank Wala', 'Amazon', 300, 0, 3.8, 40, 't')"); st.db.commit()
+    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-R','Rank Item', 'Amazon', 300, 0, 3.8, 40, 't')"); st.db.commit()
     d = rank_diagnostic(st, "kaju", "SKU-R")
     hyps = " ".join(h["hypothesis"] for h in d["hypotheses"])
     assert "Stock" in hyps, "a stock-out must be checked first"

@@ -87,7 +87,7 @@ def test_realized_fees_pipeline():
     import finance as F
     from ops_finance import import_settlements
     st = Store(":memory:")
-    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-F','Fee Wala','Amazon',300,0,0,0,'t')"); st.db.commit()
+    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-F','Fee Item','Amazon',300,0,0,0,'t')"); st.db.commit()
     F.set_cost(st.db, "SKU-F", 100, 20, approved_by="owner")
     before = F.contribution_v2(st.db, "SKU-F", 300)
     assert "ESTIMATE" in before["fee_source"]
