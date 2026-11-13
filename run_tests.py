@@ -1,4 +1,4 @@
-"""Saare test suites ek command me:  python3 run_tests.py"""
+"""All test suites in one command:  python3 run_tests.py"""
 import subprocess, glob, sys, os
 files = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "tests", "test_*.py")))
 fail = 0
@@ -8,5 +8,5 @@ for f in files:
     print(f"{'✔' if r.returncode == 0 else '✘'} {os.path.basename(f)}: {last}")
     if r.returncode != 0:
         fail = 1; print(r.stdout[-1500:]); print(r.stderr[-1500:])
-print("\nSAB PASS ✔" if not fail else "\nKUCH FAIL HAI ✘")
+print("\nALL PASS ✔" if not fail else "\nSOME FAILED ✘")
 sys.exit(fail)

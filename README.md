@@ -1,68 +1,87 @@
 # 🌰 NutriScale OS
 
-**Autonomous Multi-Agent Ecommerce Growth System — Dry Fruits ke liye, Amazon IN + Flipkart par.**
+**An approval-gated, self-learning sales growth system for a dry-fruits brand on Amazon India and Flipkart.**
 
-Listings sudhare, Ads chalaye, Competitors par nazar rakhe, FBA + Unicommerce sambhale —
-**khud sab kare, malik se sirf approval le.** Roz apne results aur web ke best sources se seekh kar strong hota jaye.
+It improves listings, manages ads, watches competitors, plans FBA and Unicommerce stock, and turns what it finds
+into proposals. **Nothing changes live without the owner's approval.** Every applied change is measured after
+7/14 days, and the result raises or lowers the agents' confidence in the rule behind it.
 
-> Imaandar note: Ye system "magic" nahi hai. Ye ek profit-first, data-first machine hai —
-> pehle listing/price/conversion fix karti hai, phir ads scale karti hai, aur organic flywheel
-> (rank → free sales) se Blended ROAS ko 8–10 ki taraf le jati hai.
+> Honest note: this system is not magic. It is a profit-first, data-first machine — it fixes listings, price and
+> conversion first, then scales ads, and uses the organic flywheel (rank → free sales) to push blended ROAS up.
+> Without real data (reports or API keys) it shows empty states, never made-up numbers.
 
-## Khaas baatein
+## What it does
 
-- **9 Agents** (Market, Competitor, Keyword, Listing, Creative, Ads, Pricing, Review, Governance) + **10 Deterministic Flows** — jahan formula hai wahan agent nahi
-- **Approval-Only Autonomous:** Tier-0 kaam khud, Tier-1 ek-tap approval, Tier-2 double confirm, aur bina-approval **Kill Switch**
-- **Self-Learning:** har action ka result 7/14 din me maapa jata hai; fail rules khud band; web se roz subah learning crawl
-- **Algorithm Intelligence:** Amazon (COSMO/Rufus era ke saath) + Flipkart ke alag rank models, Algo-Change Watcher, Rank Probe
-- **Organic Flywheel math:** Paid ROAS nahi, **Blended ROAS / TACOS** hi asal KPI hai
-- **FBA + Flipkart Warehouse planner**, **Unicommerce** 3-way stock reconciliation
-- **FSSAI/Health-Claim checker** — galat dawa listing ko live hone se pehle rokta hai
-- **Asal Connectors:** Amazon SP-API (SigV4), Amazon Ads API, Flipkart API, Unicommerce API + CSV import (bina manzuri ke aaj se chalta hai)
+- **Dashboard** — "Today" home screen with the most urgent tasks first, Approval Inbox, War Room, Listing Builder,
+  Keyword Plan, SQP Funnel, Ads Studio, Growth Playbook, Agent Brain, Knowledge Base and more (23 screens,
+  light/dark mode, works on mobile, `Ctrl+K` to jump to a screen).
+- **Growth Autopilot** — runs daily at 07:45 IST and turns findings into proposals: negatives for wasted spend,
+  harvesting winning terms into Exact, fixing self-competition, SQP scale/click problems, pausing ads on
+  out-of-stock SKUs. It never applies anything itself; stale ads data (21+ days) pauses it.
+- **Self-learning brain** — 42 researched marketplace rules, each with sources and a confidence score. Confidence
+  changes only from VERIFIED outcomes; a rule that loses 3 times in a row is disabled. Lessons are also derived
+  from your own data (best-converting terms, wasted terms, SQP diagnoses).
+- **Listing rules engine** — Amazon's 75-character title rule (from 27 Jul 2026), 125-character Item Highlights,
+  200-byte backend terms, bullet/image rules, and FSSAI claim checks. Claims that need proof (origin, grade,
+  organic, nitrogen flush…) are blocked until evidence is in the fact registry.
+- **Profit-first ads** — break-even and target ACOS per SKU from real cost + fees; scaling is blocked without cost.
+- **Safety** — login + roles (RBAC), optional TOTP MFA, a server-side kill switch, a proposal state machine
+  (approve → queue → execute with proof → rollback), 7-day proposal expiry, nightly backups.
+- **Connectors** — Amazon SP-API (LWA), Amazon Ads API (Reporting v3), Flipkart, Unicommerce, plus CSV/TSV upload
+  straight from the dashboard (works today, no API approval needed).
 
-## Chalana
+## Run it
 
 ```bash
-# 1) Kaunsa connector taiyaar hai
-python3 src/sync_service.py --status
+# First run: create the Owner login, then start the backend
+NUTRISCALE_OWNER_USER=owner NUTRISCALE_OWNER_PASSWORD='a-long-password' python3 backend/app.py
+# Open http://localhost:8765 and log in
 
-# 2) CSV se asal data bhariye (sabse tez shuruaat)
-python3 src/sync_service.py --csv-search-terms report.csv
-python3 src/sync_service.py --csv-campaigns campaigns.csv
-python3 src/sync_service.py --csv-orders orders.csv
+# 24x7 scheduler (daily sync, learning, autopilot, backups) in a second terminal
+python3 src/jobrunner.py --daemon
 
-# 3) Backend + Dashboard
-python3 backend/app.py            # http://localhost:8765
-# browser me dashboard/index.html kholo — data hoga to LIVE dikhega, nahi to saaf khaali
+# Or both with Docker
+docker compose up -d
 ```
 
-API keys kaise bharni hain: **[CONNECTORS_SETUP.md](CONNECTORS_SETUP.md)** — keys kabhi chat/GitHub par mat bhejna.
+Getting data in:
+- **Easiest:** Integrations screen → *Upload a report* → drop the CSV from Seller Central / Ads Console.
+- Command line: `python3 src/sync_service.py --csv-search-terms report.csv` (also `--csv-campaigns`, `--csv-orders`, `--csv-inventory`).
+- API keys: see **[CONNECTORS_SETUP.md](CONNECTORS_SETUP.md)** — never send keys over chat or GitHub.
+
+Change a password: `python3 scripts/set_password.py <username>` (asks for the new password hidden).
+
+Running on the Box cloud computer with a public HTTPS link: `deploy/box/start.sh` (see [docs/RUNBOOK.md](docs/RUNBOOK.md)).
 
 ## Tests
 
 ```bash
-python3 run_tests.py   # saare suites ek saath (V26 par 31 suites)
+python3 run_tests.py   # all suites at once (31 suites as of V26)
 ```
 
-## Halat (Status)
+## Status
 
-Kya ban gaya, kya baki hai — imaandar diary: **[STATUS.md](STATUS.md)**
+What is built and what is left — the honest log: **[STATUS.md](STATUS.md)**.
+How the system runs day to day: **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
 
-## Design ke kagaz (repo me hi hain)
+## Design documents
 
-| File | Kya hai |
+| File | What it is |
 |---|---|
-| `MASTER_BLUEPRINT.md` | V1 — 12-agent mool design, ads/listing systems |
-| `MASTER_BLUEPRINT_V2.md` | V2 — Autonomous approval mode, flywheel, FBA, Unicommerce |
-| `MASTER_BLUEPRINT_V3_SELF_LEARNING.md` | V3 — Self-learning layer |
-| `GAP_AUDIT_AND_BLUEPRINT_V4.md` | V4 — Gap audit, 9 agents + 10 flows, Algorithm Intelligence |
-| `ULTIMATE_AUDIT_V5.md` | V5 — Imaandar scorecard aur % chances |
+| `MASTER_BLUEPRINT.md` | V1 — original 12-agent design, ads/listing systems |
+| `MASTER_BLUEPRINT_V2.md` | V2 — autonomous approval mode, flywheel, FBA, Unicommerce |
+| `MASTER_BLUEPRINT_V3_SELF_LEARNING.md` | V3 — self-learning layer |
+| `GAP_AUDIT_AND_BLUEPRINT_V4.md` | V4 — gap audit, 9 agents + 10 flows, algorithm intelligence |
+| `ULTIMATE_AUDIT_V5.md` | V5 — honest scorecard and odds |
+| `docs/V12_BACKLOG.md` | V12 requirements backlog (requirement IDs referenced throughout the code) |
+| `docs/openapi.yaml` | API reference |
 
-## Suraksha niyam
+## Safety rules
 
-- `config/connectors.json` aur `data/` gitignore me hain — **kabhi commit mat karna**
-- Har paisa-wala action approval + audit log ke bina nahi hota
-- Listing score < 70 → ads scale band (pehle listing, phir paisa)
+- `config/connectors.json`, `.env` and `data/` are gitignored — **never commit them**.
+- No money-moving action happens without approval and an audit log.
+- Listing score < 70 → ads scaling blocked (listing first, then money).
 
 ---
-*Repository visibility GitHub par PUBLIC hai (22 Oct 2026 ko verify) — business data isiliye repo me sirf aggregates me rakha gaya hai; raw orders/customer data kabhi push NAHI hota. Repo ko Private karna hai to GitHub → Settings → Danger Zone → Change visibility (malik ka 1-minute ka kaam).*
+*This repository is PUBLIC on GitHub. Business data is therefore never pushed — no raw orders or customer data.
+To make it private: GitHub → Settings → Danger Zone → Change visibility.*

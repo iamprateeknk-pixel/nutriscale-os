@@ -3,7 +3,7 @@ services:
   nutriscale:
     build: .
     ports:
-      - "127.0.0.1:8765:8765"   # V14: backend seedha public nahi — bahar sirf Caddy(HTTPS) se (prod override)
+      - "127.0.0.1:8765:8765"   # V14: backend is not public directly — outside access only via Caddy (HTTPS) (prod override)
     volumes:
       - nutriscale-data:/app/data
     env_file:
