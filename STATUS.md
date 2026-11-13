@@ -1,269 +1,283 @@
-# NutriScale OS — STATUS (sach ki diary)
-_Updated: 13 Nov 2026 (V26 — upload, suraksha, purane data ka pehra; kul 31 suites pass)_
+# NutriScale OS — STATUS (the honest log)
+_Updated: 13 Nov 2026 (V27 — the whole system is now in English; 31 suites pass)_
 
-## 🛡️ V26 — Full-proof hardening: dashboard upload, import suraksha, purane data ka pehra, expiry (13 Nov 2026)
-(saboot: test_v26_hardening.py — 5 tests incl. asal HTTP aur hamle; kul **31 suites pass**; browser me upload → preview → import → Keyword Lab chala)
-- **Security hole band**: CSV import API pehle server ka *koi bhi* path le leta tha (login wala user server ki doosri files padhne ki koshish kar sakta tha). Ab sirf dashboard se upload ki gayi ya `data/` ke andar ki CSV/TSV; `../`, `/etc/passwd`, symlink se bahar jaana — sab 400. Request ki seema 32MB, file 20MB.
-- **Dashboard se report upload**: Integrations par file chuno / kheench kar chhodo → system khud prakar pehchanta hai (Search Term, Campaign, Orders, Inventory, Brand Analytics, Catalog/BSR) → preview → "Import karo". Pehchana na jaaye to prakar chunne ka option. Terminal ki zaroorat khatam — asli data ki sabse badi rukawat hati.
-- **Purane data par faisla nahi**: ads data 21 din se purana ho to autopilot negative/harvest proposal nahi banata, aur Aaj screen par laal kaam aata hai "taaza report upload karo". Har proposal par `data_freshness` likha hota hai (bina tareekh wale CLI import par `AGE_UNKNOWN`).
-- **Proposal expiry**: 7 din me faisla na hua to `EXPIRED` (naya state) — purane data par bana proposal galti se approve nahi hota, inbox saaf rehta hai, itihaas bana rehta hai. Autopilot har run me safai karta hai.
-- **Seema (imaandaari)**: CSV se aaye search-term data ki umar import ki tareekh se maani jaati hai, report ke andar ki tareekh se nahi — 2 mahine purani report aaj upload karo to woh 'taaza' ginegi. API sync me asli period tareekh aati hai.
+## 🌐 V27 — Everything in English (13 Nov 2026)
+- Dashboard (all 23 screens, toasts, dialogs, empty states), API messages, agent/engine output, job outputs, CLI
+  output, code comments and docstrings, docs (README, runbook, setup guides, OpenAPI, this log, blueprints, audits)
+  — all English now.
+- Kept on purpose: Hinglish/Hindi **search vocabulary** (badam, kaju, बादाम…) because shoppers really search that
+  way, and Hinglish **detection keywords** (e.g. review complaint words, claim-checker patterns) because they
+  match real customer and seller text.
+- `seed_knowledge` / `seed_playbook` now refresh the text of rules already stored in a database, so a running
+  system switches language after its next learning cycle.
+- The autopilot now matches playbook findings by stable codes (`HARVEST_PENDING`, `SELF_COMPETITION`) instead of
+  message text.
+- `docs/SETUP_TEENO.md` → `docs/SETUP_GUIDE.md`. `docs/openapi.yaml` now lists all V23–V26 endpoints.
 
-## 🤖 V25 — Growth Autopilot: kamiyaan khud proposals bante hain, chakra poora (12 Nov 2026)
-(saboot: test_v25_autopilot.py — 7 tests; kul **30 suites pass**; browser me Autopilot → Approval Inbox flow chala)
-- **Pehle**: playbook kamiyaan *dikhata* tha, par proposals nahi banata — isliye ads ke niyamo ka bharosa kabhi asli nateejo se nahi badal sakta tha.
-- **Ab** (`src/growth_autopilot.py`, roz **07:45** — nateeje maapne ke baad): bekaar kharch wale terms → negative-exact; jeetne wale terms → Exact me harvest; apni hi bid se ladai → Auto/Broad me negative; SQP "scale karo" / "click nahi" queries; stock 0 wale SKU ke ads pause — sab **approval-wale proposals** (`rule_ids` + `campaign` ke saath) → approve → 7/14 din me maap → brain me us niyam ka bharosa upar/neeche.
-- **Suraksha**: khud kuch live nahi (ONE_TAP + kill switch); ek kaam ek hafte me ek hi baar (idempotent); ek run me max 15, aur seema me har prakar ko baari-baari jagah (negatives kamai wale harvest ko nahi dabaate); brain me DISABLED niyam par proposal nahi; jo term kahin bhi convert hua uspar negative kabhi nahi; stock-out pause sirf tab jab campaign naam me SKU ho.
-- **Haftawar report** — har Sunday 21:00 IST, `data/reports/weekly-<date>.md` (proposals, nateeje, brain ka badlav, ads structure, agle 45 din ke events); API `/api/v1/reports/weekly`. (Pehle scheduler haftawar jobs chalata hi nahi tha.)
-- **Dashboard**: Growth screen par Autopilot panel (preview + "proposals banao"), Approval Inbox me har proposal ka **"kya aur kyun"** + rule chips, Aaj screen par autopilot ka kaam.
+## 🛡️ V26 — Full-proof hardening: dashboard upload, import safety, stale-data guard, expiry (13 Nov 2026)
+(evidence: test_v26_hardening.py — 5 tests incl. real HTTP and attack cases; **31 suites pass**; upload → preview → import → Keyword Lab exercised in a browser)
+- **Security hole closed**: the CSV import API used to accept *any* server path (a logged-in user could try to read other files on the server). Now only CSV/TSV uploaded via the dashboard or inside `data/`; `../`, `/etc/passwd` and symlink escapes all return 400. Request limit 32MB, file limit 20MB.
+- **Report upload from the dashboard**: choose or drag a file on Integrations → the type is detected (Search Term, Campaign, Orders, Inventory, Brand Analytics, Catalog/BSR) → preview → "Import". If not recognised, the type can be chosen. No terminal needed — the biggest obstacle to real data is gone.
+- **No decisions on stale data**: if ads data is older than 21 days the autopilot creates no negative/harvest proposals, and the Today screen shows a red task "upload a fresh report". Every proposal records `data_freshness` (`AGE_UNKNOWN` for undated CLI imports).
+- **Proposal expiry**: no decision within 7 days → `EXPIRED` (new state) — a proposal built on old data cannot be approved by mistake, the inbox stays clean, history is kept. The autopilot cleans up on every run.
+- **Limitation (honest)**: for CSV uploads the age of search-term data is taken from the import date, not the dates inside the report — a two-month-old report uploaded today counts as "fresh". API sync carries the real report period.
 
-## 🚀 V24 — Naya dashboard + market research se agents ke naye playbook (11 Nov 2026)
-(saboot: test_v24_growth.py — 9 tests incl. asal HTTP; kul **29 suites pass**; Chromium me saare 23 screen bina JS error, mobile 390px par koi horizontal scroll nahi)
-- **Dashboard naye sire se** (`dashboard/index.html`): grouped navigation (Aaj / Badhao / Paisa / Dimaag / System), **"Aaj ka kaam" home** (zaroori kaam pehle, setup progress, agla sale event, brain), light + **dark mode**, mobile drawer, **Ctrl+K** se screen dhoondho, browser `alert/prompt` ki jagah toast + modal, khaali screen par "agla kadam" button, har sifarish ke saath **rule chip** (dabao to niyam + source).
-- **Naye screens**: Listing Builder (live akshar/byte ginti, copy button, jaanch score), Keyword Plan (meva chuno → title/highlights/backend/negative), SQP Funnel, Growth Playbook, Agent Brain, Knowledge Base. Purane 16 screen sab maujud.
-- **15 naye research niyam** (kul 42) — sab source ke saath: Amazon ads structure (Auto=khoj, Exact=kamai, harvest chakra, haftawar negatives), **break-even ACOS** formula, launch par TACOS, Vine + review policy, A+ content, Great Indian Festival ki taiyaari (FBA 15-20 din pehle, coupons/deals ~7 din pehle), India dry-fruit bazaar ka aakar, **quick commerce** (Blinkit/Zepto/Instamart), Flipkart PLA.
-- **Growth Playbook engine** (`src/growth_playbook.py`) — niyam tumhare data par: SKU ka break-even/target ACOS, campaign structure score (apni hi bid se ladai, harvest baaki, bekaar kharch), sale calendar countdown (tareekhein ANUMAAN — saaf likha), policy-safe review plan, aur home screen ka `today()`.
-- **Fixes**: (1) manual `run_cycle` ab wahi asal seekh-chakra + backup + Brand Analytics import chalata hai jo 24×7 scheduler; (2) default bullets me bina-saboot dawe the ("nitrogen flush", "FSSAI licensed", "return/replacement niti") — hata diye; (3) Listing Builder ab fact-registry bhi jaanchta hai (NS-P-01) — bina saboot ka dawa pehle hi BLOCK, approve par nahi.
-- **Imaandaari**: Amazon.in ne Box ke browser ko bhi search page nahi diya (bot-rok) — isliye top listings ka asli data nahi liya gaya, sirf research niyam. Brand-wise market share ka koi bharose-layak public source nahi mila. Sale tareekhein anumaan hain.
+## 🤖 V25 — Growth Autopilot: findings become proposals, the loop is closed (12 Nov 2026)
+(evidence: test_v25_autopilot.py — 7 tests; **30 suites pass**; Autopilot → Approval Inbox flow exercised in a browser)
+- **Before**: the playbook *showed* gaps but created no proposals — so confidence in the ads rules could never change from real outcomes.
+- **Now** (`src/growth_autopilot.py`, daily at **07:45** — after outcomes are measured): wasted-spend terms → negative-exact; winning terms → harvested into Exact; bidding against yourself → negatives in Auto/Broad; SQP "scale up" / "no clicks" queries; ads paused for SKUs with 0 stock — all as **approval-gated proposals** (with `rule_ids` + `campaign`) → approve → measured after 7/14 days → the rule's confidence in the brain goes up or down.
+- **Safety**: never changes anything live itself (ONE_TAP + kill switch); the same task at most once per week (idempotent); at most 15 per run, with every type getting room in turn (negatives do not crowd out revenue-growing harvests); no proposals for rules the brain has DISABLED; never negates a term that converted anywhere; stock-out pauses only when the campaign name contains the SKU.
+- **Weekly report** — every Sunday at 21:00 IST, `data/reports/weekly-<date>.md` (proposals, outcomes, brain changes, ads structure, events in the next 45 days); API `/api/v1/reports/weekly`. (Previously the scheduler never ran weekly jobs.)
+- **Dashboard**: Autopilot panel on the Growth screen (preview + "create proposals"), a **"what & why"** column with rule chips in the Approval Inbox, autopilot tasks on the Today screen.
 
-## 🧠 V23 — Agents ko listing/keyword ka gyaan + khud seekhna (11 Nov 2026)
-(saboot: test_v23_brain.py — 9 tests incl. asal HTTP; kul **28 suites pass**)
-- **Marketplace Knowledge Base** (`src/marketplace_knowledge.py`): web research (11 Nov 2026) se 26 niyam, **har niyam ke saath source URL + status** (OFFICIAL / MULTI_SOURCE / SINGLE_SOURCE / HEURISTIC) + bharosa. Mukhya:
-  - Amazon **title ab 75 akshar** (27 Jul 2026 se, media chhod sab category) — lamba title Amazon ka AI khud badal deta hai; naya **Item Highlights** field 125 akshar
-  - Title me koi shabd 2 se zyada nahi (plural bhi gina), `! $ ? _ { } ^` mana
-  - Amazon.in backend **200 BYTES** (Hindi akshar = 3 byte), spaces, title ke shabd dohrao mat, competitor brand/ASIN mana
-  - Bullets me emoji, ™ ®, refund/guarantee vaade, website mana
-  - Main image shuddh safed 255, ~85% bharo, 1000px+ (zoom ke liye 2000)
-  - SQP funnel padhne ka tareeka (dikhta nahi / click nahi / bikri nahi / scale karo)
-  - FSSAI 2018: bimari-dawa mana; natural/fresh/pure/traditional/authentic shart-wale shabd
-  - Dry-fruit shabdkosh: 8 meve, Hinglish + Hindi + grades (W240, Mamra...) — **search volume jaan-bujh kar nahi** (sirf SQP/licensed se)
-- **Listing Rules Engine** (`src/listing_rules.py`): title/highlights/bullets/backend/images/FSSAI ka audit (BLOCK/WARN/TIP + rule_id), aur builders jo niyam ke andar title (≤75), highlights (≤125), backend (≤200 bytes, dohraav-rahit, sirf usi grade/weight ke shabd) banate hain.
-- **Keyword Intelligence** (`src/keyword_intel.py`): Ads search terms + Brand Analytics SQP + shabdkosh ek suchi me, har term ka saboot-label; **placement plan** (TITLE / HIGHLIGHTS / BACKEND / NEGATIVE).
-- **Agent Brain** (`src/agent_brain.py`) — asal self-learning:
-  - Research niyam `playbook_rules` me; bharosa **sirf VERIFIED nateejo** se Bayesian tareeke se badalta hai; lagatar 3 haar = DISABLED (insaan hi chalu kare)
-  - Apne data se khud sabak: kaunse terms bechte hain (OWN-KW-WINNERS), kaunse paisa khaate hain (OWN-KW-WASTE), SQP ki bimariyan — roz update, dohraav nahi
-  - Roz ka `learning_crawl` job ab placeholder nahi, asal seekh-chakra chalata hai; `measure_results` ke baad playbook turant update
-  - ListingAgent ka naya `build_listing()` proposal `action_v12` me **rule_ids** ke saath daalta hai — 7/14 din ka nateeja seedha un niyamo ke bharose ko badalta hai
+## 🚀 V24 — New dashboard + new agent playbooks from market research (11 Nov 2026)
+(evidence: test_v24_growth.py — 9 tests incl. real HTTP; **29 suites pass**; all 23 screens without JS errors in Chromium, no horizontal scroll on a 390px mobile screen)
+- **Dashboard rebuilt** (`dashboard/index.html`): grouped navigation (Today / Grow / Money / Brain / System), a **"Today" home** (urgent tasks first, setup progress, next sale event, brain), light + **dark mode**, mobile drawer, **Ctrl+K** to find a screen, toasts + modals instead of browser `alert/prompt`, "next step" buttons on empty screens, a **rule chip** with every recommendation (click for the rule + source).
+- **New screens**: Listing Builder (live character/byte counters, copy buttons, check score), Keyword Plan (pick a nut → title/highlights/backend/negative), SQP Funnel, Growth Playbook, Agent Brain, Knowledge Base. All 16 old screens kept.
+- **15 new research rules** (42 total), all with sources: Amazon ads structure (Auto = discovery, Exact = earning, the harvest cycle, weekly negatives), the **break-even ACOS** formula, TACOS at launch, Vine + review policy, A+ content, Great Indian Festival preparation (FBA 15-20 days ahead, coupons/deals ~7 days ahead), India dry-fruit market size, **quick commerce** (Blinkit/Zepto/Instamart), Flipkart PLA.
+- **Growth Playbook engine** (`src/growth_playbook.py`) — rules applied to your data: SKU break-even/target ACOS, campaign structure score (self-competition, harvest pending, wasted spend), sale calendar countdown (dates are ESTIMATES — stated clearly), a policy-safe review plan, and the home screen's `today()`.
+- **Fixes**: (1) the manual `run_cycle` now runs the same real learning cycle + backup + Brand Analytics import as the 24×7 scheduler; (2) default bullets contained unproven claims ("nitrogen flush", "FSSAI licensed", "return/replacement policy") — removed; (3) the Listing Builder now also checks the fact registry (NS-P-01) — an unproven claim is BLOCKED up front, not only at approval.
+- **Honesty**: Amazon.in refused the search page even to the Box browser (bot protection) — so no real data on top listings was collected, only research rules. No trustworthy public source for brand-level market share was found. Sale dates are estimates.
+
+## 🧠 V23 — Listing/keyword knowledge for the agents + self-learning (11 Nov 2026)
+(evidence: test_v23_brain.py — 9 tests incl. real HTTP; **28 suites pass**)
+- **Marketplace Knowledge Base** (`src/marketplace_knowledge.py`): 26 rules from web research (11 Nov 2026), **each with source URLs + a status** (OFFICIAL / MULTI_SOURCE / SINGLE_SOURCE / HEURISTIC) + confidence. Highlights:
+  - Amazon **titles are now 75 characters** (from 27 Jul 2026, every category except media) — Amazon's AI rewrites longer titles; new **Item Highlights** field, 125 characters
+  - No word more than twice in a title (plurals count); `! $ ? _ { } ^` banned
+  - Amazon.in backend **200 BYTES** (a Hindi character = 3 bytes), spaces, no repeating title words, competitor brands/ASINs banned
+  - Emojis, ™ ®, refund/guarantee promises and websites banned in bullets
+  - Main image pure white 255, ~85% filled, 1000px+ (2000 for zoom)
+  - How to read the SQP funnel (not visible / no clicks / no sales / scale up)
+  - FSSAI 2018: disease claims banned; natural/fresh/pure/traditional/authentic are conditional words
+  - Dry-fruit vocabulary: 8 nuts, Hinglish + Hindi + grades (W240, Mamra…) — **search volume deliberately absent** (only from SQP/licensed sources)
+- **Listing Rules Engine** (`src/listing_rules.py`): audits title/highlights/bullets/backend/images/FSSAI (BLOCK/WARN/TIP + rule_id), and builders that produce a title (≤75), highlights (≤125) and backend (≤200 bytes, no repeats, only words for that grade/weight) within the rules.
+- **Keyword Intelligence** (`src/keyword_intel.py`): Ads search terms + Brand Analytics SQP + vocabulary in one list, each term with an evidence label; a **placement plan** (TITLE / HIGHLIGHTS / BACKEND / NEGATIVE).
+- **Agent Brain** (`src/agent_brain.py`) — real self-learning:
+  - Research rules in `playbook_rules`; confidence changes **only from VERIFIED outcomes**, the Bayesian way; 3 losses in a row = DISABLED (only a human can re-enable)
+  - Lessons from your own data: which terms sell (OWN-KW-WINNERS), which burn money (OWN-KW-WASTE), SQP problems — updated daily, no duplicates
+  - The daily `learning_crawl` job is no longer a placeholder — it runs the real learning cycle; the playbook updates right after `measure_results`
+  - The ListingAgent's new `build_listing()` puts proposals into `action_v12` **with rule_ids** — the 7/14-day outcome directly changes confidence in those rules
 - **API**: GET `/api/v1/knowledge`, `/api/v1/brain`, `/api/v1/keywords/plan?nut=`, `/api/v1/keywords/sqp`; POST `/api/v1/listings/audit`, `/api/v1/listings/build`
-- **Bug fixes**: (1) `claim_checker` "cure" pakadta tha par "cures/cured/heals/prevents" nahi — ab pakadta hai; (2) purana `generate_title` 200-akshar + "Fresh" wala title banata tha — ab 75 ke andar; (3) `test_v14` ki hardcoded dates purani pad gayi thi (velocity khidki aaj se bandhi hai) — dates ab relative; (4) in-memory DB par backup job repo me `backups/` bana deta tha — ab SKIP.
-- **Imaandaari**: Amazon/Flipkart ka ranking formula publish nahi hota — niyam disha hain, formula nahi. Zyadatar niyam seller-guides se hain (Seller Central help login ke peeche hai, is session se nahi khula) — isliye har niyam ka status saaf likha hai, aur 90 din purane niyam `stale` dikhte hain. Asal sales/search data Google par nahi milta — woh tumhare Seller Central (SQP/Ads reports) se hi aayega.
+- **Bug fixes**: (1) `claim_checker` caught "cure" but not "cures/cured/heals/prevents" — now it does; (2) the old `generate_title` produced 200-character titles with "Fresh" — now within 75; (3) hardcoded dates in `test_v14` had gone stale (the velocity window is anchored to today) — dates are now relative; (4) the backup job created `backups/` in the repo for in-memory DBs — now it SKIPs.
+- **Honesty**: Amazon/Flipkart do not publish ranking formulas — the rules are directions, not the formula. Most rules come from seller guides (Seller Central help is behind a login and could not be opened from this session) — so every rule states its status, and rules older than 90 days show as `stale`. Real sales/search data is not on Google — it only comes from your Seller Central (SQP/Ads reports).
 
-## 🔧 V21 — Naven audit ke 5 calculation/data issues band (23 Oct 2026)
-(saboot: test_v21_v22_fixes.py + purane suites naye basis par update; kul 27 suites pass)
-- **P0 Refund overwrite**: `record_refunds` ab **event-ledger** par hai (`refund_events`, scope = platform+seller_account+order+line) — ek line par kai partial refunds **judte** hain, mitte nahi; wahi event dobara aane par dohari ginati nahi. Pro-rata baant bhi ab cumulative kul par.
-- **P0 Velocity denominator**: mukhya velocity = units / **poora 30-din reporting window**; span-wali sankhya alag `run_rate_per_day` (sirf jaankari) + `observed_sale_days` report me. Cover ab is conservativ hisaab par banta hai.
-- **P1 VERIFIED sakht**: SKU outcome ab VERIFIED tabhi jab kul **≥8 order-lines** aur har khidki me **≥max(2, window ka 25%) order-din**; warna LOW_COVERAGE (nateeja darj, seekh nahi). Chhota namuna ab 'verified' nahi kahlayega.
-- **P1 Event-ID stability**: financial event-ids ab response ke **order se swatantra** (pehle pakka kram-sort, phir identical-samuh ke andar ginati) — reordered response par ids wahi, naya event judne par purane ids sthir; reorder/partial ke regression tests maujud.
-- **P1 Availability imaandaari**: Product 360 me stock ab **VERIFIED sellable** aur **UNKNOWN availability** alag-alag dikhata hai (sellable_qty darj na ho to stock 'unknown' hai, verified me chup chaap nahi milta); har location par availability tag.
+## 🔧 V21 — Ninth audit: 5 calculation/data issues closed (23 Oct 2026)
+(evidence: test_v21_v22_fixes.py + older suites updated to the new basis; 27 suites pass)
+- **P0 Refund overwrite**: `record_refunds` now uses an **event ledger** (`refund_events`, scope = platform+seller_account+order+line) — several partial refunds on one line **add up** instead of erasing each other; the same event arriving twice is not double-counted. Pro-rata splitting now uses the cumulative total.
+- **P0 Velocity denominator**: main velocity = units / **the full 30-day reporting window**; the span-based figure is a separate `run_rate_per_day` (informational) + `observed_sale_days` in the report. Cover is now based on this conservative figure.
+- **P1 Stricter VERIFIED**: a SKU outcome is VERIFIED only with **≥8 order lines** in total and **≥max(2, 25% of the window) order days** in each window; otherwise LOW_COVERAGE (outcome recorded, no learning). Small samples are no longer called "verified".
+- **P1 Event-ID stability**: financial event ids are now **independent of the response order** (fixed sort first, then counting within identical groups) — reordered responses keep the same ids, and adding a new event keeps old ids stable; regression tests for reordering/partial responses exist.
+- **P1 Availability honesty**: Product 360 now shows **VERIFIED sellable** stock and **UNKNOWN availability** separately (without recorded sellable_qty the stock is "unknown", never silently counted as verified); every location has an availability tag.
 
-## 🔌 V22 — Marketplace data automation (code-side) (23 Oct 2026)
-- **Brand Analytics scheduled import**: roz 06:45 job `brand_analytics_import` — `data/brand_analytics_inbox/` me padi SQP/SCP files khud import (SHA dedup). Seller Central se export karke folder me daalna hi bacha.
-- **Catalog ASIN/BSR snapshots**: `catalog_snapshots.py` + wizard kind — dated snapshots, BSR trend (pehli vs aakhri tasveer) summary ke saath.
-- **Seller Acceptance report**: `scripts/acceptance_report.py` — asal DB se pehli report bani: `docs/ACCEPTANCE_2026-10-22.md` (legacy revenue ₹46,069/104 orders; canonical 30-din khidki abhi khaali — yehi sach hai, live sync ke baad bharegi).
-- **Pehla asal backup ban gaya** ✔: `data/backups/growth_os-2026-10-22.db` (41 tables, restore-parikshan ke saath) — preflight me backup_exists ab ✔.
-- **Jo code se NAHI hoga (imaandaari se)**: teeno parameters (core dev / workflows / production) ka 100% live duniya maangta hai — SP-API/Ads/Flipkart live authorization, asal 7/14-din pilot saboot, HTTPS hosting par deployment, repo Private (GitHub Settings). Code-side vikas yahan **poora** hai; bachi hai sirf live pushti, jo credentials/hosting/user-kadam ke bina koi code nahi de sakta.
+## 🔌 V22 — Marketplace data automation (code side) (23 Oct 2026)
+- **Scheduled Brand Analytics import**: daily 06:45 job `brand_analytics_import` — SQP/SCP files in `data/brand_analytics_inbox/` are imported automatically (SHA dedup). Only the Seller Central export remains manual.
+- **Catalog ASIN/BSR snapshots**: `catalog_snapshots.py` + a wizard kind — dated snapshots, BSR trend (first vs last snapshot) in a summary.
+- **Seller acceptance report**: `scripts/acceptance_report.py` — the first report from the real DB: `docs/ACCEPTANCE_2026-10-22.md` (legacy revenue ₹46,069 / 104 orders; the canonical 30-day window is still empty — that is the truth until live sync fills it).
+- **First real backup created** ✔: `data/backups/growth_os-2026-10-22.db` (41 tables, restore-tested) — preflight `backup_exists` is now ✔.
+- **What code CANNOT do (honestly)**: reaching 100% on all three parameters (core dev / workflows / production) needs the live world — SP-API/Ads/Flipkart live authorization, real 7/14-day pilot evidence, deployment on HTTPS hosting, a private repo (GitHub settings). Code-side development is **complete**; only live confirmation remains, which no code can provide without credentials/hosting/owner steps.
 
-## 🔧 V20 — Aathve audit ke saare code-issues band (23 Oct 2026)
-(saboot: test_v20_audit8.py — 9 tests incl. asal HTTP; kul 26 suites pass)
-- **P0 Velocity stale thi**: khidki ab **aaj (reporting date)** se bandhi hai — 60 din purani bikri ab 'taaza' raftaar nahi bana sakti; `sku_velocity_report` me last-sale date, days-since aur **STALE chetaavni**; Product 360 me velocity_report sahit.
-- **P0 Finance seller-account key**: `order_fees` ki PK ab (platform, **seller_account**, order, sku) — purani DBs par data-surakshit rebuild migration ('default' khaate me); matching aur completeness bhi khaate-war key par.
-- **P1 Fee events**: har financial event alag darj (`order_fee_events`, event-id/content-hash pehchan, dohari ginati nahi); `order_fees` ab events ka **yog** hai — ek hi order+SKU ke kai shipment events ab overwrite nahi honge. SP connector per-event rows (SHIPMENT/REFUND ab alag) deta hai.
-- **P1 Stock channel mapping**: naam-andaz ki jagah **explicit `stock_channel_map`** (API: GET/POST `/api/v1/stock/channel-map`); heuristic sirf fallback, basis (EXPLICIT/HEURISTIC/UNCLASSIFIED) har location ke saath saaf. Inventory me **sellable/unsellable** alag — channel cover sirf sellable par.
-- **P1 Attribution imaandaar**: outcome ab attribution ke saath darj — **VERIFIED / CONTAMINATED / LOW_COVERAGE**; dusre channel/action ka takraav (same SKU/campaign, overlapping window) mile to nateeja kisi ke naam nahi lagega; **rule-confidence sirf VERIFIED nateejo se** banti hai. SKU maap ab action ke apne platform tak seemit.
-- **Brand Analytics importer** (`src/brand_analytics.py`): SQP + SCP reports ka dedicated import (SHA dedup, wizard me `brand_analytics` kind), summary API `/api/v1/brand-analytics` — brand purchase-share sahit. **Live report abhi import nahi hui** — Seller Central se file aate hi chalega.
-- **Baki (code se nahi hoga)**: SP-API/Ads/Flipkart live sync + write pilot + asal fees/settlement saboot = credentials par; 24×7 deployment = hosting faisle par; repo Private = user ka GitHub Settings kadam. Preflight asal DB par chalaya — owner/kill-switch/HTTPS-pack ✔, connectors/capabilities/backup ✘ (yahi sach hai).
+## 🔧 V20 — Eighth audit: all code issues closed (23 Oct 2026)
+(evidence: test_v20_audit8.py — 9 tests incl. real HTTP; 26 suites pass)
+- **P0 Stale velocity**: the window is now anchored to **today (the reporting date)** — sales from 60 days ago can no longer create "fresh" velocity; `sku_velocity_report` adds last-sale date, days since, and a **STALE warning**; included in Product 360.
+- **P0 Finance seller-account key**: the `order_fees` PK is now (platform, **seller_account**, order, sku) — a data-safe rebuild migration for old DBs (into the 'default' account); matching and completeness also use the account-level key.
+- **P1 Fee events**: every financial event is recorded separately (`order_fee_events`, event-id/content-hash identity, no double counting); `order_fees` is now the **sum** of events — several shipment events for the same order+SKU no longer overwrite each other. The SP connector returns per-event rows (SHIPMENT/REFUND now separate).
+- **P1 Stock channel mapping**: an **explicit `stock_channel_map`** instead of name guessing (API: GET/POST `/api/v1/stock/channel-map`); the heuristic is only a fallback, and the basis (EXPLICIT/HEURISTIC/UNCLASSIFIED) is shown for each location. Inventory has separate **sellable/unsellable** — channel cover only uses sellable stock.
+- **P1 Honest attribution**: outcomes are recorded with attribution — **VERIFIED / CONTAMINATED / LOW_COVERAGE**; when another channel/action collides (same SKU/campaign, overlapping window) the outcome is attributed to no one; **rule confidence comes only from VERIFIED outcomes**. SKU measurement is limited to the action's own platform.
+- **Brand Analytics importer** (`src/brand_analytics.py`): dedicated import of SQP + SCP reports (SHA dedup, `brand_analytics` kind in the wizard), summary API `/api/v1/brand-analytics` — including brand purchase share. **No live report imported yet** — it works as soon as a file arrives from Seller Central.
+- **Remaining (not doable in code)**: SP-API/Ads/Flipkart live sync + write pilot + real fees/settlement evidence = needs credentials; 24×7 deployment = a hosting decision; private repo = an owner step in GitHub settings. Preflight run on the real DB — owner/kill switch/HTTPS pack ✔, connectors/capabilities/backup ✘ (that is the truth).
 
-## 🔧 V19 — Saatve audit ke bache bugs band (23 Oct 2026)
-(saboot: test_v19_finance_stock.py, kul 25 suites pass)
-- **P0 Velocity jhoothi raftaar**: all-time units ko 30 din se baantna band — ab sirf **trailing 30-din** ki bikri, cancelled bahar. Purani galti se cover kam aur raftaar zyada dikhti thi.
-- **P0 Finance milaan ka aadhaar hi ulta tha**: NET banam GROSS ki tulna band — ab **gross-se-gross aur refund-se-refund** alag parkhe jayenge; order_fees me refund column + Finances se refunds bhi SKU-war darj.
-- **Seller-account isolation**: saare order joins ab (platform, seller_account, order) teeno kunji par — do khaaton ka ek-jaisa order-id data nahi milayega; orders ginati bhi khaate-war.
-- **Product 360 channel stock**: stock ab channel ke hisaab se (location-naam se pehchan: Amazon FBA / Flipkart Warehouse / unclassified alag); channel view me sirf usi channel ka bechne-yogya stock aur usi par cover.
-- **Capability naam ek**: registry ka `edit_listing` ab `write_listings` — wahi naam jo publish gate dekhta hai (pehle certified karna hi mumkin nahi tha, registry me woh kunji thi hi nahi); purani DBs par auto-migration.
-- **Settlement tulna NON-FINAL ghoshit**: overlap wale settlement ki poori rakam khidki ki nahi mani jayegi — din-anupaat anumaan alag dikhega, final milaan transaction-level data se hoga (report me saaf likha).
+## 🔧 V19 — Seventh audit: remaining bugs closed (23 Oct 2026)
+(evidence: test_v19_finance_stock.py, 25 suites pass)
+- **P0 False velocity**: no more dividing all-time units by 30 days — now only **trailing 30-day** sales, cancelled excluded. The old bug made cover look lower and velocity higher.
+- **P0 The finance matching basis was backwards**: no more NET vs GROSS comparisons — **gross-to-gross and refund-to-refund** are checked separately; order_fees has a refund column + refunds from Finances recorded per SKU.
+- **Seller-account isolation**: all order joins now use the (platform, seller_account, order) triple key — identical order ids from two accounts never merge; order counts are per account too.
+- **Product 360 channel stock**: stock is now per channel (identified by location name: Amazon FBA / Flipkart Warehouse / unclassified separately); a channel view shows only that channel's sellable stock and cover.
+- **One capability name**: the registry's `edit_listing` is now `write_listings` — the same name the publish gate checks (before, certifying was impossible because the registry lacked that key); auto-migration for old DBs.
+- **Settlement comparison declared NON-FINAL**: the full amount of an overlapping settlement is not treated as the window's — a day-pro-rata estimate is shown separately; the final match needs transaction-level data (stated clearly in the report).
 
-## ✅ V18 — Chhathe audit ki data-correctness closure (23 Oct 2026)
-Audit ke bache hue teen "partial" mudde poori tarah band + ginati ki ek aur chhupi galti (saboot: test_v18_closure.py, kul 24 suites pass):
-- **Cancelled-order ginati bhi galat thi** — revenue to bahar tha, par "orders" ki sankhya cancelled ko ginti thi (dashboard ka order count bada dikhta tha). Ab `orders` saaf ginati, `cancelled_orders` alag se dikhega.
-- **Finance-grade settlement matching** — totals ke milaan se aage: har order alag parkha jayega (canonical NET banam Finances gross/fees) — MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH shreniyon + exceptions suchi ke saath. Settlements me order-key hota hi nahi, isiliye order-stariya milaan Finances se — ye seema report me saaf likhi hai.
-- **Reporting completeness** — har reconciliation ke saath sampurnata: khidki me ads-coverage %, fee-coverage %, order-days ki maujudgi. Aadha data ab chup chaap "poora" nahi kahlayega.
-- **Refund exact line-id** — vendor ne line-id diya to refund seedha usi line par; anupaat-baant sirf fallback.
-- **Channel-specific stock hisaab** — velocity ab platform-wise; Product 360 ke channel view me usi channel ki raftaar se cover banta hai.
-- TACOS kharch ka aadhaar bhi ab KPIs me label sahit hai (period-tagged search-terms).
+## ✅ V18 — Sixth audit: data-correctness closure (23 Oct 2026)
+The audit's three remaining "partial" items fully closed + one more hidden counting bug (evidence: test_v18_closure.py, 24 suites pass):
+- **The cancelled-order count was also wrong** — revenue excluded them, but the "orders" count still included cancelled ones (the dashboard order count looked too high). Now `orders` is a clean count and `cancelled_orders` is shown separately.
+- **Finance-grade settlement matching** — beyond matching totals: every order is checked separately (canonical NET vs Finances gross/fees) — MATCHED / FEE_DATA_MISSING / AMOUNT_MISMATCH classes + an exceptions list. Settlements have no order key, so order-level matching uses Finances — this limitation is stated in the report.
+- **Reporting completeness** — every reconciliation includes completeness: ads coverage %, fee coverage %, order-day presence in the window. Half the data is no longer silently called "complete".
+- **Exact refund line id** — when the vendor gives a line id the refund goes straight to that line; proportional splitting is only a fallback.
+- **Channel-specific stock math** — velocity is per platform; Product 360's channel view computes cover from that channel's velocity.
+- The TACOS spend basis is now labelled in the KPIs (period-tagged search terms).
 
-## 🐛 V17 — Paanchve audit ke verified core bugs (22 Oct 2026)
-Is baar audit ne mere hi V15/V16 ke kaam me asli bugs pakde — sab verify karke fix (saboot: test_v17_audit5.py incl. **asal HTTP regression test**, kul 23 suites pass):
+## 🐛 V17 — Fifth audit: verified core bugs (22 Oct 2026)
+This time the audit found real bugs in my own V15/V16 work — all verified and fixed (evidence: test_v17_audit5.py incl. a **real HTTP regression test**, 23 suites pass):
 | Bug | Fix |
 |---|---|
-| **SKU 360 API asal HTTP par crash** (undefined `u.query` — mera V15 code) | Sahi `_q.get('platform')`; ab backend ko asal chalakar login→360 (platform ke saath aur bina) 200 verify hota hai |
-| campaign-map sync asal campaign metrics ko ₹0 se kuchal deta tha | Mapping ab sirf ID↔naam; campaign row sirf tab banti hai jab ho hi na, metrics ko haath nahi lagta |
-| TACOS "false MATCHED" — rows hona hi kaafi tha | Ab **din-ginti coverage ≥80%** (30-din khidki) + channel-scope (gair-Amazon bikri + sirf-Amazon ads = NOT_COMPARABLE wajah sahit) + kam-se-kam 5 bikri-lines |
-| Preflight alag DB (nutriscale.db) dekhta tha, backend growth_os.db | **Ek hi raasta**: `db_store.DEFAULT_PATH`, aur `NUTRISCALE_DB` env ab poore system (backend/jobs/preflight) me sammanit |
-| Reconciliation unscoped thi | Platform + 30-din khidki scoped: khidki ke orders NET banam takraane wale settlements; purane settlements bahar |
-| Refund ek order+SKU ki saari lines par poora lag jata tha | **Line-level anupaat baant** (gross ke hisse se, bacha sabse badi line par) |
-| Backup ka koi scheduled job hi nahi tha | **23:30 backup_restore job** (data/backups/, restore-parikshan ke saath); preflight wahi jagah dekhta hai |
+| **SKU 360 API crashed over real HTTP** (undefined `u.query` — my V15 code) | Correct `_q.get('platform')`; the backend is now started for real and login→360 (with and without platform) is verified as 200 |
+| Campaign-map sync crushed real campaign metrics with ₹0 | The mapping is now only ID↔name; a campaign row is created only when none exists, metrics are untouched |
+| TACOS "false MATCHED" — rows existing was enough | Now **day-count coverage ≥80%** (30-day window) + channel scope (non-Amazon sales + Amazon-only ads = NOT_COMPARABLE with a reason) + at least 5 sales lines |
+| Preflight looked at a different DB (nutriscale.db) than the backend (growth_os.db) | **One path**: `db_store.DEFAULT_PATH`, and the `NUTRISCALE_DB` env var is now honoured system-wide (backend/jobs/preflight) |
+| Reconciliation was unscoped | Scoped to platform + a 30-day window: the window's NET orders vs overlapping settlements; older settlements excluded |
+| A refund was applied in full to every line of an order+SKU | **Line-level proportional split** (by gross share, remainder on the largest line) |
+| There was no scheduled backup job | **23:30 backup_restore job** (data/backups/, restore-tested); preflight checks the same place |
 
 ## 🚪 V16 — Acceptance Gates Kit (22 Oct 2026)
-Audit ke 5 live gates ko "salah" se "chalane yogya astra" me badla — keys aate hi ek command:
-- **`src/pilot.py` + `scripts/preflight.py`** — preflight report: har connector ki taiyaari, capability halat, Owner khata, kill switch, backup, HTTPS pack — jo nahi hai woh ✘ ke saath saaf dikhega, ready ka jhootha dawa kabhi nahi
-- **Reconciliation report** — orders ↔ settlements ↔ ads ka milaan ek jagah (farq EXCEPTION ke roop me dikhega, chhupega nahi)
-- **Controlled drill** — gate #3 poora: proposal → Owner approve → queue → adapter execute (vendor refetch-pushti) → rollback (purani halat ki pushti), har kadam ka saboot steps me. Taale teen: kill-switch ON = BLOCKED; live=False = sirf yojana; write_ads certified na ho = BLOCKED. Test me nakli vendor ke saath poora drill PASS aur campaign purani halat par wapas verified.
-- Kul **22 test suites SAB PASS**.
+Turned the audit's 5 live gates from "advice" into "runnable tools" — one command once keys arrive:
+- **`src/pilot.py` + `scripts/preflight.py`** — a preflight report: each connector's readiness, capability status, Owner account, kill switch, backup, HTTPS pack — anything missing shows a clear ✘, never a false "ready"
+- **Reconciliation report** — orders ↔ settlements ↔ ads matched in one place (gaps shown as EXCEPTION, never hidden)
+- **Controlled drill** — gate #3 complete: proposal → Owner approval → queue → adapter execute (vendor refetch confirmation) → rollback (previous-state confirmation), evidence for every step. Three locks: kill switch ON = BLOCKED; live=False = plan only; write_ads not certified = BLOCKED. In tests the full drill PASSES with a fake vendor and the campaign is verified back in its previous state.
+- **22 test suites ALL PASS**.
 
-## 🎯 V15 — Chauthe audit ke data-accuracy mudde (22 Oct 2026)
+## 🎯 V15 — Fourth audit: data-accuracy issues (22 Oct 2026)
 | Issue | Fix |
 |---|---|
-| War Room TACOS lifetime unmatched totals se banta tha | **Matched-period enforcement**: TACOS sirf pichle 30 din ki dated NET bikri banam usi khidki ke period-tagged ads kharch par; data aparyapt to `tacos_pct = null, status = NOT_COMPARABLE` — screen par jhootha ratio nahi dikhega |
-| Outcome maap campaign naam par nirbhar tha, actions me campaign_id hota hai | **campaign_map** (Ads sync se ID→naam naksha, roz ke sync me bhi); outcome ab ID se naam pakka dhoondhta hai |
-| Kam dated data par bhi success ghoshit ho sakta tha | **Coverage gates**: campaign raah par khidki ke ≥70% din ke periods dono taraf; SKU raah par kul ≥4 order-lines — warna INSUFFICIENT_DATA |
-| Canonical orders INSERT OR IGNORE — status/refund kabhi update nahi hote the | Teeno raasto (SP API, Flipkart, CSV) par **UPSERT**; refunds Finances se `order_items.refund` me; **revenue ab NET** hai aur **Cancelled orders ginati se bahar** |
-| Boundary din share karne wale periods ka takraav choot jata tha | Periods ab **inclusive date hisaab** se — ek din ka takraav bhi BLOCK; satta hua par alag dinon wala saaf |
-| Product 360 channels mix karta tha | `?platform=` par ek-channel nazar; bina platform ke **sales_by_platform** alag-alag + channels suchi |
-| Bacha hua (code se bahar) | Competitor/rank ka licensed provider, live seller-account verification, asal reports ka reconciliation, controlled pilot — sab live duniya ke kadam (neeche suchi) |
+| War Room TACOS was built from lifetime unmatched totals | **Matched-period enforcement**: TACOS only from the last 30 days of dated NET sales vs period-tagged ad spend in the same window; with insufficient data `tacos_pct = null, status = NOT_COMPARABLE` — no fake ratio on screen |
+| Outcome measurement relied on campaign names, while actions carry campaign_id | **campaign_map** (ID→name map from Ads sync, also in the daily sync); outcomes now resolve IDs to names reliably |
+| Success could be declared on thin dated data | **Coverage gates**: the campaign path needs periods covering ≥70% of the window's days on both sides; the SKU path needs ≥4 order lines in total — otherwise INSUFFICIENT_DATA |
+| Canonical orders used INSERT OR IGNORE — status/refunds never updated | **UPSERT** on all three paths (SP API, Flipkart, CSV); refunds from Finances into `order_items.refund`; **revenue is now NET** and **cancelled orders are excluded from counts** |
+| Overlaps of periods sharing a boundary day were missed | Periods now use **inclusive date math** — even a one-day overlap is BLOCKED; adjacent but distinct days are fine |
+| Product 360 mixed channels | `?platform=` gives a single-channel view; without a platform, **sales_by_platform** separately + a channel list |
+| Remaining (outside code) | A licensed competitor/rank provider, live seller-account verification, reconciliation against real reports, a controlled pilot — all live-world steps (list below) |
 
-## 🎯 V14 — Teesre audit ki correctness kamiyaan (22 Oct 2026)
-Audit is baar aur gehrai me gaya — aur phir sahi nikla. Fixes (saboot: test_v14_audit3.py, kul 20 suites pass):
+## 🎯 V14 — Third audit: correctness gaps (22 Oct 2026)
+The audit went deeper this time — and was right again. Fixes (evidence: test_v14_audit3.py, 20 suites pass):
 | Issue | Fix |
 |---|---|
-| Outcome maap jama-kul totals se hota tha, asal 7/14-din khidkiyon se nahi | **Windowed measurement**: lagne se pehle ke w din banam baad ke w din — campaign ke liye period-tagged terms, SKU ke liye dated canonical orders; data na mile to jhootha nateeja nahi, `INSUFFICIENT_DATA` |
-| Overlapping Ads periods dohra gin sakte the | **Period Overlap Engine** (connectors/periods.py): contained=skip, supersede=replace, partial=BLOCK with wajah; roz ka sync ab 1-din ki khidki par |
-| Production HTTPS bypass (base compose 8765 public) | Base compose ab `127.0.0.1:8765` — bahar ka rasta sirf Caddy/HTTPS |
-| Listing publish ka backend endpoint nahi tha | `POST /api/v1/listings/publish` (execute perm) + dashboard par Preview-parkh/Live buttons |
-| SKU fees scheduled sync se judi nahi thi | data_sync ab SP orders ke saath **order fees** bhi laata hai; Flipkart branch bhi scheduled sync me jud gaya |
-| Ek SKU dono bazaaro par mix ho sakta tha | products/campaigns ki pehchan ab **(sku, platform)** — bina data khove migration |
-| Days-of-cover ki raftaar zyada dikhti thi (sirf bikri-din ginna) | Denominator ab poori observation-window (pehli→aakhri bikri ka antar) |
-| War Room organic/TACOS ka aadhaar chhupa tha | KPIs me `organic_basis`/`tacos_basis` saaf shabdon me — organic ek ANDAAZ hai, ye ab screen par bhi likha aayega |
+| Outcomes were measured from cumulative totals, not real 7/14-day windows | **Windowed measurement**: w days before applying vs w days after — period-tagged terms for campaigns, dated canonical orders for SKUs; without data no fake outcome, `INSUFFICIENT_DATA` |
+| Overlapping Ads periods could be double-counted | **Period Overlap Engine** (connectors/periods.py): contained = skip, supersede = replace, partial = BLOCK with a reason; the daily sync now uses a one-day window |
+| Production HTTPS bypass (base compose exposed 8765 publicly) | Base compose now binds `127.0.0.1:8765` — outside access only via Caddy/HTTPS |
+| No backend endpoint for listing publish | `POST /api/v1/listings/publish` (execute permission) + Preview check/Live buttons on the dashboard |
+| SKU fees were not in the scheduled sync | data_sync now also fetches **order fees** with SP orders; the Flipkart branch joined the scheduled sync too |
+| One SKU could be mixed across both marketplaces | Products/campaigns are now identified by **(sku, platform)** — migration without data loss |
+| Days-of-cover velocity looked too high (counting only sale days) | The denominator is now the full observation window (first → last sale) |
+| The basis of War Room organic/TACOS was hidden | KPIs now carry `organic_basis`/`tacos_basis` in plain words — organic is an ESTIMATE, and the screen says so |
 
-## 🏁 V13 — Code-side jo kuch bhi bacha tha, sab band (22 Oct 2026)
-| Bacha hua kaam | Hal |
+## 🏁 V13 — Everything left on the code side, done (22 Oct 2026)
+| Remaining work | Solution |
 |---|---|
-| Self-learning aadha tha (action lagta, nateeja khud nahi maapa jata tha) | **Outcome Engine**: execute par baseline tasveer; 7/14 din par asal dobara-maap; jeet/guardrail se success; kind-wise asal jeet-dar (rule confidence) — seekh ab asal bikri se banti hai |
-| SKU-wise exact fees baaki thi | **SP Finances API** se per-order fees → `order_fees`; contribution me sabse pakkī `SKU_EXACT` shreni sabse upar |
-| Automatic listing publishing pending tha | **Listings Items API** path: APPROVED version hi; pehle VALIDATION_PREVIEW parkh; live sirf `write_listings=certified` par; Amazon ke issues jaise-aaye darj |
-| SKU 360° drilldown nahi tha | Products screen me **360° panel** (bikri, munafa+fee precision, stock cover, listing versions) + War Room **platform filter** |
-| HTTPS/protected deployment | `docker-compose.prod.yml` + Caddy (auto-HTTPS + security headers) — domain/host milte hi chalu |
-| Security/load saboot | Injection-parakh, kill-switch par vendor execute block, 2000-order performance smoke — `test_v13_hundred.py` |
+| Self-learning was half done (actions applied, outcomes never measured) | **Outcome Engine**: baseline snapshot at execution; real re-measurement after 7/14 days; success from win + guardrail; real win rate per kind (rule confidence) — learning now comes from real sales |
+| SKU-level exact fees were missing | Per-order fees from the **SP Finances API** → `order_fees`; the most precise `SKU_EXACT` class ranks first in contribution |
+| Automatic listing publishing was pending | **Listings Items API** path: APPROVED versions only; VALIDATION_PREVIEW check first; live only with `write_listings=certified`; Amazon's issues recorded as returned |
+| No SKU 360° drilldown | A **360° panel** on the Products screen (sales, profit + fee precision, stock cover, listing versions) + a War Room **platform filter** |
+| HTTPS/protected deployment | `docker-compose.prod.yml` + Caddy (auto-HTTPS + security headers) — ready once a domain/host exists |
+| Security/load evidence | Injection checks, vendor execute blocked by the kill switch, a 2000-order performance smoke test — `test_v13_hundred.py` |
 
-**Code-side: 19/19 suites, kuch pending nahi।** Iske aage ke % code se nahi badhenge — woh live duniya ke hain:
-live certification (tumhari API keys), Ads/Listings pilot sign-off (certified gates), licensed rank data (contract),
-repo Private (GitHub Settings), hosting + 14-din pilot, aur hero SKU cost sheet.
+**Code side: 19/19 suites, nothing pending.** Further progress no longer comes from code — it is live-world work:
+live certification (your API keys), Ads/Listings pilot sign-off (certified gates), licensed rank data (contract),
+a private repo (GitHub settings), hosting + a 14-day pilot, and the hero SKU cost sheet.
 
-## 🔧 V12.2 — Dusre audit ke 6 asal source-mismatch fix (22 Oct 2026)
+## 🔧 V12.2 — Second audit: 6 real source-mismatch fixes (22 Oct 2026)
 | Issue | Fix |
 |---|---|
-| War Room revenue mismatch (naya sync canonical, warroom legacy padhta tha) | `analytics.py` — canonical-first unified totals; warroom ab wahi se padhta hai, source label ke saath |
-| Dashboard revenue field bug (`k.revenue` vs `total_sales`) | KPIs me ab revenue + total_sales + orders teeno; mapping pakka |
-| Docker me dashboard missing | Dockerfile me `COPY dashboard/` — container se bhi dashboard serve hoga (smoke-verified pattern) |
-| Ads sync duplication | search_terms me batch/period columns; file ke andar (term+campaign) aggregation; period-wise delete-then-insert — re-sync/re-import par totals double NAHI |
-| FBA coverage adhoora (sirf <50 units andaaz) | Asal **days-of-cover**: canonical bikri-raftaar se; <21 din par SKU-ke-naam ke saath chetavni |
-| Fee accuracy (platform average) | Coverage-weighted precision: ≥80% settlement coverage = REALIZED/HIGH, 30–80% BLENDED/MEDIUM, neeche ESTIMATE/LOW — har number par `fee_precision` label |
-| Security (audit §5.2) | Login **rate-limit** (5 galat = 10-min lock) + MFA enrolment endpoint `/api/v1/auth/mfa/enable`; HTTPS deployment ki zimmedari (RUNBOOK: reverse proxy) |
-Saboot: `tests/test_v12_2_fixes.py` — kul **18 suites SAB PASS**.
+| War Room revenue mismatch (new sync is canonical, the war room read legacy) | `analytics.py` — canonical-first unified totals; the war room now reads from there, with a source label |
+| Dashboard revenue field bug (`k.revenue` vs `total_sales`) | KPIs now carry revenue + total_sales + orders; mapping fixed |
+| Dashboard missing in Docker | `COPY dashboard/` in the Dockerfile — the container serves the dashboard too (smoke-verified) |
+| Ads sync duplication | batch/period columns on search_terms; (term+campaign) aggregation within a file; per-period delete-then-insert — re-sync/re-import never doubles totals |
+| Incomplete FBA coverage (a "<50 units" guess) | Real **days of cover** from canonical sales velocity; a warning with the SKU name under 21 days |
+| Fee accuracy (platform average) | Coverage-weighted precision: ≥80% settlement coverage = REALIZED/HIGH, 30–80% BLENDED/MEDIUM, below ESTIMATE/LOW — every number has a `fee_precision` label |
+| Security (audit §5.2) | Login **rate limit** (5 failures = 10-minute lock) + MFA enrolment endpoint `/api/v1/auth/mfa/enable`; HTTPS deployment responsibility (RUNBOOK: reverse proxy) |
+Evidence: `tests/test_v12_2_fixes.py` — **18 suites ALL PASS**.
 
-## 🔧 V12.1 — Bahari audit ka jawab (22 Oct 2026)
-Ek bahari review ki zyadaatar baatein sahi nikli — jo code se fix ho sakti thi, sab ho gayi (17 suites sab pass, test_v12_hardening.py saboot):
+## 🔧 V12.1 — Response to an external audit (22 Oct 2026)
+Most points of an external review turned out to be right — everything fixable in code was fixed (17 suites pass, evidence test_v12_hardening.py):
 
 | Audit point | Fix |
 |---|---|
-| Repo PUBLIC (hamari "private" jaankari galat thi — signed-out verify) | Private karna malik ka GitHub Settings kaam (1 min); repo me secret/raw PII kabhi nahi gaya (scan ✔); README ki galat line sudhar gayi |
-| sync_service legacy; Flipkart sync adhoora | V2: SP orders+items canonical, Ads terms sync CLI, Flipkart orders+listings, CSV wizard-based |
-| Daemon sab jobs ek hi daily_cycle se | `job_handlers.py` dedicated handlers + compose `worker` service; bina-connector data_sync imaandaar SKIP |
-| ManualAdapter par vendor pushti nahi | `AmazonAdsWriteAdapter`: asal write + refetch-pushti + rollback; `write_ads=certified` gate bina nahi chalega |
-| Fees assumptions | Settlements se realized fee-rate contribution/bids me; estimate par `fee_source` label |
+| The repo is PUBLIC (our "private" note was wrong — verified signed out) | Making it private is the owner's GitHub settings step (1 min); no secrets/raw PII ever entered the repo (scan ✔); the wrong README line was corrected |
+| sync_service was legacy; Flipkart sync incomplete | V2: canonical SP orders+items, Ads terms sync CLI, Flipkart orders+listings, wizard-based CSV |
+| The daemon ran every job through one daily_cycle | Dedicated handlers in `job_handlers.py` + a compose `worker` service; data_sync without connectors is an honest SKIP |
+| No vendor confirmation in the ManualAdapter | `AmazonAdsWriteAdapter`: real write + refetch confirmation + rollback; does not run without `write_ads=certified` |
+| Fee assumptions | Realized fee rates from settlements in contribution/bids; estimates carry a `fee_source` label |
 | Dashboard :8765/CORS/token | Same-origin serving, XSS escaping, rank chart + spend bars, **TOTP MFA** |
-| Helium10 data / live certification / pilot | Code se aage: licensed contract + API keys + hosting (neeche wali table) |
+| Helium10 data / live certification / pilot | Beyond code: a licensed contract + API keys + hosting (table below) |
 
-## 🚀 V12 — Master Blueprint ke hisaab se poora development (22 Oct 2026)
-User ke bheje **V12 Blueprint + Developer Backlog** (docs/V12_BACKLOG.md) ke har requirement ID par kaam hua.
-**Kul 16 test suites, sab pass** (purane 11 + 5 naye V12: p0, integrations, growth, uc, qa).
+## 🚀 V12 — Full development per the Master Blueprint (22 Oct 2026)
+Every requirement ID in the **V12 Blueprint + Developer Backlog** (docs/V12_BACKLOG.md) was worked on.
+**16 test suites, all passing** (the old 11 + 5 new V12 suites: p0, integrations, growth, uc, qa).
 
-| ID | Kya bana | Saboot |
+| ID | What was built | Evidence |
 |---|---|---|
-| SEC-01 | Login + RBAC (6 roles), saare API band bina token ke | test_v12_p0 + HTTP parikshan (401/200) |
-| SEC-02 | Kill switch server-side, DB me persist — restart par bhi yaad | test kill + QA-06 (file-DB restart) |
-| SEC-03 | Approval state machine (9 states), Tier-2 par 2 alag Owner, idempotency key, poora event audit | test_v12_p0, UC-09 |
-| SEC-04 | Keys sirf env/file; repo-wide secret scan script + CI-ready | scripts/secret_scan.py (QA-14 me pass) |
-| DAT-01 | Canonical schema: order_headers/order_items (line-level), settlements, batch SHA-256, duplicate import block | UC-07, wizard test |
-| DAT-02 | Matched-period gating — windows na milein to TACOS = NOT_COMPARABLE | test_v12_p0 metrics |
-| JOB-01 | Durable job runner: IST next_run DB me, lock, retry/backoff, dead-letter record, daemon mode | QA-11 |
-| UI-01 | Naya dashboard: koi demo number nahi; khaali DB = imaandaar khaali state | QA-03 |
-| INT-01 | SP-API LWA-only (AWS keys ki shart khatm), orders pagination | test_v12_integrations |
-| INT-02 | Ads Reporting v3 poora pipeline: create→poll→gzip download→DB import + batch record | mock-transport test |
-| INT-03/05, API-03 | Capability registry: Flipkart ads = report-only, write = unavailable (fictional button kabhi nahi); Intel adapter bina license ke UNAVAILABLE | UC-06 |
-| INT-04 | CSV Wizard: preview (hash/kind/rows) → commit, duplicate block, receipt | wizard test |
-| ADS-01..06 | Ads Studio: health, **profit-led bid** (SKU margin se target ACOS, max CPC, 20% daily cap), harvest/negative safety, pacing, 3 budget scenarios | test_v12_growth, UC-03/04 |
-| KWD-01..04 | **clicks×20 wala jhootha volume hata diya**; taxonomy (badam↔almond), opportunity matrix (volume = null/UNAVAILABLE), rank alerts ≥3 points | UC-02 |
-| RNK-01..04 | Rank observations scope ke saath (locale/device/source), funnel ki neev, experiment verdict se jod | keyword_lab |
-| CMP-01..04 + CP-01..05 | Peer matching (grade/pack/processing; **W240≠W320**), ₹/100g, dated snapshots + change feed, decision packets (saboot→farq→parikalpana→margin guardrail→tajurba) | UC-01/05 |
-| LST-01..05 | Listing Score **v2** (versioned, 'Amazon formula nahi' saaf likha), content gap audit, listing versions + approve gate + rollback | UC-08 |
-| CVR-01..04 | Creative brief endpoint, experiment registry (min sample bina jeet nahi), season/BOM lab | UC-10 |
-| FIN-01/02 | Versioned costs; **cost unknown/stale = scale band**; settlement import + reconciliation (MATCHED/EXCEPTION) | QA-07 prakar ke tests |
-| INV-01/02 | Stock-to-ads gate (STOCKOUT = scale band), hamper BOM feasibility | UC-04/10 |
-| AGY-01 | Agency scorecard — saboot bina task DONE nahi, fees + verified badlav | growth test |
-| AIG-01/02 | Learning store (lagu na hue action se seekh nahi), LLM budget governor (roz/mahina cap, prompt hash-matra log) | growth test |
-| POL-01 | Verified Fact Registry — saboot bina dawa copy me nahi (NEEDS_EVIDENCE) | UC-08 |
-| OPS-01 | System health (jobs/kill/capabilities/alerts), backup + restore parikshan | QA-14 |
+| SEC-01 | Login + RBAC (6 roles), every API closed without a token | test_v12_p0 + HTTP checks (401/200) |
+| SEC-02 | Server-side kill switch persisted in the DB — remembered across restarts | kill test + QA-06 (file-DB restart) |
+| SEC-03 | Approval state machine (9 states), 2 different Owners for Tier-2, idempotency keys, full event audit | test_v12_p0, UC-09 |
+| SEC-04 | Keys only in env/file; a repo-wide secret scan script, CI-ready | scripts/secret_scan.py (passes in QA-14) |
+| DAT-01 | Canonical schema: order_headers/order_items (line-level), settlements, batch SHA-256, duplicate imports blocked | UC-07, wizard test |
+| DAT-02 | Matched-period gating — if windows do not match, TACOS = NOT_COMPARABLE | test_v12_p0 metrics |
+| JOB-01 | Durable job runner: IST next_run in the DB, lock, retry/backoff, dead-letter record, daemon mode | QA-11 |
+| UI-01 | New dashboard: no demo numbers; an empty DB = an honest empty state | QA-03 |
+| INT-01 | SP-API LWA-only (no more AWS key requirement), orders pagination | test_v12_integrations |
+| INT-02 | Full Ads Reporting v3 pipeline: create → poll → gzip download → DB import + batch record | mock-transport test |
+| INT-03/05, API-03 | Capability registry: Flipkart ads = report-only, write = unavailable (never a fictional button); the intel adapter is UNAVAILABLE without a licence | UC-06 |
+| INT-04 | CSV wizard: preview (hash/kind/rows) → commit, duplicates blocked, receipt | wizard test |
+| ADS-01..06 | Ads Studio: health, **profit-led bids** (target ACOS from SKU margin, max CPC, 20% daily cap), harvest/negative safety, pacing, 3 budget scenarios | test_v12_growth, UC-03/04 |
+| KWD-01..04 | **The fake clicks×20 volume removed**; taxonomy (badam↔almond), opportunity matrix (volume = null/UNAVAILABLE), rank alerts need ≥3 points | UC-02 |
+| RNK-01..04 | Rank observations with scope (locale/device/source), the funnel's foundation, linked to experiment verdicts | keyword_lab |
+| CMP-01..04 + CP-01..05 | Peer matching (grade/pack/processing; **W240≠W320**), ₹/100g, dated snapshots + change feed, decision packets (evidence → gap → hypothesis → margin guardrail → experiment) | UC-01/05 |
+| LST-01..05 | Listing Score **v2** (versioned, "not Amazon's formula" stated clearly), content gap audit, listing versions + approval gate + rollback | UC-08 |
+| CVR-01..04 | Creative brief endpoint, experiment registry (no win without a minimum sample), season/BOM lab | UC-10 |
+| FIN-01/02 | Versioned costs; **unknown/stale cost = scaling blocked**; settlement import + reconciliation (MATCHED/EXCEPTION) | QA-07-type tests |
+| INV-01/02 | Stock-to-ads gate (STOCKOUT = scaling blocked), hamper BOM feasibility | UC-04/10 |
+| AGY-01 | Agency scorecard — no task DONE without evidence, fees + verified changes | growth test |
+| AIG-01/02 | Learning store (no learning from unapplied actions), LLM budget governor (daily/monthly caps, prompt-hash-only logging) | growth test |
+| POL-01 | Verified fact registry — no claim in copy without evidence (NEEDS_EVIDENCE) | UC-08 |
+| OPS-01 | System health (jobs/kill/capabilities/alerts), backup + restore test | QA-14 |
 | API-01/02 | OpenAPI spec (docs/openapi.yaml), envelope {data, meta, errors}, idempotent proposals/execution | backend HTTP test |
-| UX-01..16 | Dashboard ke **16 screens** saare API-backed, login ke saath, evidence badges, live kill switch | QA-13 + JS syntax + saare endpoints 200 |
+| UX-01..16 | All **16 dashboard screens** API-backed, with login, evidence badges, a live kill switch | QA-13 + JS syntax + all endpoints 200 |
 
-### V12 me bhi jo CODE se aage ki cheez hai (jhooth nahi bolenge)
-| Cheez | Asli wajah |
+### What is beyond code even in V12 (no false claims)
+| Item | The real reason |
 |---|---|
-| Live API certification (QA-04 asal) | Tumhari SP-API/Ads keys lagein tabhi — code + mock pipeline taiyaar hai |
-| Vendor par asal write + verification (GATE-D) | ManualAdapter saboot (ref) maangta hai; live write adapter owner ke pilot sign-off ke baad |
-| Licensed keyword/rank data (Helium10 aadi) | Contract kharidna tumhara faisla hai — tab tak volume/rank 'unknown' hi dikhega |
-| PostgreSQL/Next.js jaisi badi migration | Blueprint ki 'suggested' topology hai; maujuda stdlib+SQLite asal kaam kar raha hai — bojh badhne par migration ka faisla |
-| GATE-F pilot (2 hafto ki asal chaap) | System 24×7 host par chalega tabhi gin sakte hain — hosting faisla tumhara |
+| Live API certification (real QA-04) | Only once your SP-API/Ads keys are in — code + mock pipeline are ready |
+| Real vendor write + verification (GATE-D) | The ManualAdapter asks for proof (a ref); the live write adapter comes after the owner's pilot sign-off |
+| Licensed keyword/rank data (Helium10 etc.) | Buying a contract is your decision — until then volume/rank show as "unknown" |
+| A big migration such as PostgreSQL/Next.js | It is the blueprint's "suggested" topology; the current stdlib + SQLite does the real work — migrate when load demands it |
+| GATE-F pilot (2 weeks of real footprint) | Only countable once the system runs on a 24×7 host — hosting is your decision |
 
 ---
 
-# Purana record (V11 tak)
+# Older record (up to V11)
 
-## Ban gaya hai (code + tests ke saath)
-| Hissa | Halat |
+## Built (with code + tests)
+| Part | Status |
 |---|---|
-| Engines (profit/listing/ads/keyword/competitor/flywheel/FBA/claim-check) | ✅ 20+ modules, tested |
-| Agent Layer — **saare 9 agents asal kaam ke saath**: A01 Market (season calendar), A02 Competitor (price-hamla pakadna), A03 Keyword (bank + HERO chunav), A04 Listing (title/bullets generation), A05 Creative (7-shot brief + video script), A06 Ads (DB se proposals), A07 Pricing (margin parakh + price proposals), A08 Review (shikayat mining), A09 Governance (daily cycle) | ✅ V9 |
-| Chalane ke sadhan: `src/run_cycle.py` (ek command daily report), `run_tests.py`, Dockerfile | ✅ V9 |
-| Flows design F1–F10 + Scheduler (9 daily + 2 weekly jobs) | ✅ |
-| Self-Learning (knowledge store, outcome learner, A/B engine, source registry) | ✅ design+core tested |
-| Algorithm Intelligence (Amazon/Flipkart rank models, Buy Box, change impact, Rank Probe) | ✅ |
-| Connectors: Amazon SP-API (SigV4), Ads API, Flipkart, Unicommerce, CSV Import | ✅ code + mock tests; **live test data/keys aane par** |
+| Engines (profit/listing/ads/keyword/competitor/flywheel/FBA/claim check) | ✅ 20+ modules, tested |
+| Agent layer — **all 9 agents doing real work**: A01 Market (season calendar), A02 Competitor (catching price attacks), A03 Keyword (bank + HERO selection), A04 Listing (title/bullet generation), A05 Creative (7-shot brief + video script), A06 Ads (proposals from the DB), A07 Pricing (margin checks + price proposals), A08 Review (complaint mining), A09 Governance (daily cycle) | ✅ V9 |
+| Run tools: `src/run_cycle.py` (one-command daily report), `run_tests.py`, Dockerfile | ✅ V9 |
+| Flow designs F1–F10 + scheduler (9 daily + 2 weekly jobs) | ✅ |
+| Self-learning (knowledge store, outcome learner, A/B engine, source registry) | ✅ design + core tested |
+| Algorithm intelligence (Amazon/Flipkart rank models, Buy Box, change impact, Rank Probe) | ✅ |
+| Connectors: Amazon SP-API (SigV4), Ads API, Flipkart, Unicommerce, CSV import | ✅ code + mock tests; **live test once data/keys arrive** |
 | Database (SQLite: knowledge/actions/rank/products/orders/campaigns/search_terms/inventory) | ✅ |
-| Backend API (health, warroom, connectors status, approvals DB se, cycle run) | ✅ |
+| Backend API (health, warroom, connector status, approvals from the DB, cycle run) | ✅ |
 | Dashboard (11 sections, controls, kill switch, live-data loader) | ✅ |
 | Control Center + Approval Engine (Tier 0/1/2 + guardrails) | ✅ |
 
-## Data LIVE hai — Phase-0 Audit ho gaya (21 Oct 2026) 🟢
-| Cheez | Halat |
+## Data is LIVE — Phase-0 audit done (21 Oct 2026) 🟢
+| Item | Status |
 |---|---|
-| User ki 3 reports import (224 campaign rows, 253 search-term rows, 104 orders) | ✅ Brand: **Dry Fruit Farm** (Amazon) |
-| **Phase-0 Audit** `docs/PHASE0_AUDIT_2026-10-21.md` | ✅ TACOS ≈61%, ROAS 1.48, 14/23 campaigns zero-sale, bikri ka 87% Brazil Nuts + Cranberry par, CVR sirf 3.6% |
-| CI workflow file (user ne web se lagayi) | ✅ GitHub par verify |
-| Ads Agent ke asal proposals | ✅ 15 bid-down proposals (approval ke intezaar me) |
-| **Action Planner (V10)** — pause/scale/watch/negative lists asal data se | ✅ `docs/ACTION_PLAN_2026-10-21.md`: 16 tay kaam, pause se ₹3,808/cycle bachat; dono hero listings ke sudhar packs (score 35→65) |
-| Importer ke 2 asal bug fix (order-id column, campaign aggregation) + Keyword Agent ka term-aggregation fix | ✅ asal data ne pakde |
+| The user's 3 reports imported (224 campaign rows, 253 search-term rows, 104 orders) | ✅ Brand: **Dry Fruit Farm** (Amazon) |
+| **Phase-0 audit** `docs/PHASE0_AUDIT_2026-10-21.md` | ✅ TACOS ≈61%, ROAS 1.48, 14/23 campaigns with zero sales, 87% of sales from Brazil Nuts + Cranberry, CVR only 3.6% |
+| CI workflow file (added by the user via the web) | ✅ verified on GitHub |
+| Real proposals from the Ads agent | ✅ 15 bid-down proposals (awaiting approval) |
+| **Action Planner (V10)** — pause/scale/watch/negative lists from real data | ✅ `docs/ACTION_PLAN_2026-10-21.md`: 16 concrete tasks, ₹3,808/cycle saved by pausing; improvement packs for both hero listings (score 35→65) |
+| 2 real importer bugs fixed (order-id column, campaign aggregation) + the Keyword agent's term-aggregation fix | ✅ caught by real data |
 
-## Baki hai (kis ka intezaar hai)
-| Kaam | Kis par atka hai |
+## Still pending (waiting on what)
+| Work | Blocked on |
 |---|---|
-| Margin/break-even hisaab | User: **hero SKU cost sheet** (Brazil Nuts + Cranberry pehle) |
-| Kaju/Badam listing jaanch (ads chal rahe, bikri ~0) | User: unki **listing links** |
-| Flipkart ki halat | User: Flipkart data |
-| Auto-sync (roz ka data bina bheje) | User: API keys (config/connectors.json) — CSV rasta ab chal raha hai |
-| FBA status + agency fee ki jankari | User |
-| LLM Agents ka dimaag (copy/strategy LLM se) | LLM API key (env: GOS_LLM_API_KEY) — interface taiyaar hai, key aate hi plug |
-| Asal fee tables (Amazon/Flipkart category-wise) | Live Seller Central/Hub se milegi |
-| Deployment (server par 24×7 chalana) | Server/hosting ka faisla (Phase-2 ke baad) |
-| Quick Commerce (Blinkit/Zepto), D2C, AI creative generation, ML forecasting | Phase-3 |
+| Margin/break-even math | User: **hero SKU cost sheet** (Brazil Nuts + Cranberry first) |
+| Cashew/almond listing review (ads running, sales ~0) | User: their **listing links** |
+| Flipkart status | User: Flipkart data |
+| Auto-sync (daily data without sending files) | User: API keys (config/connectors.json) — the CSV route works now |
+| FBA status + agency fee details | User |
+| LLM agent brain (copy/strategy from an LLM) | An LLM API key (env: GOS_LLM_API_KEY) — the interface is ready, it plugs in once the key arrives |
+| Real fee tables (Amazon/Flipkart by category) | From live Seller Central/Hub |
+| Deployment (24×7 on a server) | Server/hosting decision (after Phase 2) |
+| Quick commerce (Blinkit/Zepto), D2C, AI creative generation, ML forecasting | Phase 3 |
 
-## 🏁 Development Complete (code-side) — V11, 21 Oct 2026
-Jo kuch bina user ke inputs ke ban sakta tha, **sab ban gaya hai**: 20+ engines, 9 asal agents, Action Planner,
-Season Planner (Diwali combos), LLM ka asal call-code (key lagte hi live, claim-check ke saath), asal connectors
-+ CSV import, backend (warroom/approvals/action-plan/season-pack/cycle), dashboard, Docker + compose, CI.
-**Kul 44 tests, 11 suites, sab pass — aur system asal business data par chal bhi raha hai.**
-Iske aage ka har kadam kisi na kisi input par ruka hai (neeche wali table), code par nahi.
+## 🏁 Development complete (code side) — V11, 21 Oct 2026
+Everything that could be built without the user's inputs **is built**: 20+ engines, 9 real agents, the Action
+Planner, the Season Planner (Diwali combos), real LLM call code (live as soon as a key is added, with the claim
+check), real connectors + CSV import, backend (warroom/approvals/action-plan/season-pack/cycle), dashboard,
+Docker + compose, CI.
+**44 tests, 11 suites, all passing — and the system is already running on real business data.**
+Every further step was blocked on some input (table above), not on code.
 
-## Niyam
-- Jo nahi bana, woh yahan "baki" me likha rahega — README ya dashboard me kabhi "ho gaya" jhooth nahi likhenge.
-- Har commit ke saath tests pass hone chahiye (CI laga hai).
+## Rules
+- Whatever is not built stays listed here as "pending" — the README or dashboard never falsely say "done".
+- Tests must pass with every commit (CI is in place).
