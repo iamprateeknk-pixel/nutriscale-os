@@ -61,7 +61,24 @@ class H(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
-    def do_GET(self):
+    def _guarded(self, handler):
+        """Bad input (a non-numeric id, a missing field) gets a clean 400 instead of a dropped connection;
+        anything unexpected gets a JSON 500. Details go to the server log, never to the client."""
+        try:
+            return handler()
+        except (ValueError, KeyError, TypeError, IndexError) as e:
+            self.log_error("bad request %s: %r", self.path, e)
+            try: return self._send(400, {"error": "bad request — check the ids and fields you sent"})
+            except Exception: pass
+        except Exception as e:
+            self.log_error("server error %s: %r", self.path, e)
+            try: return self._send(500, {"error": "server error — see the backend log"})
+            except Exception: pass
+
+    def do_GET(self): return self._guarded(self._do_GET)
+    def do_POST(self): return self._guarded(self._do_POST)
+
+    def _do_GET(self):
         p = self.path.split("?")[0]
         if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V13"})
         # Same-origin serving (V12.1): the dashboard is served by this backend — no CORS needed, the token stays on one origin
@@ -114,7 +131,9 @@ class H(BaseHTTPRequestHandler):
                     rows.append(d)
                 return self._env(200, {"proposals": rows})
             if p.startswith("/api/v1/actions/"):
-                aid = int(p.split("/")[-1])
+                tail = p.split("/")[-1]
+                if not tail.isdigit(): return self._send(400, {"error": "action id must be a number"})
+                aid = int(tail)
                 a = s.db.execute("SELECT * FROM action_v12 WHERE id=?", (aid,)).fetchone()
                 if not a: return self._send(404, {"error": "action not found"})
                 return self._env(200, {"action": dict(a), "timeline": act.action_timeline(s.db, aid)})
@@ -232,7 +251,7 @@ class H(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         finally: s.close()
 
-    def do_POST(self):
+    def _do_POST(self):
         p = self.path.split("?")[0]; parts = p.strip("/").split("/")
         if p == "/api/v1/auth/login":
             b = self._body(); s = Store()

@@ -95,6 +95,14 @@ def test_v26_http_upload_flow():
         assert call("/api/v1/imports/commit", {"upload": "../g.db"}, tok)[0] == 400
         assert call("/api/v1/imports/upload", {"filename": "x.exe", "content_b64": "eA=="}, tok)[0] == 400
         assert call("/api/v1/imports/upload", {"filename": "a.csv", "content_b64": "eA=="})[0] == 401, "no upload without login"
+        # a malformed action id gets a clean 400 instead of dropping the connection
+        assert call("/api/v1/actions/", tok=tok)[0] == 400 and call("/api/v1/actions/abc", tok=tok)[0] == 400
+        assert call("/api/v1/actions/999999", tok=tok)[0] == 404
+        # the same for POST routes that read an id from the path or body: 400, and the server stays up
+        assert call("/api/v1/proposals/abc/approve", {}, tok)[0] == 400
+        assert call("/api/v1/competitors/snapshots", {"peer_id": "x"}, tok)[0] == 400
+        assert call("/api/approvals/abc/approve", {}, tok)[0] == 400
+        assert call("/health")[0] == 200, "the backend is still serving"
     finally:
         p.terminate(); p.wait(5)
 
