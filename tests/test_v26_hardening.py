@@ -95,6 +95,14 @@ def test_v26_http_upload_flow():
         assert call("/api/v1/imports/commit", {"upload": "../g.db"}, tok)[0] == 400
         assert call("/api/v1/imports/upload", {"filename": "x.exe", "content_b64": "eA=="}, tok)[0] == 400
         assert call("/api/v1/imports/upload", {"filename": "a.csv", "content_b64": "eA=="})[0] == 401, "no upload without login"
+        # a malformed action id gets a clean 400 instead of dropping the connection
+        assert call("/api/v1/actions/", tok=tok)[0] == 400 and call("/api/v1/actions/abc", tok=tok)[0] == 400
+        assert call("/api/v1/actions/999999", tok=tok)[0] == 404
+        # the same for POST routes that read an id from the path or body: 400, and the server stays up
+        assert call("/api/v1/proposals/abc/approve", {}, tok)[0] == 400
+        assert call("/api/v1/competitors/snapshots", {"peer_id": "x"}, tok)[0] == 400
+        assert call("/api/approvals/abc/approve", {}, tok)[0] == 400
+        assert call("/health")[0] == 200, "the backend is still serving"
     finally:
         p.terminate(); p.wait(5)
 
@@ -116,9 +124,18 @@ def test_capability_notes_refresh_after_language_change():
     w = CAP.capability(st.db, "Amazon", "write_ads")
     assert w["status"] == "certified" and w["reason"] == "pilot signed off", "an operator's change is never overwritten"
 
+def test_create_user_after_mfa_migration():
+    import auth
+    st = Store(":memory:")
+    assert auth.create_user(st.db, "owner1", "long-password-1", "Owner")["ok"]
+    auth._ensure_totp_col(st.db)   # the MFA column exists now (any database that has used MFA)
+    assert auth.create_user(st.db, "analyst1", "long-password-2", "Analyst")["ok"], "a second user can still be created"
+    assert (auth.verify_login(st.db, "analyst1", "long-password-2") or {}).get("token"), "and can log in"
+
 if __name__ == "__main__":
     for t in [test_upload_and_path_safety, test_autopilot_stops_on_stale_ads_data, test_proposal_expiry,
               test_v26_http_upload_flow, test_dashboard_upload_widget,
-              test_capability_notes_refresh_after_language_change]:
+              test_capability_notes_refresh_after_language_change,
+              test_create_user_after_mfa_migration]:
         t(); print(f"PASS {t.__name__}")
     print("ALL V26 TESTS PASS")
