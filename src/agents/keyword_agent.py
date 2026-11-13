@@ -39,7 +39,7 @@ class KeywordAgent(BaseAgent):
         heroes = [b for b in bank if b["tier"] == "HERO"]
         if heroes:
             self.file_proposal("ALERT", f"Keyword bank ready: {len(heroes)} HERO keywords for rank push — {', '.join(h['term'] for h in heroes[:3])}")
-        return {"bank": bank, "heroes": heroes, "note": f"{len(bank)} terms parkhe gaye, {len(heroes)} HERO mile"}
+        return {"bank": bank, "heroes": heroes, "note": f"{len(bank)} terms checked, {len(heroes)} HERO terms found"}
 
     def placement_plan(self, nut: str, platform: str = "Amazon") -> dict:
         """V23: which keyword goes in title / highlights / backend / negative — with evidence labels."""

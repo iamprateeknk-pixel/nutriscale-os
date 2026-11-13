@@ -34,7 +34,7 @@ def sqp_funnel(db, platform: str = "Amazon", min_impressions: float = 50) -> dic
         if (r["im"] or 0) < min_impressions: continue
         s = {"impression": _share(r["bim"] or 0, r["im"]), "click": _share(r["bcl"] or 0, r["cl"]),
              "cart": _share(r["bca"] or 0, r["ca"]), "purchase": _share(r["bpu"] or 0, r["pu"])}
-        diag, action, rid, prio = "HEALTHY", "Share banaye rakho; hafte-war trend dekho", "AMZ-Q-01", 3
+        diag, action, rid, prio = "HEALTHY", "Maintain share; watch the weekly trend", "AMZ-Q-01", 3
         imp, clk, pur = s["impression"] or 0, s["click"], s["purchase"]
         if pur is not None and imp and pur > imp and imp < low_imp:
             diag, rid, prio = "SCALE_OPPORTUNITY", "AMZ-Q-03", 1

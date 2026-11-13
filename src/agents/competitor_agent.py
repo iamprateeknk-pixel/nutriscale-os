@@ -1,6 +1,6 @@
 """A02 Competitor Intelligence Agent — snapshots ka milaan.
-Pichle snapshot se price badlav pakadna aur gap analysis — yahi roz ka kaam hai.
-Snapshot data connector/scraping se aayega; agent ka dimaag (analysis) yahan hai.
+Catching price changes since the last snapshot and gap analysis — that is the daily job.
+Snapshot data comes from connectors/observations; the agent's brain (analysis) lives here.
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -10,7 +10,7 @@ from keyword_competitor import competitor_gap
 class CompetitorAgent(BaseAgent):
     id = "A02"; name = "Competitor Intelligence"
     def detect_price_moves(self, previous: dict, current: dict) -> list:
-        """previous/current: {competitor_sku: price_per_kg}. 5%+ badlav = hamla ya mauka."""
+        """previous/current: {competitor_sku: price_per_kg}. A 5%+ change = an attack or an opportunity."""
         moves = []
         for sku, price in current.items():
             old = previous.get(sku)
@@ -19,10 +19,10 @@ class CompetitorAgent(BaseAgent):
                 if change <= -5:
                     moves.append({"sku": sku, "change_pct": round(change, 1), "type": "PRICE_ATTACK",
                                   "action": "A07 ko bhejo: coupon/price jawab ka proposal bane"})
-                    self.file_proposal("ALERT", f"Competitor hamla: {sku} par {change:.0f}% price gira — jawab chahiye")
+                    self.file_proposal("ALERT", f"Competitor attack: price dropped {change:.0f}% on {sku} — a response is needed")
                 elif change >= 5:
                     moves.append({"sku": sku, "change_pct": round(change, 1), "type": "PRICE_UP",
-                                  "action": "Mauka: competitor mehenga hua — apna price rakho, ads thoda badha sakte ho"})
+                                  "action": "Opportunity: the competitor got pricier — hold your price, ads can go up a little"})
         return moves
     def gap_report(self, yours: dict, comp: dict) -> dict:
         return competitor_gap(yours["price_per_kg"], comp["price_per_kg"],

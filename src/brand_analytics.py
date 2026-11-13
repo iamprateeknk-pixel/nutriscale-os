@@ -1,11 +1,11 @@
-"""Brand Analytics Importer (V20) — Amazon Brand Analytics ki asal reports ka dedicated rasta.
-Ab tak ye data system me aata hi nahi tha (audit: 'Dedicated importer not present').
-Do report chalengi:
+"""Brand Analytics Importer (V20) — a dedicated path for real Amazon Brand Analytics reports.
+Until now this data never entered the system (audit: 'Dedicated importer not present').
+Two reports are supported:
   SQP (Search Query Performance) — query-level: volume, impressions, clicks, cart-adds, purchases
-       + brand ka hissa (Brand Count columns) — ASIN-view me ASIN column bhi aata hai.
+       + the brand's share (Brand Count columns) — the ASIN view also includes an ASIN column.
   SCP (Search Catalog Performance) — ASIN-level funnel: impressions/clicks/cart-adds/purchases.
-Dedup import_batches ke SHA-256 se (wizard jaisa hi niyam): ek file dobara nahi ghusegi.
-Jo column report me nahi, woh NULL rahega — invent kuch nahi hoga."""
+Dedup via import_batches SHA-256 (same rule as the wizard): a file is never imported twice.
+Columns missing from the report stay NULL — nothing is invented."""
 import os, sys, csv
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12, sha256_file, now_utc
@@ -40,15 +40,15 @@ def import_brand_analytics(db, path: str, platform: str = "Amazon", account: str
     h = sha256_file(path)
     dup = db.execute("SELECT id FROM import_batches WHERE platform=? AND seller_account=? AND file_sha256=? AND report_type LIKE 'brand_%'",
                      (platform, account, h)).fetchone()
-    if dup: return {"ok": False, "duplicate": True, "imported": 0, "note": "Ye Brand Analytics file pehle aa chuki hai — duplicate roka gaya"}
+    if dup: return {"ok": False, "duplicate": True, "imported": 0, "note": "This Brand Analytics file was already imported — duplicate blocked"}
     with open(path, newline="", encoding="utf-8-sig") as f:
         sample = f.read(3000); f.seek(0)
         delim = "\t" if "\t" in sample.split("\n")[0] else ","
         rows = list(csv.DictReader(f, delimiter=delim))
-    if not rows: return {"ok": False, "imported": 0, "note": "File khaali hai"}
+    if not rows: return {"ok": False, "imported": 0, "note": "File is empty"}
     rtype = detect_type(list(rows[0].keys()))
     if rtype == "unknown":
-        return {"ok": False, "imported": 0, "note": "Report type pehchana nahi gaya — SQP (Search Query) ya SCP (ASIN) report chahiye"}
+        return {"ok": False, "imported": 0, "note": "Report type not recognised — an SQP (Search Query) or SCP (ASIN) report is needed"}
     batch = "ba:" + h[:16]
     n = 0
     for r in rows:
@@ -77,15 +77,15 @@ def import_brand_analytics(db, path: str, platform: str = "Amazon", account: str
     return {"ok": True, "duplicate": False, "report_type": rtype, "imported": n, "batch_id": batch}
 
 def import_dropfolder(db, folder: str = None, platform: str = "Amazon", account: str = "default") -> dict:
-    """Scheduled automation (V22): drop-folder me padi Brand Analytics CSV files khud import hongi.
-    Seller Central se SQP/SCP export karke is folder me daalna hi kaam bachega —
+    """Scheduled automation (V22): Brand Analytics CSV files in the drop folder are imported automatically.
+    The only remaining manual step is exporting SQP/SCP from Seller Central into this folder —
     folder: env NUTRISCALE_BA_INBOX ya <data>/brand_analytics_inbox. Duplicate files SHA se rukengi."""
     import glob as _glob
     folder = folder or os.environ.get("NUTRISCALE_BA_INBOX") or os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "brand_analytics_inbox")
     if not os.path.isdir(folder):
         return {"folder": folder, "available": False, "imported_files": 0,
-                "note": "Drop-folder maujud nahi — Seller Central se SQP/SCP export karke yahan daalo: " + folder}
+                "note": "Drop folder does not exist — export SQP/SCP from Seller Central and put it here: " + folder}
     results = []
     for path in sorted(_glob.glob(os.path.join(folder, "*.csv"))):
         r = import_brand_analytics(db, path, platform, account, imported_by="scheduled-dropfolder")
@@ -97,8 +97,8 @@ def import_dropfolder(db, folder: str = None, platform: str = "Amazon", account:
             "rows_imported": sum(x["imported"] for x in results), "files": results}
 
 def summary(db, platform: str = "Amazon", limit: int = 10) -> dict:
-    """SQP ki top queries (purchases se) brand-hisse ke saath + SCP ke top ASINs.
-    Data na ho to saaf 'uplabdh nahi' — koi andaaz nahi."""
+    """Top SQP queries (by purchases) with brand share + top SCP ASINs.
+    Without data it says plainly 'not available' — no estimates."""
     ensure_v12(db)
     tq = db.execute("""SELECT query, MAX(search_volume) vol, SUM(impressions) imp, SUM(clicks) clk,
                               SUM(purchases) pur, SUM(brand_purchases) bpur
@@ -116,4 +116,4 @@ def summary(db, platform: str = "Amazon", limit: int = 10) -> dict:
     return {"available": bool(tq or ta),
             "top_queries_by_purchases": top_q,
             "top_asins_scp": [dict(r) for r in ta],
-            "note": "Brand Analytics asal report se — file import hone ke baad hi number aayenge" if not (tq or ta) else "Amazon Brand Analytics (Seller Central) se import kiya gaya asal data"}
+            "note": "From real Brand Analytics reports — numbers appear only after a file is imported" if not (tq or ta) else "Real data imported from Amazon Brand Analytics (Seller Central)"}

@@ -1,5 +1,5 @@
-"""A08 Review / Customer Voice Agent — reviews padhkar asal shikayatein nikalta hai.
-Shikayat ke pattern hi product/listing sudhar ki sabse sachhi list hai.
+"""A08 Review / Customer Voice Agent — reads reviews and extracts the real complaints.
+Complaint patterns are the most honest to-do list for product/listing improvements.
 """
 import os, sys, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -26,21 +26,21 @@ def analyze_reviews(reviews: list) -> dict:
             if any(w in t for w in words): comp_count[cat] = comp_count.get(cat, 0) + 1
     top = max(comp_count, key=comp_count.get) if comp_count else None
     actions = {
-        "SIZE": "Pack par grade/size bade aksharon me likho + size-comparison photo (shot 2) lagao — ummeed saaf hogi to shikayat ghategi",
-        "QUALITY_TASTE": "Supplier/batch ki jaanch karo — freshness ka masla listing se nahi, maal se hai. FEFO lago karo",
-        "PACKING": "Packing material badlo — ye sabse sasta sudhar hai aur return bhi ghataega",
-        "PRICE": "Per-kg hisaab competitor se milao; chhota pack (250g) ka sasta entry variant banao",
-        "DELIVERY": "FBA/Assured ka hissa badhao — delivery ki shikayat wahan sabse kam aati hai",
-        "QUANTITY": "Pack par net weight aur 'bina shell ke wazan' saaf likho; jaanch me wazan pura nikle iski QC karo",
+        "SIZE": "Print grade/size in large letters on the pack + add a size-comparison photo (shot 2) — clear expectations mean fewer complaints",
+        "QUALITY_TASTE": "Check the supplier/batch — freshness is a product issue, not a listing issue. Apply FEFO",
+        "PACKING": "Change the packing material — the cheapest fix, and it reduces returns too",
+        "PRICE": "Match per-kg pricing with competitors; create a cheaper 250g entry pack",
+        "DELIVERY": "Increase the FBA/Assured share — delivery complaints are lowest there",
+        "QUANTITY": "Print net weight and 'weight without shell' clearly; QC that the weight checks out",
     }
     return {"total": len(reviews), "negative": len(neg), "praise_mentions": praise,
             "complaint_counts": comp_count, "top_complaint": top,
-            "top_action": actions.get(top, "Koi bada pattern nahi — reviews swasth hain")}
+            "top_action": actions.get(top, "No major pattern — reviews are healthy")}
 
 class ReviewAgent(BaseAgent):
     id = "A08"; name = "Review / Customer Voice"
     def analyze(self, reviews: list) -> dict:
         r = analyze_reviews(reviews)
         if r["top_complaint"]:
-            self.file_proposal("ALERT", f"Reviews ki sabse badi shikayat: {r['top_complaint']} ({r['complaint_counts'][r['top_complaint']]} baar) — {r['top_action']}")
+            self.file_proposal("ALERT", f"Top review complaint: {r['top_complaint']} ({r['complaint_counts'][r['top_complaint']]} times) — {r['top_action']}")
         return r

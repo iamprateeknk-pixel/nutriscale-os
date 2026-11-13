@@ -1,5 +1,5 @@
-"""A07 Pricing Strategist — har product ka margin parkhkar price ke proposals.
-Calculator flows (Amazon/Flipkart) ka math istemal; faisla (proposal) agent ka.
+"""A07 Pricing Strategist — checks each product's margin and proposes prices.
+Uses the calculator flows' math (Amazon/Flipkart); the decision (proposal) is the agent's.
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -15,7 +15,7 @@ class PricingAgent(BaseAgent):
 
     def evaluate_products(self) -> dict:
         products = self.store.all_products()
-        if not products: return {"evaluations": [], "note": "Products data nahi — pehle catalog sync/import karo"}
+        if not products: return {"evaluations": [], "note": "No product data — sync/import the catalog first"}
         out = []
         for p in products:
             if p["platform"] == "Flipkart":
@@ -29,9 +29,9 @@ class PricingAgent(BaseAgent):
                   "margin_pct": margin, "verdict": verdict}
             if verdict == "LOSS_RISK":
                 ev["proposal"] = self.file_proposal(
-                    "PRICE_CHANGE", f"{p['name']}: margin {margin}% floor {self.controls.min_margin_pct}% se kam — price badhao ya cost ghatao, ads is par band rakho",
-                    change_pct=8, predicted="Margin surakshit star par laana")
+                    "PRICE_CHANGE", f"{p['name']}: margin {margin}% is below the {self.controls.min_margin_pct}% floor — raise the price or cut cost, keep ads off for it",
+                    change_pct=8, predicted="Bring margin to a safe level")
             elif verdict == "THIN":
-                ev["note"] = "Margin patla hai — sirf HERO keywords par simit ads, Rank-Push savdhani se"
+                ev["note"] = "Thin margin — limited ads on HERO keywords only, careful rank push"
             out.append(ev)
-        return {"evaluations": out, "note": f"{len(out)} products parkhe gaye"}
+        return {"evaluations": out, "note": f"{len(out)} products checked"}

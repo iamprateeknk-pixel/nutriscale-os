@@ -1,4 +1,4 @@
-"""NutriScale Agent Layer — engines ke upar asal agents.
-Har agent: data padhta hai -> sochta hai (rules aaj, LLM key aane par wahi plug) ->
-Proposal banata hai -> Approval Engine se tier milta hai -> DB me WAITING status ke saath.
+"""NutriScale Agent Layer — real agents on top of the engines.
+Every agent: reads data -> thinks (rules today; an LLM plugs into the same place once a key is added) ->
+creates a proposal -> gets a tier from the Approval Engine -> stored in the DB with WAITING status.
 """

@@ -5,11 +5,11 @@ Flow = deterministic code, zero LLM cost, 100% repeatable. Agent = can drift, so
 AGENTS = {
     "A01": ("Market Research", "Making sense of trends/news — judgment"),
     "A02": ("Competitor Intelligence", "Understanding the intent behind competitor moves — judgment"),
-    "A03": ("Keyword Domination", "Khareed-intent pehchanna — language judgment"),
+    "A03": ("Keyword Domination", "Recognising buying intent — language judgment"),
     "A04": ("Listing Optimization", "Writing copy that sells — creativity"),
     "A05": ("Creative", "Image/video design judgment"),
-    "A06": ("Ads Manager", "Rank-Push vs Harvest — paisa + strategy judgment"),
-    "A07": ("Pricing Strategist", "Calculator F4 use karke ran-neeti — judgment"),
+    "A06": ("Ads Manager", "Rank push vs harvest — money + strategy judgment"),
+    "A07": ("Pricing Strategist", "Strategy using the F4 calculator — judgment"),
     "A08": ("Review / Customer Voice", "Real problems from the language of complaints — language judgment"),
     "A09": ("Governance (Orchestrator+Approval+Learning+Algo Impact)", "Owner of the system — coordination judgment"),
 }

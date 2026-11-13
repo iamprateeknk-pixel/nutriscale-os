@@ -31,7 +31,7 @@ def test_listing_agent_proposal():
 def test_ads_agent_real_data_only():
     st = Store(":memory:")
     empty = AdsAgent(st).analyze()
-    assert empty["proposals"] == [] and "data nahi" in empty["note"]   # data nahi to proposal nahi — imaandari
+    assert empty["proposals"] == [] and "No search-term data" in empty["note"]   # data nahi to proposal nahi — imaandari
     st.add_search_term("cheap combo offer", "Broad", 900, 0, 60, 0, "test")
     st.add_search_term("mamra almonds", "Exact", 500, 5200, 40, 8, "test")
     res = AdsAgent(st).analyze()

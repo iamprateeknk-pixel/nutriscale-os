@@ -1,6 +1,6 @@
-"""Unicommerce (Uniware) API Connector — A13/F2 ka asal data yahi se aayega.
+"""Unicommerce (Uniware) API Connector — the source of A13/F2's real data.
 REST APIs: token (username/password), Sale Orders, Inventory Snapshot, Facilities, Returns.
-Tenant URL har seller ka apna hota hai (https://<tenant>.unicommerce.com).
+Each seller has their own tenant URL (https://<tenant>.unicommerce.com).
 Docs: https://docs.unicommerce.com/
 """
 from .config import require
@@ -30,7 +30,7 @@ class Unicommerce:
         return r.get("elements", [])
 
     def inventory_snapshot(self, facility_code: str) -> list:
-        """Ek facility ka pura stock — 3-way reconciliation ka 'sach' yahi hai."""
+        """Full stock of one facility — the 'truth' for 3-way reconciliation."""
         r = self._post("/services/rest/v1/inventory/inventorySnapshot/get",
                        {"facilityCode": facility_code})
         return r.get("inventorySnapshots", [])

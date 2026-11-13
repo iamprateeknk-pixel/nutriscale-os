@@ -1,5 +1,5 @@
 """FIN-02 Settlements, INV-01/02 Stock safety + BOM, AGY-01 Agency, AIG-02 LLM budget, OPS-01 Health.
-Chhote par pakke modules — har ek ka ek saaf kaam.
+Small but solid modules — each with one clear job.
 """
 import os, sys, csv, shutil, sqlite3, datetime
 sys.path.insert(0, os.path.dirname(__file__))
@@ -28,7 +28,7 @@ def import_settlements(store, path, platform="Amazon", account="default") -> dic
     db.commit(); return {"imported": n}
 
 def reconciliation(store, platform="Amazon", account="default") -> dict:
-    """Order GMV vs settlement gross — farq chhupaya nahi jayega, exception report banegi."""
+    """Order GMV vs settlement gross — gaps are never hidden; an exception report is produced."""
     db = store.db; ensure_v12(db)
     og = db.execute("SELECT COALESCE(SUM(gross),0) g, COUNT(*) c FROM order_items WHERE platform=?", (platform,)).fetchone()
     sg = db.execute("SELECT COALESCE(SUM(gross),0) g, COALESCE(SUM(net),0) n FROM settlements WHERE platform=?", (platform,)).fetchone()
@@ -36,7 +36,7 @@ def reconciliation(store, platform="Amazon", account="default") -> dict:
     return {"order_gmv": og["g"], "order_lines": og["c"], "settlement_gross": sg["g"],
             "settlement_net_payout": sg["n"], "difference": diff,
             "status": "MATCHED" if sg["g"] and abs(diff) <= max(og["g"] * 0.02, 100) else "EXCEPTION",
-            "note": "Farq ke kaaran ho sakte hain: samay-khidki ka antar, refunds, pending settlements — pehle ye parkho, phir number par bharosa karo"}
+            "note": "Possible reasons for a gap: different time windows, refunds, pending settlements — check these first, then trust the number"}
 
 # ---------- INV-01: stock-to-ads safety ----------
 def stock_gate(store, sku: str) -> dict:
@@ -44,7 +44,7 @@ def stock_gate(store, sku: str) -> dict:
     qty = row["q"] if row else 0
     return {"sku": sku, "qty": qty, "scale_allowed": qty > 0,
             "status": "OK" if qty > 20 else "LOW" if qty > 0 else "STOCKOUT",
-            "note": "Stock na ho to ads scale karna paisa jalana hai — gate yahi rokta hai" if qty <= 0 else ""}
+            "note": "Scaling ads without stock burns money — this gate stops it" if qty <= 0 else ""}
 
 def set_bom(db, parent_sku, components: dict):
     ensure_v12(db)
@@ -53,10 +53,10 @@ def set_bom(db, parent_sku, components: dict):
     db.commit()
 
 def bom_feasibility(store, parent_sku: str, want_units: int) -> dict:
-    """INV-02 / UC-10: hamper ke liye asal ghatak stock — kam pade to kitne ban sakte hain."""
+    """INV-02 / UC-10: real component stock for a hamper — if short, how many can be made."""
     db = store.db; ensure_v12(db)
     comps = [dict(r) for r in db.execute("SELECT * FROM product_bom WHERE parent_sku=?", (parent_sku,))]
-    if not comps: return {"parent": parent_sku, "feasible_units": 0, "note": "BOM define nahi hai — pehle components darj karo"}
+    if not comps: return {"parent": parent_sku, "feasible_units": 0, "note": "No BOM defined — record the components first"}
     detail, feasible = [], None
     for c in comps:
         have = store.db.execute("SELECT COALESCE(SUM(qty),0) q FROM inventory WHERE sku=?", (c["component_sku"],)).fetchone()["q"]
@@ -80,16 +80,16 @@ def llm_spend(db, period: str) -> float:
 def governed_llm_call(db, llm, role: str, prompt: str, est_cost_inr: float = 2.0, system: str = "") -> dict:
     ensure_v12(db)
     if llm_spend(db, "daily") + est_cost_inr > LLM_BUDGET["daily_inr"]:
-        return {"ok": False, "blocked": "DAILY_BUDGET", "note": "Aaj ka LLM budget khatm — agents rule-mode me chalte rahenge"}
+        return {"ok": False, "blocked": "DAILY_BUDGET", "note": "Today's LLM budget is used up — agents keep running in rule mode"}
     if llm_spend(db, "monthly") + est_cost_inr > LLM_BUDGET["monthly_inr"]:
-        return {"ok": False, "blocked": "MONTHLY_BUDGET", "note": "Mahine ka LLM budget khatm"}
+        return {"ok": False, "blocked": "MONTHLY_BUDGET", "note": "This month's LLM budget is used up"}
     import hashlib
     out = llm.generate(prompt, system=system)
     db.execute("INSERT INTO llm_usage(day,role,calls,est_cost,prompt_hash,at) VALUES (?,?,1,?,?,?)",
                (datetime.date.today().isoformat(), role, est_cost_inr,
                 hashlib.sha256(prompt.encode()).hexdigest()[:12], now_utc())); db.commit()
     return {"ok": True, "text": out, "est_cost": est_cost_inr,
-            "note": "Prompt ka sirf hash darj hai — raaz/prompts me customer data nahi jata"}
+            "note": "Only a hash of the prompt is recorded — no secrets/customer data in prompts"}
 
 # ---------- OPS-01: health + backup ----------
 def create_backup(db_path: str, dest: str) -> dict:
@@ -98,7 +98,7 @@ def create_backup(db_path: str, dest: str) -> dict:
         src.backup(dst)
         tables = dst.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
         return {"ok": True, "dest": dest, "tables": tables, "at": now_utc(),
-                "note": "Backup ban gaya — restore ka parikshan bhi isi ginati se hua (tables khul gayi)"}
+                "note": "Backup created — the restore test ran with this count too (tables opened)"}
     finally: src.close(); dst.close()
 
 def system_health(store) -> dict:
@@ -110,6 +110,6 @@ def system_health(store) -> dict:
     failed = [j for j in jobs if j["last_status"] == "FAILED"]
     return {"kill_switch": act.kill_status(db), "jobs_failed": failed, "jobs_total": len(jobs),
             "capabilities": caps.all_capabilities(db), "last_import_at": last_batch,
-            "alerts": (["Kuch jobs FAILED hain — job status dekho"] if failed else []) +
-                      (["3 din se koi data import nahi — data purana ho raha hai"] if not last_batch else []),
+            "alerts": (["Some jobs FAILED — check job status"] if failed else []) +
+                      (["No data import in 3 days — data is getting old"] if not last_batch else []),
             "checked_at": now_utc()}

@@ -24,9 +24,9 @@ def _data_sync(store):
         out.append(f"ads terms {r['imported']} ({r.get('overlap_status', '')})")
         try:
             m = sync_service.sync_campaign_map(store)
-            out.append(f"campaign naksha {m['mapped']}")
+            out.append(f"campaign map {m['mapped']}")
         except Exception as e:
-            out.append(f"campaign naksha skip: {type(e).__name__}")
+            out.append(f"campaign map skipped: {type(e).__name__}")
     if "amazon_sp" in ready:
         import sync_service
         since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)).isoformat()

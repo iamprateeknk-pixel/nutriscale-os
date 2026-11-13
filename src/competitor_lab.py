@@ -18,7 +18,7 @@ def classify_peer(own: dict, peer: dict) -> dict:
     pack_same = abs((own.get("pack_g") or 0) - (peer.get("pack_g") or 0)) < 1
     proc_same = (own.get("processing") or "raw") == (peer.get("processing") or "raw")
     if grade_same and pack_same and proc_same:
-        return {"class": "STRICT", "reasons": ["Grade, pack, processing — teeno barabar"]}
+        return {"class": "STRICT", "reasons": ["Grade, pack, processing — all three match"]}
     if not grade_same: reasons.append(f"Different grade ({own.get('grade')} vs {peer.get('grade')}) — NOT an exact match")
     if not pack_same: reasons.append(f"Different pack ({own.get('pack_g')}g vs {peer.get('pack_g')}g) — compare per ₹/100g")
     if not proc_same: reasons.append("Processing alag (raw/roasted/salted)")

@@ -1,7 +1,7 @@
 """NutriScale OS Backend — V12: with Auth + RBAC (SEC-01).
 No business data is shown without login (only /health and login are open).
-Pehla Owner banana:  NUTRISCALE_OWNER_USER=... NUTRISCALE_OWNER_PASSWORD=... python3 backend/app.py
-ya:  python3 -c "import sys; sys.path.insert(0,'src'); from db_store import Store; import auth; s=Store(); print(auth.create_user(s.db,'owner','lamba-password','Owner')); s.close()"
+Create the first Owner:  NUTRISCALE_OWNER_USER=... NUTRISCALE_OWNER_PASSWORD=... python3 backend/app.py
+or:  python3 -c "import sys; sys.path.insert(0,'src'); from db_store import Store; import auth; s=Store(); print(auth.create_user(s.db,'owner','a-long-password','Owner')); s.close()"
 API v1 envelope: {data, meta:{request_id, computed_at}, errors:[]}
 Chalana: python3 backend/app.py  (port 8765)
 """

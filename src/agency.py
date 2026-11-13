@@ -1,5 +1,5 @@
-"""AGY-01 Agency Scorecard — agency ne kaha vs asal me hua.
-Agency ke 'humne kar diya' par nahi, vendor-confirmed badlav (action_events) par hisaab hoga.
+"""AGY-01 Agency Scorecard — what the agency said vs what actually happened.
+Scored on vendor-confirmed changes (action_events), not on the agency's 'we did it'.
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -23,7 +23,7 @@ def add_task(db, title, platform="Amazon", due_date="") -> dict:
 def complete_task(db, task_id, evidence_ref="") -> dict:
     _tables(db)
     if not evidence_ref:
-        return {"ok": False, "error": "Saboot (badlav ka ref/screenshot) bina task 'ho gaya' nahi mana jayega"}
+        return {"ok": False, "error": "A task is never counted as done without evidence (a ref/screenshot of the change)"}
     db.execute("UPDATE agency_tasks SET status='DONE', evidence_ref=? WHERE id=?", (evidence_ref, task_id)); db.commit()
     return {"ok": True, "status": "DONE"}
 
@@ -44,4 +44,4 @@ def scorecard(db, month: str = None) -> dict:
             "tasks_pending": len(tasks) - len(done), "fees_total": fees,
             "vendor_verified_changes": verified_changes,
             "completion_pct": round(len(done) / len(tasks) * 100, 1) if tasks else None,
-            "note": "Scorecard agency ke dave par nahi — saboot wale kaamo aur verified badlavon par banta hai"}
+            "note": "The scorecard is built on evidence-backed work and verified changes — not the agency's claims"}

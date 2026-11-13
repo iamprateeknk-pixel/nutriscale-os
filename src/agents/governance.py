@@ -9,7 +9,7 @@ from agents.base import BaseAgent
 from agents.ads_agent import AdsAgent
 from scheduler import run_jobs, DAILY_JOBS
 from connectors import config as cfg
-from connectors.csv_import import *  # noqa — flows uplabdh
+from connectors.csv_import import *  # noqa — flows available
 from unicommerce_agent import reconcile
 from warroom_service import warroom_data
 from learning_sources import daily_crawl_plan

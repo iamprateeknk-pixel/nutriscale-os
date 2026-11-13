@@ -12,7 +12,7 @@ AMAZON_RANK_WEIGHTS = {
     "ctr": 12,                  # click % when shown in search
     "price_competitiveness": 10,
     "prime_fba": 8,             # FBA/Prime badge
-    "stock_availability": 6,    # stock khatm = rank khatm
+    "stock_availability": 6,    # out of stock = rank gone
     "rating_reviews": 6,
 }
 FLIPKART_RANK_WEIGHTS = {
@@ -50,11 +50,11 @@ def buybox_score_amazon(price_rank: int, total_sellers: int, is_fba: bool,
 CHANGE_MAP = [
     (["fee", "referral", "commission", "shulk"], ["F4 Profit Flow", "A07 Pricing"], "HIGH", "Every SKU margin must be recalculated"),
     (["fba", "fulfillment", "warehouse", "storage"], ["F3 Inventory & FBA Flow"], "HIGH", "Stock plan and shipment plan will change"),
-    (["search", "ranking", "algorithm", "cosmo", "rufus", "a10", "a9"], ["A04 Listing", "A03 Keyword", "Rank Probe"], "HIGH", "Playbook update + listing dobara parkho"),
-    (["advertising", "ads", "sponsored", "bid"], ["A06 Ads Manager"], "MEDIUM", "Campaign structure/bidding parkho"),
-    (["policy", "account health", "odr", "performance"], ["F10 Seller Health Flow", "A09 Governance"], "HIGH", "Account suraksha — turant dhyan do"),
-    (["review", "rating"], ["A08 Review Agent"], "MEDIUM", "Review strategy parkho"),
-    (["unicommerce", "api"], ["F1 Data Sync", "F2 Unicommerce Flow"], "MEDIUM", "Integration parkho"),
+    (["search", "ranking", "algorithm", "cosmo", "rufus", "a10", "a9"], ["A04 Listing", "A03 Keyword", "Rank Probe"], "HIGH", "Update the playbook + re-check listings"),
+    (["advertising", "ads", "sponsored", "bid"], ["A06 Ads Manager"], "MEDIUM", "Review campaign structure/bidding"),
+    (["policy", "account health", "odr", "performance"], ["F10 Seller Health Flow", "A09 Governance"], "HIGH", "Account safety — act immediately"),
+    (["review", "rating"], ["A08 Review Agent"], "MEDIUM", "Review the review strategy"),
+    (["unicommerce", "api"], ["F1 Data Sync", "F2 Unicommerce Flow"], "MEDIUM", "Check the integration"),
 ]
 
 def assess_algorithm_change(change_text: str) -> dict:

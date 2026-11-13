@@ -1,6 +1,6 @@
-"""HTTP layer — saare connectors isi se baat karenge.
-Retry: 429 (rate limit) aur 5xx par backoff ke saath dobara. 4xx par turant saaf error.
-Transport injectable hai taaki tests me asal internet ke bina parakh ho sake.
+"""HTTP layer — every connector talks through this.
+Retry: back off and retry on 429 (rate limit) and 5xx. A clear error immediately on 4xx.
+The transport is injectable so tests can run without the real internet.
 """
 import json, time, urllib.request, urllib.error
 
@@ -33,7 +33,7 @@ def _urllib_raw_transport(req: dict):
 
 def request_raw(method: str, url: str, headers: dict = None, transport=None,
                 retries: int = 3, sleep=time.sleep) -> bytes:
-    """Bytes wala download (report ki gzip file ke liye). 429/5xx par backoff retry (INT-02)."""
+    """Byte download (for a report's gzip file). Backoff retry on 429/5xx (INT-02)."""
     req = {"method": method, "url": url, "headers": dict(headers or {}), "body_bytes": None}
     transport = transport or _urllib_raw_transport
     for attempt in range(retries + 1):
@@ -60,4 +60,4 @@ def request_json(method: str, url: str, headers: dict = None, json_body: dict = 
         if status in (429, 500, 502, 503, 504) and attempt < retries:
             sleep(min(2 ** attempt, 8)); continue
         raise APIError(status, body, url)
-    raise APIError(0, {}, url)  # yahan pahuncha matlab retries khatm
+    raise APIError(0, {}, url)  # reaching here means retries are exhausted

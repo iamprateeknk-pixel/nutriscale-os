@@ -1,5 +1,5 @@
-"""AWS Signature V4 — Amazon SP-API har request par ye sign mangta hai.
-Pure Python (hashlib/hmac) — koi bahari library nahi.
+"""AWS Signature V4 — Amazon SP-API asks for this signature on every request.
+Pure Python (hashlib/hmac) — no external library.
 """
 import hashlib, hmac, datetime
 

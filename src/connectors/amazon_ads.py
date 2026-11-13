@@ -1,6 +1,6 @@
 """Amazon Ads API Connector (EU endpoint).
 OAuth (LWA) -> Profiles -> Sponsored Products campaigns/ad groups/keywords +
-Reporting v3 (search term report — A06 Ads Agent ka khana yahi se aayega).
+Reporting v3 (search term report — this is where the A06 Ads Agent's data comes from).
 Docs: https://advertising.amazon.com/API/docs/en-us/
 """
 from .config import require
@@ -48,7 +48,7 @@ class AmazonAds:
         return r.get("keywords", [])
 
     def update_campaigns(self, campaigns: list) -> dict:
-        """Write API: campaign state/budget badlav. Sirf certified capability par chalega (adapter gate)."""
+        """Write API: campaign state/budget changes. Only runs with a certified capability (adapter gate)."""
         return request_json("POST", ENDPOINT + "/sp/campaigns", headers=self._headers(SP_CONTENT_TYPE),
                             json_body={"campaigns": campaigns}, transport=self.transport)
 
@@ -58,7 +58,7 @@ class AmazonAds:
                             json_body={"keywords": keywords}, transport=self.transport)
 
     def request_search_term_report(self, start_date: str, end_date: str) -> str:
-        """Reporting v3 — reportId milega, phir status poll karke download URL (gzip JSON)."""
+        """Reporting v3 — returns a reportId, then poll the status for the download URL (gzip JSON)."""
         body = {"name": "GrowthOS Search Terms", "startDate": start_date, "endDate": end_date,
                 "configuration": {"adProduct": "SPONSORED_PRODUCTS", "groupBy": ["searchTerm"],
                                   "columns": ["searchTerm", "campaignName", "clicks", "cost",
@@ -74,8 +74,8 @@ class AmazonAds:
 
     def wait_and_download(self, report_id: str, raw_transport=None, max_polls: int = 30,
                           sleep=lambda s: None) -> list:
-        """INT-02: status poll -> COMPLETED par download URL -> gzip kholo -> rows.
-        FAILURE/429 par saaf error — adhoori report ko data nahi mana jayega."""
+        """INT-02: poll status -> download URL on COMPLETED -> unzip gzip -> rows.
+        A clear error on FAILURE/429 — a partial report is never treated as data."""
         import gzip, json as _json
         from .http_base import request_raw
         for _ in range(max_polls):
@@ -91,17 +91,17 @@ class AmazonAds:
             if status in ("FAILURE", "CANCELLED"):
                 raise RuntimeError(f"Ads report fail ho gayi: {st.get('failureReason', status)}")
             sleep(5)
-        raise RuntimeError("Ads report samay par taiyaar nahi hui — baad me dobara koshish hogi (job retry)")
+        raise RuntimeError("The Ads report was not ready in time — it will be retried later (job retry)")
 
     def sync_search_terms(self, store, start_date: str, end_date: str, raw_transport=None,
                           sleep=lambda s: None) -> dict:
-        """Poora pipeline: request -> poll -> download -> DB (search_terms) + batch record."""
+        """Full pipeline: request -> poll -> download -> DB (search_terms) + batch record."""
         import sys as _s, os as _os
         _s.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
         from platform_core import ensure_v12, now_utc
         rid = self.request_search_term_report(start_date, end_date)
         rows = self.wait_and_download(rid, raw_transport=raw_transport, sleep=sleep)
-        # V12.2 idempotent + V14 overlap-niyam: barabar/supersede/contained/partial — periods.py se
+        # V12.2 idempotent + V14 overlap rule: equal/supersede/contained/partial — via periods.py
         ensure_v12(store.db)
         agg = {}
         for r in rows:

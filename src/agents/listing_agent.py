@@ -81,10 +81,10 @@ class ListingAgent(BaseAgent):
         import json as _json
         prompt = (f"Create JSON for an Amazon India listing: {{\"title\": \"...\", \"bullets\": [\"...\" x5]}}\n"
                   f"Product: Dry Fruit Farm Premium {product} {grade} {weight}. Keywords: {', '.join(keywords)}.\n"
-                  f"Tathya: {facts.get('grade_detail','')}; {facts.get('origin','')}; {facts.get('nutrition_line','')}; {facts.get('pack_line','')}.\n"
+                  f"Facts: {facts.get('grade_detail','')}; {facts.get('origin','')}; {facts.get('nutrition_line','')}; {facts.get('pack_line','')}.\n"
                   f"Rules: title of at most 75 characters, NO disease/cure claims (FSSAI), English copy.")
         try:
-            raw = self.llm.generate(prompt, system="Tum ek tajurbe-kaar Amazon India listing visheshagya ho.")
+            raw = self.llm.generate(prompt, system="You are an experienced Amazon India listing specialist.")
             data = _json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
             title, bullets = str(data["title"])[:200], [str(b) for b in data["bullets"]][:5]
         except Exception:

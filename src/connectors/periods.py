@@ -1,9 +1,9 @@
 """Period Overlap Engine (V14, V15 me boundary semantics pakki) — Ads reports ke periods
-INCLUSIVE hote hain (pehla aur aakhri din dono ginati me). Niyam:
-- Naya period kisi bade purane ke ANDAR hai        -> SKIP (dohra hisaab nahi)
-- Naya period purane chhoto ko poora dhakta hai    -> purane hatakar naya (supersede)
-- Ek bhi din ka takraav (boundary din bhi)         -> BLOCK, saaf wajah (aadha takraav todna galat)
-- Sata hua par takraav-rahit (ek khatm, dusra agle din se) -> saaf, insert
+are INCLUSIVE (both the first and last day count). Rules:
+- New period lies INSIDE a bigger old one         -> SKIP (no double counting)
+- New period fully covers smaller old ones         -> remove the old ones, keep the new (supersede)
+- Any overlap of even one day (boundary day too)    -> BLOCK, with a clear reason (splitting an overlap is wrong)
+- Adjacent but non-overlapping (one ends, the next starts the following day) -> clean, insert
 """
 import os, sys, datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -25,13 +25,13 @@ def apply_period_rows(db, source: str, start: str, end: str, insert_fn) -> dict:
         if s == s_new and e == e_new:
             superseded.append((s0, e0)); continue
         if s <= s_new and e >= e_new:
-            return {"status": "SKIPPED_CONTAINED", "detail": f"Purana period {s0}..{e0} isey pehle se dhakta hai — dohra hisaab rokne ke liye naya skip"}
+            return {"status": "SKIPPED_CONTAINED", "detail": f"Old period {s0}..{e0} already covers this — the new one is skipped to avoid double counting"}
         if s_new <= s and e_new >= e:
             superseded.append((s0, e0)); continue
         overlap_days = (min(e, e_new) - max(s, s_new)).days + 1
         if overlap_days > 0:
             return {"status": "BLOCKED_PARTIAL_OVERLAP",
-                    "detail": f"Period {s0}..{e0} se {overlap_days} din ka takraav hai (boundary din bhi ginati me aata hai) — aggregates todna galat hoga; pehle purana hatao ya poora bada period lao"}
+                    "detail": f"Overlaps period {s0}..{e0} by {overlap_days} days (boundary days count) — splitting aggregates would be wrong; remove the old one first or load one larger period"}
     for (s0, e0) in superseded:
         db.execute("DELETE FROM search_terms WHERE source=? AND period_start=? AND period_end=?", (source, s0, e0))
     db.commit()

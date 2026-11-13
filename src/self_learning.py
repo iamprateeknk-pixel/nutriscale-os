@@ -1,6 +1,6 @@
-"""A14 Self-Learning Core — agent apne results aur web ki knowledge se roz strong banta hai.
+"""A14 Self-Learning Core — agents get stronger every day from their own results and web knowledge.
 3 hisse: (1) Knowledge Store, (2) Outcome Learner (rule confidence), (3) Agent Strength Score.
-Niyam: lagatar 3 baar fail rule = auto-disable. Seekh pehle backtest, phir live.
+Rule: a rule that fails 3 times in a row = auto-disabled. Learning is backtested first, then goes live.
 """
 from dataclasses import dataclass, field
 
@@ -9,14 +9,14 @@ from dataclasses import dataclass, field
 class KnowledgeItem:
     lesson: str
     source: str
-    reliability: float        # 0-1, source ka bharosa
+    reliability: float        # 0-1, trust in the source
     agent: str
     applied_count: int = 0
     success_count: int = 0
     @property
     def trust(self) -> float:
-        """Bharosa = source reliability x asal results. Sirf padhne se nahi, parakhne se bharosa banta hai."""
-        if self.applied_count == 0: return round(self.reliability * 0.5, 3)  # naya gyaan: aadha bharosa
+        """Trust = source reliability x real results. Trust comes from testing, not just reading."""
+        if self.applied_count == 0: return round(self.reliability * 0.5, 3)  # new knowledge: half trust
         return round(self.reliability * 0.4 + (self.success_count / self.applied_count) * 0.6, 3)
 
 class KnowledgeStore:
@@ -29,10 +29,10 @@ class KnowledgeStore:
         return sorted([k for k in self.items if k.agent == agent and k.trust >= min_trust],
                       key=lambda k: k.trust, reverse=True)
 
-# ---------- 2. Outcome Learner — rules apne results se seekhte hain ----------
+# ---------- 2. Outcome Learner — rules learn from their own results ----------
 @dataclass
 class RuleStats:
-    rule: str            # e.g. "BID_UP_20" — context ke saath key banti hai: "A06:BID_UP_20:Almonds"
+    rule: str            # e.g. "BID_UP_20" — the key includes context: "A06:BID_UP_20:Almonds"
     confidence: float = 0.5
     wins: int = 0
     losses: int = 0
@@ -40,7 +40,7 @@ class RuleStats:
     enabled: bool = True
 
 class OutcomeLearner:
-    """Confidence up/down asal measured result se hota hai (7/14 din baad)."""
+    """Confidence goes up/down from real measured results (after 7/14 days)."""
     def __init__(self, lr: float = 0.1): self.lr = lr; self.rules: dict[str, RuleStats] = {}
     def _get(self, key: str) -> RuleStats:
         return self.rules.setdefault(key, RuleStats(key))
@@ -63,8 +63,8 @@ class OutcomeLearner:
 def strength_score(wins: int, losses: int, knowledge_count: int, days_active: int) -> dict:
     total = wins + losses
     success_rate = (wins / total) if total else 0.5
-    experience = min(days_active / 90, 1.0)           # 90 din me full tajurba
+    experience = min(days_active / 90, 1.0)           # full experience after 90 days
     score = round((success_rate * 70 + experience * 20 + min(knowledge_count / 50, 1.0) * 10), 1)
     grade = "STRONG" if score >= 75 else "IMPROVING" if score >= 50 else "LEARNING"
     return {"strength_score": score, "success_rate_pct": round(success_rate * 100, 1), "grade": grade,
-            "note": "Score har Sunday pichle Sunday se upar jana chahiye — yahi 'strong day by day' ka saboot hai"}
+            "note": "The score should beat last Sunday's every Sunday — that is the proof of getting stronger day by day"}
