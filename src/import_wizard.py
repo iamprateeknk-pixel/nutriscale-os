@@ -76,3 +76,46 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
         db.execute("INSERT OR IGNORE INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                    (platform, account, kind, period[0], period[1], pv["sha256"], n, pv["bad_rows_est"], imported_by, now_utc(), how)); db.commit()
     return {"ok": True, "duplicate": pv["duplicate"], "imported": n, "exceptions": exceptions, "how": how, "receipt": pv}
+
+# ---------------- V26: dashboard se upload + path suraksha ----------------
+import re as _re, base64 as _b64, hashlib as _hl
+UPLOAD_EXT = {".csv", ".tsv", ".txt"}
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+def data_dir(db_path: str) -> str:
+    return os.path.dirname(os.path.abspath(db_path))
+
+def uploads_dir(db_path: str) -> str:
+    d = os.path.join(data_dir(db_path), "uploads"); os.makedirs(d, exist_ok=True); return d
+
+def allowed_path(db_path: str, path: str) -> bool:
+    """API se import sirf data/ folder ke andar ki file — pehle koi bhi server path chal jaata tha
+    (login wala user server ki doosri files padhne ki koshish kar sakta tha)."""
+    if not path: return False
+    root = os.path.realpath(data_dir(db_path))
+    p = os.path.realpath(path)
+    return (p == root or p.startswith(root + os.sep)) and os.path.isfile(p) and os.path.splitext(p)[1].lower() in UPLOAD_EXT
+
+def save_upload(db_path: str, filename: str, content_b64: str) -> dict:
+    """Dashboard se aayi report (base64) ko data/uploads/ me surakshit naam se rakho."""
+    base = os.path.basename(filename or "")
+    ext = os.path.splitext(base)[1].lower()
+    if ext not in UPLOAD_EXT:
+        return {"ok": False, "error": f"Sirf CSV/TSV/TXT report chalegi (mili: '{ext or 'bina extension'}') — Excel ho to 'Save as CSV' karo"}
+    try: raw = _b64.b64decode(content_b64 or "", validate=True)
+    except Exception: return {"ok": False, "error": "File ka content padha nahi gaya (base64 galat)"}
+    if not raw: return {"ok": False, "error": "File khaali hai"}
+    if len(raw) > MAX_UPLOAD_BYTES:
+        return {"ok": False, "error": f"File {len(raw)//1024//1024}MB hai — seema {MAX_UPLOAD_BYTES//1024//1024}MB"}
+    safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", base)[:80] or "report.csv"
+    sha = _hl.sha256(raw).hexdigest()
+    name = f"{sha[:12]}-{safe}"
+    path = os.path.join(uploads_dir(db_path), name)
+    with open(path, "wb") as fh: fh.write(raw)
+    return {"ok": True, "upload": name, "path": path, "bytes": len(raw), "sha256": sha}
+
+def resolve_upload(db_path: str, name: str):
+    """Sirf data/uploads/ ke andar ka naam — '../' jaise raaste nahi."""
+    if not name or os.path.basename(name) != name: return None
+    p = os.path.join(uploads_dir(db_path), name)
+    return p if os.path.isfile(p) else None

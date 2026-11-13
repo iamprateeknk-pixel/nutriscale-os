@@ -151,6 +151,8 @@ details.rule p{margin:8px 0 0;color:var(--ink-2)}
 #palette .res button{display:flex;gap:10px;width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;color:var(--ink);font-size:14px}
 #palette .res button.sel,#palette .res button:hover{background:var(--brand-soft)}
 .scrim{display:none}
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;border:2px dashed var(--line-2);border-radius:var(--r);padding:26px 16px;text-align:center;cursor:pointer;background:var(--surface-2);transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
 
 /* ---------- Responsive ---------- */
 @media (max-width:1024px){.cols{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:1fr 1fr}}
@@ -401,6 +403,8 @@ async growth(m){
   const ap=await api('/api/v1/autopilot/preview');
   const apHtml='<div class="panel"><div class="hero" style="justify-content:space-between"><div><h3 style="margin:0">🤖 Growth Autopilot</h3><p class="small muted" style="margin:4px 0 0">Playbook ki kamiyon se approval-wale proposals — khud kuch live nahi karta. Roz 07:45 par khud chalta hai.</p></div>'+(ap.created.length?'<button class="btn" onclick="runAutopilot()">'+ap.created.length+' proposals banao</button>':badge('Is hafte ka sab ho chuka','ok'))+'</div>'+
    (ap.created.length?table([{t:'Prakar',k:'kind'},{t:'Kis par',f:r=>esc(String(r.ident).replace('|',' → '))},{t:'Ummeed',f:r=>'<span class="small">'+esc(r.predicted)+'</span>'}],ap.created):'')+
+   ((ap.skipped_stale_data||[]).length?'<p class="small">'+badge('DATA PURANA','bad')+' '+esc(ap.skipped_stale_data[0].why)+' <a href="#" onclick="show(\'integrations\');return false">Upload karo →</a></p>':'')+
+   (ap.ads_data_age_days!=null?'<p class="small muted">Ads data '+ap.ads_data_age_days+' din purana · '+(ap.expired_old_proposals?ap.expired_old_proposals+' purane proposals expire hue':'')+'</p>':'')+
    (ap.skipped_disabled_rules.length?'<p class="small">'+badge(ap.skipped_disabled_rules.length+' chhode','warn')+' brain ne in niyamo ko band kiya hai (3 baar haare)</p>':'')+'</div>';
   m.innerHTML=apHtml+'<div class="grid g2"><div class="panel"><h3>Sale calendar '+ruleChip('IN-E-01')+' '+ruleChip('IN-E-02')+'</h3><p class="small muted">'+esc(evs.note)+'</p>'+tl+'</div>'+
   '<div class="panel"><h3>Break-even ACOS '+ruleChip('AMZ-A-04')+'</h3><p class="small muted">Ads se pehle ka munafa ÷ price. Isse upar ACOS = har ad-bikri par ghaata.</p><form class="row" onsubmit="return loadBE(event)"><input name="sku" placeholder="SKU" required><input name="price" type="number" step="0.01" placeholder="Price ₹ (optional)"><button class="btn">Nikalo</button></form><div id="beout"></div></div></div>'+
@@ -419,7 +423,7 @@ async inventory(m){
 },
 async approvals(m){
   const pv=await api('/api/v1/proposals'); const legacy=await api('/api/approvals');
-  m.innerHTML='<h3>Proposals (state machine)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Prakar',k:'kind'},{t:'Kya aur kyun',f:r=>'<span class="small">'+esc(r.summary||'')+'</span> '+(r.rule_ids||[]).map(ruleChip).join(' ')},{t:'Tier',k:'tier'},{t:'State',f:r=>badge(r.state,r.state==='APPLIED_VERIFIED'?'ok':r.state==='APPROVAL_PENDING'?'warn':'info')},{t:'Banaya',k:'created_by'},{t:'',f:r=>'<button class="btn sm ghost" onclick="viewProp('+r.id+')">Dekho</button>'+(r.state==='APPROVAL_PENDING'?'<button class="btn sm" onclick="propAct('+r.id+',\'approve\')">Approve</button>':r.state==='APPROVED'?'<button class="btn sm" onclick="propAct('+r.id+',\'queue\')">Queue</button>':r.state==='QUEUED'?'<button class="btn sm" onclick="propExec('+r.id+')">Execute</button>':'')}],pv.proposals,'Koi proposal nahi — sab saaf ✨',['today','Aaj par wapas'])+
+  m.innerHTML='<h3>Proposals (state machine)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Prakar',k:'kind'},{t:'Kya aur kyun',f:r=>'<span class="small">'+esc(r.summary||'')+'</span> '+(r.rule_ids||[]).map(ruleChip).join(' ')},{t:'Tier',k:'tier'},{t:'State',f:r=>badge(r.state,r.state==='APPLIED_VERIFIED'?'ok':r.state==='APPROVAL_PENDING'?'warn':r.state==='EXPIRED'||r.state==='CANCELLED'?'mute':'info')},{t:'Banaya',k:'created_by'},{t:'',f:r=>'<button class="btn sm ghost" onclick="viewProp('+r.id+')">Dekho</button>'+(r.state==='APPROVAL_PENDING'?'<button class="btn sm" onclick="propAct('+r.id+',\'approve\')">Approve</button>':r.state==='APPROVED'?'<button class="btn sm" onclick="propAct('+r.id+',\'queue\')">Queue</button>':r.state==='QUEUED'?'<button class="btn sm" onclick="propExec('+r.id+')">Execute</button>':'')}],pv.proposals,'Koi proposal nahi — sab saaf ✨',['today','Aaj par wapas'])+
   '<h3 style="margin-top:18px">Agent proposals (purani kataar)</h3>'+table([{t:'ID',k:'id',n:1},{t:'Agent',k:'agent'},{t:'Prakar',k:'action_type'},{t:'Vivaran',k:'description'},{t:'Tier',k:'tier'},{t:'',f:r=>'<button class="btn sm" onclick="legacyAct('+r.id+',\'approve\')">Approve</button> <button class="btn sm sec" onclick="legacyAct('+r.id+',\'reject\')">Reject</button>'}],legacy.approvals,'Koi intezaar wala proposal nahi',['today','Aaj par wapas'])+ev('SEC-03 — APPLIED_VERIFIED sirf pushti par');
 },
 async brain(m){
@@ -444,7 +448,8 @@ async integrations(m){
   const cs=await api('/api/connectors/status'); const caps=await api('/api/v1/capabilities');
   const connRows=Object.entries(cs.connectors).map(([k,v])=>({name:k,...v}));
   m.innerHTML='<div class="grid g2"><div><h3>Connectors</h3>'+table([{t:'Connector',k:'name'},{t:'Halat',f:r=>r.configured?badge('CONFIGURED','ok'):badge('baaki: '+(r.missing||[]).join(', '),'warn')}],connRows)+'<p class="small muted">Keys kaise bharein: CONNECTORS_SETUP.md — keys kabhi chat/GitHub par mat bhejo.</p></div>'+
-  '<div class="panel"><h3>CSV Wizard — pehle preview, phir commit</h3><p class="small muted">Server par file ka poora path do (Search Term, Campaign, Orders, Inventory, Brand Analytics).</p><form class="row" onsubmit="return wizPreview(event)"><input name="path" placeholder="/home/user/Downloads/report.csv" style="flex:1;min-width:200px" required><button class="btn sec">Preview</button></form><div id="wiz"></div><form class="row" onsubmit="return wizCommit(event)"><button class="btn">Commit karo</button></form></div></div>'+
+  '<div class="panel"><h3>📤 Report upload karo</h3><p class="small muted" style="margin-top:-4px">Seller Central / Ads Console se download ki CSV yahan daalo — system khud pehchanega: Search Term, Campaign, Orders, Inventory, Brand Analytics (SQP/SCP), Catalog/BSR. Pehle preview, phir import; wahi file dobara aaye to duplicate roka jaata hai.</p>'+
+  '<label id="drop" class="drop" for="upf"><input type="file" id="upf" accept=".csv,.tsv,.txt" style="display:none" onchange="uploadFile(this.files[0])"><span style="font-size:24px">📄</span><b>File chuno ya yahan kheench kar chhodo</b><span class="small muted">CSV / TSV · 20MB tak · Excel ho to pehle "Save as CSV"</span></label><div id="wiz"></div></div></div>'+
   '<h3>Capabilities (jo certified nahi, woh band)</h3>'+table([{t:'Platform',k:'platform'},{t:'Capability',k:'capability'},{t:'Status',f:r=>badge(r.status,r.status==='unavailable'?'bad':r.status==='report_only'?'warn':r.status==='certified'?'ok':'info')},{t:'Wajah',k:'reason'}],caps.capabilities)+ev('INT-04 — duplicate file dobara import nahi hogi');
 },
 async agency(m){
@@ -508,9 +513,26 @@ async function viewProp(id){try{const d=await api('/api/v1/actions/'+id);const a
 async function propAct(id,op){try{const r=await api('/api/v1/proposals/'+id+'/'+op,'POST',{});toast(r.state?(op==='approve'&&r.needed?'Pushti darj — '+(r.approvals||1)+'/'+r.needed:'State: '+r.state):(r.error||'ho gaya'),r.error?'bad':'ok');}catch(e){toast('Nahi ho paya: '+e.message,'bad');}show('approvals');}
 async function propExec(id){const ref=await ask('Execute ka saboot','Vendor console me badlav karke uska ref/saboot do — bina saboot ke APPLIED nahi likha jayega.',{placeholder:'jaise: campaign change id / screenshot ref',ok:'Darj karo'});if(!ref)return;try{const r=await api('/api/v1/proposals/'+id+'/execute','POST',{manual_ref:ref});r.state==='APPLIED_VERIFIED'?toast('✔ APPLIED_VERIFIED','ok'):toast('Nahi hua: '+(r.error||r.state),'bad');}catch(e){toast(e.message,'bad');}show('approvals');}
 async function legacyAct(id,op){try{await api('/api/approvals/'+id+'/'+op,'POST',{});toast(op==='approve'?'Approve ho gaya':'Reject ho gaya','ok');}catch(e){toast(e.message,'bad');}show('approvals');}
-let WIZPATH='';
-async function wizPreview(e){e.preventDefault();const f=Object.fromEntries(new FormData(e.target));WIZPATH=f.path;try{const d=await api('/api/v1/imports/preview','POST',{path:f.path});document.getElementById('wiz').innerHTML='<p>Prakar: <b>'+esc(d.kind)+'</b> · Rows: '+esc(d.rows)+' · '+(d.duplicate?badge('DUPLICATE — commit rukega','warn'):badge('naya','ok'))+'<br><span class="small muted">'+esc(d.note)+'</span></p>';}catch(err){toast(err.message,'bad');}return false;}
-async function wizCommit(e){e.preventDefault();if(!WIZPATH){toast('Pehle preview karo','bad');return false;}try{const d=await api('/api/v1/imports/commit','POST',{path:WIZPATH});d.duplicate?toast('Duplicate — import nahi hua','bad'):toast('Import ho gaya: '+(d.imported??0)+' rows','ok');}catch(err){toast(err.message,'bad');}return false;}
+let UPNAME='';
+const KINDS={search_terms:'Search Term report',campaigns:'Campaign report',orders:'Orders',inventory:'Inventory',brand_analytics:'Brand Analytics (SQP/SCP)',catalog_snapshot:'Catalog / BSR',unknown:'Pehchana nahi gaya'};
+async function uploadFile(file){if(!file)return;const w=document.getElementById('wiz');
+  if(file.size>20*1024*1024){toast('File 20MB se badi hai','bad');return;}
+  w.innerHTML='<div class="skeleton"></div><p class="small muted">'+esc(file.name)+' upload ho rahi hai…</p>';
+  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=rej;r.readAsDataURL(file);});
+  try{const d=await api('/api/v1/imports/upload','POST',{filename:file.name,content_b64:b64});UPNAME=d.upload;const pv=d.preview;
+    w.innerHTML='<div class="issue" style="margin-top:12px">'+(pv.kind==='unknown'?badge('?','warn'):badge('✓','ok'))+'<div style="flex:1"><b>'+esc(KINDS[pv.kind]||pv.kind)+'</b> · '+esc(pv.rows)+' rows · '+esc(file.name)+'<div class="small muted">'+esc(pv.note)+'</div><div class="small muted">Columns: '+esc((pv.headers||[]).join(', '))+'</div></div></div>'+
+    (pv.kind==='unknown'?'<form class="row" onsubmit="return commitUpload(event)"><select name="kind">'+Object.keys(KINDS).filter(k=>k!=='unknown').map(k=>'<option value="'+k+'">'+KINDS[k]+'</option>').join('')+'</select><button class="btn">Is prakar se import karo</button></form>':
+     pv.duplicate?'<p>'+badge('DUPLICATE','warn')+' Ye file pehle aa chuki hai — dobara import nahi hogi</p>':'<button class="btn" onclick="commitUpload()">✓ Import karo</button>');
+  }catch(err){w.innerHTML='';toast(err.message,'bad');}}
+async function commitUpload(e){if(e)e.preventDefault();if(!UPNAME){toast('Pehle file upload karo','bad');return false;}
+  const kind=e?new FormData(e.target).get('kind'):undefined;
+  try{const d=await api('/api/v1/imports/commit','POST',{upload:UPNAME,kind:kind});
+    if(d.duplicate)toast('Duplicate — import nahi hua','bad');else if(d.ok===false)toast(d.note||'Import nahi hua','bad');
+    else{toast('Import ho gaya: '+(d.imported??0)+' rows ✓','ok');UPNAME='';document.getElementById('wiz').innerHTML='<p>'+badge('Import ho gaya','ok')+' '+esc(d.how||'')+' · <a href="#" onclick="show(\'today\');return false">Aaj ka kaam dekho →</a></p>';}
+  }catch(err){toast(err.message,'bad');}return false;}
+document.addEventListener('dragover',e=>{const d=document.getElementById('drop');if(d&&d.contains(e.target)){e.preventDefault();d.classList.add('over');}});
+document.addEventListener('dragleave',e=>{const d=document.getElementById('drop');if(d)d.classList.remove('over');});
+document.addEventListener('drop',e=>{const d=document.getElementById('drop');if(d&&d.contains(e.target)){e.preventDefault();d.classList.remove('over');uploadFile(e.dataTransfer.files[0]);}});
 
 /* ---------- Navigation ---------- */
 async function show(name){if(!VIEWS[name])name='today';CURRENT=name;

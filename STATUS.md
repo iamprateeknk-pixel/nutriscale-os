@@ -1,5 +1,13 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 12 Nov 2026 (V25 — Growth Autopilot: seekh ka chakra poora; kul 30 suites pass)_
+_Updated: 13 Nov 2026 (V26 — upload, suraksha, purane data ka pehra; kul 31 suites pass)_
+
+## 🛡️ V26 — Full-proof hardening: dashboard upload, import suraksha, purane data ka pehra, expiry (13 Nov 2026)
+(saboot: test_v26_hardening.py — 5 tests incl. asal HTTP aur hamle; kul **31 suites pass**; browser me upload → preview → import → Keyword Lab chala)
+- **Security hole band**: CSV import API pehle server ka *koi bhi* path le leta tha (login wala user server ki doosri files padhne ki koshish kar sakta tha). Ab sirf dashboard se upload ki gayi ya `data/` ke andar ki CSV/TSV; `../`, `/etc/passwd`, symlink se bahar jaana — sab 400. Request ki seema 32MB, file 20MB.
+- **Dashboard se report upload**: Integrations par file chuno / kheench kar chhodo → system khud prakar pehchanta hai (Search Term, Campaign, Orders, Inventory, Brand Analytics, Catalog/BSR) → preview → "Import karo". Pehchana na jaaye to prakar chunne ka option. Terminal ki zaroorat khatam — asli data ki sabse badi rukawat hati.
+- **Purane data par faisla nahi**: ads data 21 din se purana ho to autopilot negative/harvest proposal nahi banata, aur Aaj screen par laal kaam aata hai "taaza report upload karo". Har proposal par `data_freshness` likha hota hai (bina tareekh wale CLI import par `AGE_UNKNOWN`).
+- **Proposal expiry**: 7 din me faisla na hua to `EXPIRED` (naya state) — purane data par bana proposal galti se approve nahi hota, inbox saaf rehta hai, itihaas bana rehta hai. Autopilot har run me safai karta hai.
+- **Seema (imaandaari)**: CSV se aaye search-term data ki umar import ki tareekh se maani jaati hai, report ke andar ki tareekh se nahi — 2 mahine purani report aaj upload karo to woh 'taaza' ginegi. API sync me asli period tareekh aati hai.
 
 ## 🤖 V25 — Growth Autopilot: kamiyaan khud proposals bante hain, chakra poora (12 Nov 2026)
 (saboot: test_v25_autopilot.py — 7 tests; kul **30 suites pass**; browser me Autopilot → Approval Inbox flow chala)

@@ -196,6 +196,10 @@ def today(store) -> dict:
                       "screen": "growth", "rule_id": "IN-E-01"})
     try:
         import growth_autopilot as GA
+        age = GA.ads_data_age(db)
+        if age is not None and age > GA.STALE_ADS_DAYS:
+            tasks.append({"priority": 1, "area": "data", "title": f"Ads data {age} din purana — autopilot ruka hua hai; taaza Search Term report upload karo",
+                          "screen": "integrations"})
         ap = GA.run(store, dry_run=True)
         if ap["created"]:
             tasks.append({"priority": 2, "area": "autopilot", "title": f"Autopilot ke paas {len(ap['created'])} naye proposals taiyaar — Growth screen se banao, phir approve",

@@ -38,8 +38,12 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
     def _env(self, code, data):
         return self._send(code, {"data": data, "meta": {"request_id": uuid.uuid4().hex[:12], "computed_at": now_utc()}, "errors": []})
+    MAX_BODY = 32 * 1024 * 1024   # V26: 20MB file ka base64 + thoda — isse badi request padhi hi nahi jaati
     def _body(self):
-        try: return json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0) or 0)).decode() or "{}")
+        try:
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n > self.MAX_BODY: return {"_too_large": n}
+            return json.loads(self.rfile.read(n).decode() or "{}")
         except Exception: return {}
     def _auth(self, perm):
         s = Store()
@@ -295,7 +299,8 @@ class H(BaseHTTPRequestHandler):
             finally: s.close()
         if p in ("/api/v1/competitors/peers", "/api/v1/competitors/snapshots", "/api/v1/costs",
                  "/api/v1/listings/draft", "/api/v1/listings/approve", "/api/v1/listings/publish", "/api/v1/imports/preview",
-                 "/api/v1/imports/commit", "/api/v1/experiments", "/api/v1/listings/audit", "/api/v1/listings/build"):
+                 "/api/v1/imports/commit", "/api/v1/experiments", "/api/v1/listings/audit", "/api/v1/listings/build",
+                 "/api/v1/imports/upload"):
             perm = "import" if "imports" in p else ("costs" if p.endswith("costs") else ("execute" if p.endswith("publish") else "propose"))
             s, user, err = self._auth(perm)
             if err: s.close(); return
@@ -341,13 +346,24 @@ class H(BaseHTTPRequestHandler):
                     import listing_v2 as L2
                     return self._env(200, L2.publish(s.db, int(b["id"]), b.get("product_type", "FOOD"),
                                                      live=bool(b.get("live"))))
-                if p == "/api/v1/imports/preview":
-                    from import_wizard import preview_import
-                    return self._env(200, preview_import(s.db, b["path"], b.get("platform", "Amazon")))
-                if p == "/api/v1/imports/commit":
-                    from import_wizard import commit_import
-                    return self._env(200, commit_import(s, b["path"], b.get("kind"), b.get("platform", "Amazon"),
-                                                        imported_by=user["username"]))
+                if p.startswith("/api/v1/imports/"):
+                    import import_wizard as IW
+                    if b.get("_too_large"):
+                        return self._send(413, {"error": "TOO_LARGE", "message": "File bahut badi hai (seema 20MB)"})
+                    if p == "/api/v1/imports/upload":
+                        up = IW.save_upload(s.path, b.get("filename", ""), b.get("content_b64", ""))
+                        if not up["ok"]: return self._send(400, {"error": "BAD_UPLOAD", "message": up["error"]})
+                        pv = IW.preview_import(s.db, up["path"], b.get("platform", "Amazon"))
+                        return self._env(200, {"upload": up["upload"], "bytes": up["bytes"], "preview": pv})
+                    # V26: sirf upload ka naam ya data/ ke andar ka path — koi bhi server file nahi
+                    path = IW.resolve_upload(s.path, b["upload"]) if b.get("upload") else b.get("path")
+                    if not path or not IW.allowed_path(s.path, path):
+                        return self._send(400, {"error": "PATH_NOT_ALLOWED",
+                                                "message": "Sirf dashboard se upload ki gayi ya data/ folder ke andar ki CSV import hoti hai"})
+                    if p == "/api/v1/imports/preview":
+                        return self._env(200, IW.preview_import(s.db, path, b.get("platform", "Amazon")))
+                    return self._env(200, IW.commit_import(s, path, b.get("kind"), b.get("platform", "Amazon"),
+                                                           imported_by=user["username"]))
                 if p == "/api/v1/experiments":
                     import experiments as EX
                     return self._env(200, EX.create_experiment(s.db, b.get("name", ""), b.get("sku", ""),
