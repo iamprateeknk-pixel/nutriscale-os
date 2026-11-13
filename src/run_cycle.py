@@ -1,7 +1,7 @@
-"""NutriScale OS — Ek command me poora din ka cycle.
+"""NutriScale OS — the whole daily cycle in one command.
 Chalana:  python3 src/run_cycle.py
-Report terminal par saaf Hindi-English me aayegi; proposals DB me file ho jayenge
-(backend ke /api/approvals par dikhenge).
+The report is printed to the terminal; proposals are filed in the DB
+(visible in the dashboard Approval Inbox).
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,18 +16,18 @@ def main():
         print("🌰 NutriScale OS — Daily Cycle Report")
         print("=" * 62)
         season = MarketAgent(store).today_brief()
-        print(f"\n📅 Aaj ka mausam: {season['season']} — {season['note']}")
+        print(f"\n📅 Season today: {season['season']} — {season['note']}")
         rep = GovernanceAgent(store).daily_cycle()
-        print("\n⏰ Roz ke kaam (Scheduler):")
+        print("\n⏰ Daily jobs (scheduler):")
         for j in rep["jobs"]:
             out = j.get("output", j["status"])
             print(f"  {j['time']}  {j['job']:<24} {out[:90]}")
         print(f"\n📥 Aaj bane proposals: {rep['proposals_created']}")
         print(f"🔌 Connectors: " + ", ".join(
             f"{k}={'✔' if v['configured'] else '✘'}" for k, v in rep["connectors"].items()))
-        print(f"📊 War Room data: {'🟢 LIVE' if rep['warroom_connected'] else '⚪ abhi data nahi (CSV import ya keys chahiye)'}")
+        print(f"📊 War Room data: {'🟢 LIVE' if rep['warroom_connected'] else '⚪ no data yet (needs a CSV upload or API keys)'}")
         waiting = store.db.execute("SELECT COUNT(*) c FROM actions WHERE status LIKE 'WAITING%'").fetchone()["c"]
-        print(f"✋ Tumhare faisle ka intezaar kar rahe approvals: {waiting}")
+        print(f"✋ Approvals waiting for your decision: {waiting}")
         print("\n" + rep["note"])
     finally:
         store.close()

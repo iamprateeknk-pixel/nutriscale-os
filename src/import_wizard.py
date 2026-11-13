@@ -1,6 +1,6 @@
-"""INT-04 CSV Wizard — koi bhi report pehle PREVIEW, phir COMMIT.
-Preview: file hash, pehchana gaya type, header-mapping, galat rows ki ginati, duplicate hai ya nahi.
-Commit: import + receipt + exceptions (galat rows ki list) — reimport par duplicate block.
+"""INT-04 CSV Wizard — every report is PREVIEWED first, then COMMITTED.
+Preview: file hash, detected type, header mapping, bad-row count, duplicate or not.
+Commit: import + receipt + exceptions (list of bad rows) — re-imports are blocked as duplicates.
 """
 import os, sys, csv
 sys.path.insert(0, os.path.dirname(__file__))
@@ -17,7 +17,7 @@ def _sniff(path):
 
 def guess_kind(headers: list) -> str:
     h = " ".join(headers).lower()
-    if "search query" in h: return "brand_analytics"   # V20: Brand Analytics SQP — search-terms se pehle parkho
+    if "search query" in h: return "brand_analytics"   # V20: Brand Analytics SQP — check before search terms
     if "customer search term" in h or "search term" in h: return "search_terms"
     if "order-id" in h or "amazon-order-id" in h: return "orders"
     if "asin" in h and "impressions" in h: return "brand_analytics"   # V22: SCP (ASIN funnel) report
@@ -38,8 +38,8 @@ def preview_import(db, path: str, platform: str = "Amazon", account: str = "defa
         bad = sum(1 for r in rows if not (r.get("order-id") or r.get("amazon-order-id")))
     return {"sha256": h, "kind": kind, "rows": len(rows), "bad_rows_est": bad,
             "headers": headers[:12], "duplicate": bool(dup),
-            "note": "Duplicate file hai — commit karne par dobara import NAHI hoga" if dup else
-                    ("Pehchana gaya: " + kind if kind != "unknown" else "Report ka type pehchana nahi gaya — kind haath se do")}
+            "note": "Duplicate file — committing will NOT import it again" if dup else
+                    ("Detected: " + kind if kind != "unknown" else "Report type not recognised — choose the kind manually")}
 
 def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
                   account: str = "default", period: tuple = ("", ""), imported_by: str = "wizard") -> dict:
@@ -48,7 +48,7 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
     kind = kind or pv["kind"]
     if pv["duplicate"] and kind != "orders":
         return {"ok": False, "duplicate": True, "receipt": pv, "exceptions": [],
-                "note": "Ye file pehle aa chuki hai — duplicate roka gaya"}
+                "note": "This file was already imported — duplicate blocked"}
     exceptions = []
     if kind == "search_terms":
         n = csv_import.import_ads_search_terms(path, store, platform); how = "legacy table: search_terms"
@@ -71,13 +71,13 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
     elif kind == "inventory":
         n = csv_import.import_inventory_csv(path, store); how = "legacy table: inventory"
     else:
-        return {"ok": False, "note": "Kind pehchana nahi gaya — pehle preview dekho, phir kind batao", "receipt": pv}
+        return {"ok": False, "note": "Kind not recognised — check the preview, then choose the kind", "receipt": pv}
     if not pv["duplicate"]:
         db.execute("INSERT OR IGNORE INTO import_batches(platform,seller_account,report_type,period_start,period_end,file_sha256,rows_ok,rows_bad,imported_by,imported_at,receipt) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                    (platform, account, kind, period[0], period[1], pv["sha256"], n, pv["bad_rows_est"], imported_by, now_utc(), how)); db.commit()
     return {"ok": True, "duplicate": pv["duplicate"], "imported": n, "exceptions": exceptions, "how": how, "receipt": pv}
 
-# ---------------- V26: dashboard se upload + path suraksha ----------------
+# ---------------- V26: dashboard upload + path safety ----------------
 import re as _re, base64 as _b64, hashlib as _hl
 UPLOAD_EXT = {".csv", ".tsv", ".txt"}
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -89,24 +89,24 @@ def uploads_dir(db_path: str) -> str:
     d = os.path.join(data_dir(db_path), "uploads"); os.makedirs(d, exist_ok=True); return d
 
 def allowed_path(db_path: str, path: str) -> bool:
-    """API se import sirf data/ folder ke andar ki file — pehle koi bhi server path chal jaata tha
-    (login wala user server ki doosri files padhne ki koshish kar sakta tha)."""
+    """API imports only accept files inside the data/ folder — previously any server path worked
+    (a logged-in user could try to read other files on the server)."""
     if not path: return False
     root = os.path.realpath(data_dir(db_path))
     p = os.path.realpath(path)
     return (p == root or p.startswith(root + os.sep)) and os.path.isfile(p) and os.path.splitext(p)[1].lower() in UPLOAD_EXT
 
 def save_upload(db_path: str, filename: str, content_b64: str) -> dict:
-    """Dashboard se aayi report (base64) ko data/uploads/ me surakshit naam se rakho."""
+    """Store a report uploaded from the dashboard (base64) in data/uploads/ under a safe name."""
     base = os.path.basename(filename or "")
     ext = os.path.splitext(base)[1].lower()
     if ext not in UPLOAD_EXT:
-        return {"ok": False, "error": f"Sirf CSV/TSV/TXT report chalegi (mili: '{ext or 'bina extension'}') — Excel ho to 'Save as CSV' karo"}
+        return {"ok": False, "error": f"Only CSV/TSV/TXT reports are accepted (got: '{ext or 'no extension'}') — for Excel use 'Save as CSV'"}
     try: raw = _b64.b64decode(content_b64 or "", validate=True)
-    except Exception: return {"ok": False, "error": "File ka content padha nahi gaya (base64 galat)"}
-    if not raw: return {"ok": False, "error": "File khaali hai"}
+    except Exception: return {"ok": False, "error": "Could not read the file content (invalid base64)"}
+    if not raw: return {"ok": False, "error": "File is empty"}
     if len(raw) > MAX_UPLOAD_BYTES:
-        return {"ok": False, "error": f"File {len(raw)//1024//1024}MB hai — seema {MAX_UPLOAD_BYTES//1024//1024}MB"}
+        return {"ok": False, "error": f"File is {len(raw)//1024//1024}MB — limit {MAX_UPLOAD_BYTES//1024//1024}MB"}
     safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", base)[:80] or "report.csv"
     sha = _hl.sha256(raw).hexdigest()
     name = f"{sha[:12]}-{safe}"
@@ -115,7 +115,7 @@ def save_upload(db_path: str, filename: str, content_b64: str) -> dict:
     return {"ok": True, "upload": name, "path": path, "bytes": len(raw), "sha256": sha}
 
 def resolve_upload(db_path: str, name: str):
-    """Sirf data/uploads/ ke andar ka naam — '../' jaise raaste nahi."""
+    """Only names inside data/uploads/ — no paths like '../'."""
     if not name or os.path.basename(name) != name: return None
     p = os.path.join(uploads_dir(db_path), name)
     return p if os.path.isfile(p) else None
