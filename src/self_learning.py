@@ -53,7 +53,7 @@ class OutcomeLearner:
         else:
             r.losses += 1; r.consecutive_losses += 1
             r.confidence = max(0.01, r.confidence - self.lr * 1.5 * r.confidence)
-            if r.consecutive_losses >= 3: r.enabled = False   # 3 baar fail = auto-disable
+            if r.consecutive_losses >= 3: r.enabled = False   # 3 failures in a row = auto-disable
         return r
     def should_use(self, agent: str, rule: str, context: str) -> bool:
         r = self.rules.get(f"{agent}:{rule}:{context}")

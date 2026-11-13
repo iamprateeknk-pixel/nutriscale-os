@@ -9,7 +9,7 @@ DAILY_JOBS = [
     {"time": "06:45", "job": "brand_analytics_import", "owner": "F1 Data Sync",  "desc": "Auto-import new files from the Brand Analytics drop folder (SQP/SCP)"},
     {"time": "07:00", "job": "measure_results",       "owner": "A09 Governance", "desc": "Results of actions from yesterday/7/14 days ago — confidence up/down"},
     {"time": "07:15", "job": "seller_health_check",   "owner": "F10 Health",     "desc": "ODR/cancellation/late dispatch — red alert near the limits"},
-    {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock milaan — mismatch = oversell rokna"},
+    {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock reconciliation — a mismatch = prevent overselling"},
     {"time": "07:45", "job": "growth_autopilot",      "owner": "A06/A03",        "desc": "Playbook findings -> approval-gated proposals (negatives, harvest, SQP scale, stock-out pause)"},
     {"time": "08:00", "job": "war_room_report",        "owner": "F8 Report",      "desc": "Your daily one-page report (dashboard)"},
     {"time": "12:00", "job": "fba_cover_check",        "owner": "F3 Inventory",   "desc": "Days of cover — replenishment alert under 21 days"},

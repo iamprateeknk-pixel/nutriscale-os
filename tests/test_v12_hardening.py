@@ -1,4 +1,4 @@
-"""V12.1 AUDIT-FIX TESTS — bahari audit ki har sachi kami ka saboot-fix."""
+"""V12.1 AUDIT-FIX TESTS — a fix with evidence for every valid point of the external audit."""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
@@ -20,7 +20,7 @@ def test_sync_v2_flipkart_and_sp():
         def get_order_items(self, oid): return [{"OrderItemId": "OI1", "SellerSKU": "SKU-BR", "ASIN": "B0X",
                                                  "QuantityOrdered": 1, "ItemPrice": {"Amount": "798"}}]
     r2 = SS.sync_amazon_orders(st, "2026-10-01T00:00:00Z", sp=FakeSP())
-    assert r2["orders"] == 1 and r2["items"] == 1, "SP sync ab items ke saath canonical hoga"
+    assert r2["orders"] == 1 and r2["items"] == 1, "SP sync is now canonical, with items"
     st.close()
 
 def test_job_handlers_dedicated():
@@ -28,13 +28,13 @@ def test_job_handlers_dedicated():
     from jobrunner import DAILY_JOBS, run_due_jobs
     st = Store(":memory:")
     h = build_handlers(st)
-    assert set(h) == {j["job"] for j in DAILY_JOBS}, "har job ka apna handler hona chahiye"
+    assert set(h) == {j["job"] for j in DAILY_JOBS}, "every job must have its own handler"
     from jobrunner import seed_jobs
     seed_jobs(st.db)
     st.db.execute("UPDATE job_state SET next_run='2020-01-01T00:00:00+00:00'"); st.db.commit()
     out = run_due_jobs(st.db, h)
     by = {o["job"]: o["status"] for o in out}
-    assert by["data_sync"] == "SKIPPED", "connector bina data_sync imaandaar SKIP hoga, nakli DONE nahi"
+    assert by["data_sync"] == "SKIPPED", "without a connector data_sync is an honest SKIP, not a fake DONE"
     assert by["learning_crawl"] == "DONE"
     st.close()
 
@@ -58,16 +58,16 @@ def test_vendor_adapter_gate_verify_rollback():
                         "ONE_TAP", "test", "hk-1")
     approve(st.db, p["id"], owner); queue_action(st.db, p["id"], owner)
     r = execute(st.db, p["id"], owner, ad)
-    assert r["state"] == "FAILED" and state["camp"]["state"] == "ENABLED", "certified bina vendor write NAHI hoga"
+    assert r["state"] == "FAILED" and state["camp"]["state"] == "ENABLED", "no vendor write without certification"
     caps.set_capability(st.db, "Amazon", "write_ads", "certified", "pilot sign-off test by owner2")
     p2 = create_proposal(st.db, "PAUSE_CAMPAIGN", "Amazon", "acc",
                           {"kind": "PAUSE_CAMPAIGN", "campaign_id": "C1", "adapter": "amazon_ads"},
                           "ONE_TAP", "test", "hk-2")
     approve(st.db, p2["id"], owner); queue_action(st.db, p2["id"], owner)
     r2 = execute(st.db, p2["id"], owner, ad)
-    assert r2["state"] == "APPLIED_VERIFIED" and state["camp"]["state"] == "PAUSED", "asal write + refetch pushti"
+    assert r2["state"] == "APPLIED_VERIFIED" and state["camp"]["state"] == "PAUSED", "real write + refetch confirmation"
     rb = rollback(st.db, p2["id"], owner, ad)
-    assert rb["ok"] and state["camp"]["state"] == "ENABLED", "rollback purani halat wapas layega"
+    assert rb["ok"] and state["camp"]["state"] == "ENABLED", "rollback restores the previous state"
     st.close()
 
 def test_totp_mfa():
@@ -77,10 +77,10 @@ def test_totp_mfa():
     en = A.enable_totp(st.db, "mfauser")
     assert en["secret"]
     r = A.verify_login(st.db, "mfauser", "pass1234")
-    assert r and r.get("mfa_required"), "code bina login nahi milega"
+    assert r and r.get("mfa_required"), "no login without the code"
     code = next(iter(A._totp_codes(en["secret"])))
     r2 = A.verify_login(st.db, "mfauser", "pass1234", code)
-    assert r2 and r2.get("token"), "sahi code par token milega"
+    assert r2 and r2.get("token"), "the right code gives a token"
     st.close()
 
 def test_realized_fees_pipeline():
@@ -98,13 +98,13 @@ def test_realized_fees_pipeline():
         w.writerow(["S1", "2026-09-01", "2026-09-15", 50000, 15000, 5000, 30000])
     import_settlements(st, path)
     after = F.contribution_v2(st.db, "SKU-F", 300)
-    assert "REALIZED" in after["fee_source"] and abs(after["platform_fees"] - 120.0) < 0.01, "40% asal dar se 300 par 120 fee"
+    assert "REALIZED" in after["fee_source"] and abs(after["platform_fees"] - 120.0) < 0.01, "a 120 fee on 300 at the real 40% rate"
     st.close()
 
 def test_dashboard_hardening():
     html = open(os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")).read()
     assert "location.origin" in html and "esc=" in html or "const esc" in html
-    assert "sparkSVG" in html, "rank chart hona chahiye"
+    assert "sparkSVG" in html, "the rank chart must exist"
     app = open(os.path.join(os.path.dirname(__file__), "..", "backend", "app.py")).read()
     assert "_serve_dashboard" in app and "MFA_REQUIRED" in app
     print("  Dashboard: same-origin + escaping + charts + MFA ✔")

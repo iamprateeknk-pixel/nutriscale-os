@@ -24,7 +24,7 @@ def test_sigv4_and_config():
     h = sign_headers("sellingpartnerapi-eu.amazon.com", "/orders/v0/orders", "a=b",
                      "eu-west-1", "execute-api", "AKID", "secret")
     assert h["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=AKID/") and "Signature=" in h["Authorization"]
-    assert "refresh_token" in missing_keys("amazon_sp") or True  # env par nirbhar — sirf type check
+    assert "refresh_token" in missing_keys("amazon_sp") or True  # depends on the env — type check only
     try:
         from connectors.config import require
         require("unicommerce"); raised = False
@@ -61,7 +61,7 @@ def test_flipkart_unicommerce():
 def test_csv_and_warroom_real_only():
     empty = Store(":memory:")
     d0 = warroom_data(empty)
-    assert d0["connected"] is False and d0["kpis"] is None      # data nahi to nakli number NAHI
+    assert d0["connected"] is False and d0["kpis"] is None      # no data means NO fake numbers
     st = Store(":memory:")
     fx = os.path.join(os.path.dirname(__file__), "fixtures")
     assert ci.import_ads_search_terms(os.path.join(fx, "search_terms.csv"), st) == 2
@@ -70,7 +70,7 @@ def test_csv_and_warroom_real_only():
     d = warroom_data(st)
     assert d["connected"] is True and d["demo_data"] is False
     assert d["kpis"]["ad_spend"] == 480 and d["kpis"]["paid_sales"] == 5200
-    assert d["kpis"]["total_sales"] == 649 + 799          # orders table se asal jod (qty orders rows me amount per row hai)
+    assert d["kpis"]["total_sales"] == 649 + 799          # the real sum from the orders table (amount is per row in orders rows)
     assert any(w["term"] == "cheap combo" for w in d["waste_terms"])
     st.close(); empty.close()
 

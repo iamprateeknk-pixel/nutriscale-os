@@ -8,13 +8,13 @@ from season_planner import build_season_pack, render_markdown
 
 def test_llm_mock_transport():
     os.environ.pop("GOS_LLM_API_KEY", None); os.environ.pop("GOS_LLM_MODEL", None)
-    try: LLMProvider().generate("namaste"); assert False, "key bina error aana chahiye"
+    try: LLMProvider().generate("hello"); assert False, "an error is expected without a key"
     except LLMNotConfigured: pass
     os.environ["GOS_LLM_API_KEY"] = "test-key"; os.environ["GOS_LLM_MODEL"] = "test-model"
     def fake(url, payload, headers):
         assert url.endswith("/chat/completions") and headers["Authorization"] == "Bearer test-key"
-        return {"choices": [{"message": {"content": "jawab taiyaar"}}]}
-    assert LLMProvider(transport=fake).generate("sawal") == "jawab taiyaar"
+        return {"choices": [{"message": {"content": "answer ready"}}]}
+    assert LLMProvider(transport=fake).generate("question") == "answer ready"
     os.environ.pop("GOS_LLM_API_KEY"); os.environ.pop("GOS_LLM_MODEL")
 
 def test_listing_llm_path_and_fallback():
@@ -25,21 +25,21 @@ def test_listing_llm_path_and_fallback():
     ag = ListingAgent(st)
     r = ag.improve_with_llm(cur, "Dried Cranberries", "Premium", "200g", ["cranberry"],
                             {"grade_detail": "x", "origin": "y", "nutrition_line": "z", "pack_line": "p"})
-    assert r["source"].startswith("RULES") and not r["blocked"]  # key nahi -> rules fallback
-    # LLM mock: achhi copy
+    assert r["source"].startswith("RULES") and not r["blocked"]  # no key -> rules fallback
+    # LLM mock: good copy
     os.environ["GOS_LLM_API_KEY"] = "k"; os.environ["GOS_LLM_MODEL"] = "m"
-    good = json.dumps({"title": "Dried Cranberries Premium 200g | Unsweetened | Snacking Baking ke liye",
-                       "bullets": ["b1 poshak", "b2 taaza", "b3 upyog", "b4 packing", "b5 bharosa"]})
+    good = json.dumps({"title": "Dried Cranberries Premium 200g | Unsweetened | For Snacking and Baking",
+                       "bullets": ["b1 nutritious", "b2 tasty", "b3 uses", "b4 packing", "b5 trust"]})
     ag.llm = LLMProvider(transport=lambda u, p, h: {"choices": [{"message": {"content": good}}]})
     r2 = ag.improve_with_llm(cur, "Dried Cranberries", "Premium", "200g", ["cranberry"],
                              {"grade_detail": "x", "origin": "y", "nutrition_line": "z", "pack_line": "p"})
     assert r2["source"] == "LLM" and r2["title"].startswith("Dried Cranberries")
-    # LLM mock: dawaa wala dawa -> claim-check rokega -> rules fallback
-    bad = json.dumps({"title": "Cranberry diabetes cure karega 200g", "bullets": ["ilaaj pakka"] * 5})
+    # LLM mock: copy with a medical claim -> the claim check blocks it -> rules fallback
+    bad = json.dumps({"title": "Cranberry cures diabetes 200g", "bullets": ["guaranteed cure"] * 5})
     ag.llm = LLMProvider(transport=lambda u, p, h: {"choices": [{"message": {"content": bad}}]})
     r3 = ag.improve_with_llm(cur, "Dried Cranberries", "Premium", "200g", ["cranberry"],
                              {"grade_detail": "x", "origin": "y", "nutrition_line": "z", "pack_line": "p"})
-    assert r3["source"].startswith("RULES"), "bure dawe wali LLM copy live nahi jani chahiye"
+    assert r3["source"].startswith("RULES"), "LLM copy with bad claims must never go live"
     os.environ.pop("GOS_LLM_API_KEY"); os.environ.pop("GOS_LLM_MODEL")
     st.close()
 

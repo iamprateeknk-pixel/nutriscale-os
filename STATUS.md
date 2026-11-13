@@ -12,6 +12,7 @@ _Updated: 13 Nov 2026 (V27 — the whole system is now in English; 31 suites pas
   system switches language after its next learning cycle.
 - The autopilot now matches playbook findings by stable codes (`HARVEST_PENDING`, `SELF_COMPETITION`) instead of
   message text.
+- Removed the two old demo pages (`dashboard/war_room.html`, `dashboard/legacy_v11_index.html`) — unlinked, fake demo numbers, replaced by the real dashboard in V12.
 - `docs/SETUP_TEENO.md` → `docs/SETUP_GUIDE.md`. `docs/openapi.yaml` now lists all V23–V26 endpoints.
 
 ## 🛡️ V26 — Full-proof hardening: dashboard upload, import safety, stale-data guard, expiry (13 Nov 2026)

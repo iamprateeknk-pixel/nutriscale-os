@@ -1,4 +1,4 @@
-"""Period Overlap Engine (V14, V15 me boundary semantics pakki) — Ads reports ke periods
+"""Period Overlap Engine (V14; boundary semantics settled in V15) — Ads report periods
 are INCLUSIVE (both the first and last day count). Rules:
 - New period lies INSIDE a bigger old one         -> SKIP (no double counting)
 - New period fully covers smaller old ones         -> remove the old ones, keep the new (supersede)

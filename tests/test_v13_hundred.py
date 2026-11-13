@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
 
 def test_outcome_engine_loop():
-    """V14 ke baad: maap asal dated khidkiyon se hota hai (jama-kul totals se nahi — woh galat tha)."""
+    """Since V14: measurement uses real dated windows (not cumulative totals — that was wrong)."""
     import outcome_engine as OE
     from actions import create_proposal, approve, queue_action, execute
     import auth as A
@@ -16,9 +16,9 @@ def test_outcome_engine_loop():
         d = (today - datetime.timedelta(days=days_ago)).isoformat()
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',?,'INR')", (oid, d, gross))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-BR','B0',1,?,0)", (oid, oid + "L", gross))
-    order("PB1", 10, 1500)   # pehle ki khidki
+    order("PB1", 10, 1500)   # the before window
     order("PB2", 11, 500)
-    order("PA1", 3, 2600)    # baad ki khidki — behtar
+    order("PA1", 3, 2600)    # the after window — better
     order("PA2", 4, 400)
     st.db.commit()
     p = create_proposal(st.db, "BID_DOWN", "Amazon", "acc", {"sku": "SKU-BR"}, "ONE_TAP", "t", "oc-1")
@@ -28,7 +28,7 @@ def test_outcome_engine_loop():
     r = execute(st.db, p["id"], owner, OK())
     assert r["state"] == "APPLIED_VERIFIED"
     base = st.db.execute("SELECT baseline FROM action_v12 WHERE id=?", (p["id"],)).fetchone()["baseline"]
-    assert base is not None, "execute par baseline tasveer banni chahiye"
+    assert base is not None, "execute must create a baseline snapshot"
     past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8)).isoformat()
     st.db.execute("UPDATE action_events SET at=? WHERE action_id=? AND to_state='APPLIED_VERIFIED'", (past, p["id"])); st.db.commit()
     out = OE.measure_due(st.db, windows=(7,))
@@ -46,7 +46,7 @@ def test_sku_exact_fees():
     F.set_cost(st.db, "SKU-X", 150, 20, approved_by="owner")
     F.import_order_fees(st.db, [{"order_id": "O1", "sku": "SKU-X", "gross": 20000, "fees": 5000}])
     c = F.contribution_v2(st.db, "SKU-X", 400)
-    assert c["fee_precision"] == "SKU_EXACT" and abs(c["platform_fees"] - 100.0) < 0.01, "25% asal dar se 400 par 100"
+    assert c["fee_precision"] == "SKU_EXACT" and abs(c["platform_fees"] - 100.0) < 0.01, "100 on 400 at the real 25% rate"
     st.close()
 
 def test_listings_publish_gate():
@@ -54,7 +54,7 @@ def test_listings_publish_gate():
     import capabilities as caps
     st = Store(":memory:")
     d = L.save_draft(st.db, "SKU-L", "Amazon", "Dry Fruit Farm Premium Kaju W320 200g", ["b1"], "", "t")
-    r0 = L.publish(st.db, d["id"], "FOOD")  # abhi DRAFT hai
+    r0 = L.publish(st.db, d["id"], "FOOD")  # still DRAFT
     assert not r0["ok"] and "approve" in r0["error"]
     L.approve_version(st.db, d["id"], "own")
     calls = {}
@@ -65,7 +65,7 @@ def test_listings_publish_gate():
     r1 = L.publish(st.db, d["id"], "FOOD", sp=FakeSP())
     assert r1["ok"] and r1["mode"] == "VALIDATION_PREVIEW" and calls["mode"] == "VALIDATION_PREVIEW"
     r2 = L.publish(st.db, d["id"], "FOOD", sp=FakeSP(), live=True)
-    assert not r2["ok"] and "certified" in r2["error"], "live publish capability bina band rahega"
+    assert not r2["ok"] and "certified" in r2["error"], "live publish stays blocked without the capability"
     caps.set_capability(st.db, "Amazon", "write_listings", "certified", "pilot test")
     r3 = L.publish(st.db, d["id"], "FOOD", sp=FakeSP(), live=True)
     assert r3["ok"] and r3["mode"] == "NORMAL"
@@ -90,17 +90,17 @@ def test_360_and_filter_and_security():
     from platform_core import ensure_v12
     import auth as A
     st = Store(":memory:"); ensure_v12(st.db)
-    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-3','360 Wala','Amazon',300,0,4.2,10,'t')")
+    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-3','360 Item','Amazon',300,0,4.2,10,'t')")
     st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default','O3','2026-10-05','Shipped',600,'INR')")
     st.db.execute("INSERT INTO order_items VALUES ('Amazon','default','O3','I3','SKU-3','B0',2,600,0)")
     st.db.execute("INSERT INTO order_headers VALUES ('Flipkart','default','F3','2026-10-05','Shipped',900,'INR')")
     st.db.execute("INSERT INTO order_items VALUES ('Flipkart','default','F3','I4','SKU-3','B0',3,900,0)")
     st.db.commit()
     assert AN.sales_totals(st.db)["revenue"] == 1500
-    assert AN.sales_totals(st.db, "Flipkart")["revenue"] == 900, "platform filter kaam karega"
+    assert AN.sales_totals(st.db, "Flipkart")["revenue"] == 900, "the platform filter works"
     p = product360.product_360(st.db, "SKU-3")
     assert p["found"] and p["sales"]["revenue"] == 1500
-    # SQL injection ki koshish login par — na crash, na andar
+    # an SQL injection attempt on login — no crash, no access
     A.create_user(st.db, "admin", "pass1234", "Owner")
     assert A.verify_login(st.db, "admin' OR '1'='1", "x") is None
     assert A.verify_login(st.db, "admin", "' OR 1=1 --") is None
@@ -115,7 +115,7 @@ def test_performance_smoke():
     items = [("Amazon", "default", f"O{i}", f"I{i}", "SKU-P", "B0", 1, 100, 0) for i in range(2000)]
     st.db.executemany("INSERT INTO order_items VALUES (?,?,?,?,?,?,?,?,?)", items); st.db.commit()
     t0 = time.time(); tot = AN.sales_totals(st.db); dt = time.time() - t0
-    assert tot["revenue"] == 200000 and dt < 1.5, f"2000 orders ka hisaab tez hoga ({dt:.2f}s)"
+    assert tot["revenue"] == 200000 and dt < 1.5, f"2000 orders must compute fast ({dt:.2f}s)"
     st.close()
 
 if __name__ == "__main__":

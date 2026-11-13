@@ -16,11 +16,11 @@ def _o(st, oid, days_ago, sku, gross, qty=1, status="Shipped", platform="Amazon"
 def test_velocity_stale_anchor():
     import analytics as AN
     st = Store(":memory:"); ensure_v12(st.db)
-    _o(st, "STALE1", 60, "SKU-ST", 500, qty=30)   # 60 din purani bikri — V19 me yahi 'taaza' raftaar ban jati thi
+    _o(st, "STALE1", 60, "SKU-ST", 500, qty=30)   # a 60-day-old sale — in V19 this became 'fresh' velocity
     rep = AN.sku_velocity_report(st.db, "SKU-ST")
-    assert rep["velocity_per_day"] == 0.0, f"stale bikri aaj ki khidki se bahar hai, raftaar 0 honi chahiye: {rep}"
+    assert rep["velocity_per_day"] == 0.0, f"the stale sale is outside today's window, velocity should be 0: {rep}"
     assert rep["stale"] is True and rep["days_since_last_sale"] == 60 and rep["warning"], rep
-    assert rep["window_end"] == TODAY.isoformat(), "khidki ka aakhri din AAJ hona chahiye, aakhri bikri nahi"
+    assert rep["window_end"] == TODAY.isoformat(), "the window's last day must be TODAY, not the last sale"
     _o(st, "FRESH1", 2, "SKU-ST", 300, qty=6)
     rep2 = AN.sku_velocity_report(st.db, "SKU-ST")
     assert rep2["stale"] is False and rep2["velocity_per_day"] > 0, rep2
@@ -38,23 +38,23 @@ def test_fee_events_no_overwrite():
     assert r1["imported"] == 3, r1
     agg = st.db.execute("SELECT gross, fees, refund FROM order_fees WHERE external_order_id='E1' AND sku='SKU-E'").fetchone()
     assert agg["gross"] == 1000 and agg["fees"] == 120 and agg["refund"] == 200, \
-        f"do shipment events JUDNE chahiye, overwrite nahi: {dict(agg)}"
-    r2 = F.import_order_fees(st.db, rows)   # wahi events dobara sync — dohari ginati nahi
+        f"two shipment events must ADD UP, not overwrite: {dict(agg)}"
+    r2 = F.import_order_fees(st.db, rows)   # the same events synced again — no double counting
     assert r2["imported"] == 0, r2
     agg2 = st.db.execute("SELECT gross FROM order_fees WHERE external_order_id='E1' AND sku='SKU-E'").fetchone()
-    assert agg2["gross"] == 1000, "re-import par rakam dugni nahi honi chahiye"
+    assert agg2["gross"] == 1000, "a re-import must not double the amount"
     st.close()
 
 def test_fee_seller_account_separation():
     import finance as F, pilot as P
     st = Store(":memory:"); ensure_v12(st.db)
     _o(st, "DUP", 2, "SKU-A", 1000, account="acc1")
-    _o(st, "DUP", 2, "SKU-A", 1000, account="acc2")   # ek hi order-id, do khaate
+    _o(st, "DUP", 2, "SKU-A", 1000, account="acc2")   # the same order id, two accounts
     F.import_order_fees(st.db, [{"order_id": "DUP", "sku": "SKU-A", "gross": 1000, "fees": 100, "refund": 0}],
                         seller_account="acc1")
     fg = P.finance_grade_matching(st.db, "Amazon", 30)
     assert fg["matched"] == 1 and fg["fee_data_missing"] == 1, \
-        f"acc1 ki fees acc2 ke order ko MATCHED nahi bana sakti: {fg}"
+        f"acc1's fees cannot make acc2's order MATCHED: {fg}"
     exc = [e for e in fg["exceptions"] if e["issue"] == "FEE_DATA_MISSING"]
     assert exc and exc[0]["account"] == "acc2", fg["exceptions"]
     st.close()
@@ -68,31 +68,31 @@ def test_order_fees_migration():
     st.db.execute("INSERT INTO order_fees VALUES ('Amazon','OLD1','SKU-O',700,90,0)"); st.db.commit()
     ensure_v12(st.db)
     cols = [c[1] for c in st.db.execute("PRAGMA table_info(order_fees)")]
-    assert "seller_account" in cols, "purani table par seller_account aana chahiye"
+    assert "seller_account" in cols, "the old table must gain seller_account"
     r = st.db.execute("SELECT seller_account, gross FROM order_fees WHERE external_order_id='OLD1'").fetchone()
-    assert r["seller_account"] == "default" and r["gross"] == 700, "purana data 'default' khaate me surakshit rahe"
+    assert r["seller_account"] == "default" and r["gross"] == 700, "old data stays safe in the 'default' account"
     st.close()
 
 def test_stock_mapping_and_sellable():
     import product360 as P3, stock as ST
     st = Store(":memory:"); ensure_v12(st.db)
-    st.upsert_product("SKU-M", "Map Wala", "Amazon", 300)
-    st.upsert_product("SKU-M", "Map Wala", "Flipkart", 310)
-    st.set_inventory("SKU-M", "Godown", 50)                       # naam-andaz se unclassified
+    st.upsert_product("SKU-M", "Map Item", "Amazon", 300)
+    st.upsert_product("SKU-M", "Map Item", "Flipkart", 310)
+    st.set_inventory("SKU-M", "Godown", 50)                       # unclassified by name guessing
     st.set_inventory("SKU-M", "Amazon FBA", 40, sellable=30, unsellable=10)
     p0 = P3.product_360(st.db, "SKU-M")
     assert p0["inventory"]["stock_by_channel"].get("unclassified") == 50, p0["inventory"]
-    ST.set_stock_channel(st.db, "Godown", "Flipkart", "owner")    # explicit mapping heuristic ko hara degi
+    ST.set_stock_channel(st.db, "Godown", "Flipkart", "owner")    # an explicit mapping beats the heuristic
     p1 = P3.product_360(st.db, "SKU-M", "Flipkart")
     assert p1["inventory"]["stock_by_channel"].get("Flipkart") == 50, p1["inventory"]
     assert p1["inventory"]["view_qty"] == 50
     godown = [l for l in p1["inventory"]["by_location"] if l["location"] == "Godown"][0]
     assert godown["channel_basis"] == "EXPLICIT", godown
     pa = P3.product_360(st.db, "SKU-M", "Amazon")
-    assert pa["inventory"]["stock_by_channel"]["Amazon"] == 30, "channel hisaab SELLABLE par hoga"
+    assert pa["inventory"]["stock_by_channel"]["Amazon"] == 30, "channel math uses SELLABLE stock"
     assert pa["inventory"]["unsellable_by_channel"]["Amazon"] == 10, pa["inventory"]
     assert pa["inventory"]["view_qty"] == 30
-    # V21: availability ka saboot alag — FBA ka sellable VERIFIED, Godown ka stock UNKNOWN
+    # V21: separate availability evidence — FBA sellable is VERIFIED, warehouse stock is UNKNOWN
     assert pa["inventory"]["sellable_verified_by_channel"]["Amazon"] == 30, pa["inventory"]
     assert pa["inventory"]["unknown_availability_by_channel"]["Flipkart"] == 50, pa["inventory"]
     fba = [l for l in pa["inventory"]["by_location"] if l["location"] == "Amazon FBA"][0]
@@ -118,7 +118,7 @@ def test_attribution_verified_clean():
     import outcome_engine as OE, auth as A
     st = Store(":memory:"); ensure_v12(st.db)
     A.create_user(st.db, "own", "pass1234", "Owner"); owner = {"username": "own", "role": "Owner"}
-    # V21 VERIFIED threshold: kul >=8 lines + har khidki >=2 order-din — fixture usi ke hisaab se bhara hua
+    # V21 VERIFIED threshold: >=8 lines in total + >=2 order days in each window — the fixture is filled to match
     _o(st, "B1", 10, "SKU-V", 500); _o(st, "B2", 11, "SKU-V", 500); _o(st, "B3", 12, "SKU-V", 500); _o(st, "B4", 13, "SKU-V", 500)
     _o(st, "A1", 3, "SKU-V", 750); _o(st, "A2", 4, "SKU-V", 750); _o(st, "A3", 5, "SKU-V", 750); _o(st, "A4", 6, "SKU-V", 750)
     aid = _mk_action(st, owner, "BID_DOWN", "Amazon", {"sku": "SKU-V"}, "v20-clean")
@@ -139,14 +139,14 @@ def test_attribution_contaminated():
     _o(st, "B1", 10, "SKU-C", 1000, platform="Amazon"); _o(st, "B2", 11, "SKU-C", 500, platform="Amazon")
     _o(st, "A1", 3, "SKU-C", 2600, platform="Amazon"); _o(st, "A2", 4, "SKU-C", 400, platform="Amazon")
     a1 = _mk_action(st, owner, "BID_DOWN", "Amazon", {"sku": "SKU-C"}, "v20-c1")
-    a2 = _mk_action(st, owner, "PRICE_CHANGE", "Flipkart", {"sku": "SKU-C"}, "v20-c2")  # dusra channel, wahi SKU, wahi samay
+    a2 = _mk_action(st, owner, "PRICE_CHANGE", "Flipkart", {"sku": "SKU-C"}, "v20-c2")  # another channel, the same SKU, the same time
     _backdate(st, a1); _backdate(st, a2)
     OE.measure_due(st.db, windows=(7,))
     rows = st.db.execute("SELECT attribution, success FROM outcomes WHERE metric LIKE 'sku_revenue%'").fetchall()
     assert rows and all(r["attribution"] == "CONTAMINATED" and r["success"] is None for r in rows), \
-        f"cross-channel dusra action ho to nateeja kisi ek ke naam nahi lagna chahiye: {[dict(r) for r in rows]}"
+        f"with a second cross-channel action the outcome must not be attributed to either: {[dict(r) for r in rows]}"
     conf = OE.rule_confidence(st.db)
-    for c in conf: assert c["measured"] == 0, f"CONTAMINATED nateeja seekh nahi ban sakta: {c}"
+    for c in conf: assert c["measured"] == 0, f"a CONTAMINATED outcome cannot become learning: {c}"
     st.close()
 
 def test_brand_analytics_import():
@@ -166,11 +166,11 @@ def test_brand_analytics_import():
     assert s["available"] and s["top_queries_by_purchases"][0]["query"] == "brazil nuts 200g", s
     assert s["top_queries_by_purchases"][0]["brand_purchase_share_pct"] == 40.0, s
     r2 = BA.import_brand_analytics(st.db, path)
-    assert r2["duplicate"] is True and r2["imported"] == 0, "wahi file dobara nahi ghusegi"
+    assert r2["duplicate"] is True and r2["imported"] == 0, "the same file is not imported again"
     st.close()
 
 def test_http_new_endpoints():
-    """V17 ki seekh: naye endpoints asal HTTP par — brand-analytics + stock channel-map (GET/POST)."""
+    """The V17 lesson: new endpoints over real HTTP — brand-analytics + stock channel-map (GET/POST)."""
     import subprocess, time, json, urllib.request
     ROOT = os.path.join(os.path.dirname(__file__), "..")
     dbf = "/tmp/v20_http.db"
@@ -194,7 +194,7 @@ def test_http_new_endpoints():
                 return payload.get("data", payload)
         tok = call("/api/v1/auth/login", {"username": "boss", "password": "pass1234"})["token"]
         ba = call("/api/v1/brand-analytics", token=tok)
-        assert ba["available"] is False, "data bina available=False hi imaandaari hai"
+        assert ba["available"] is False, "available=False without data is the honest answer"
         seed = Store(dbf); seed.set_inventory("SKU-H", "Godown", 12); seed.close()
         m0 = call("/api/v1/stock/channel-map", token=tok)
         g = [l for l in m0["locations"] if l["location"] == "Godown"][0]

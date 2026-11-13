@@ -17,7 +17,7 @@ def test_flipkart_math():
     assert f["total_fees"] > 0 and f["you_receive"] < 649
     p = flipkart_profit(649, 340, 25, 500)
     assert p["profit_before_ads"] > 0 and p["break_even_roas"] is not None
-    cheap = flipkart_fees(250); assert cheap["commission_pct"] == 14.0   # sasta = zyada slab
+    cheap = flipkart_fees(250); assert cheap["commission_pct"] == 14.0   # cheap = higher slab
 
 def test_control_center():
     c = Controls()

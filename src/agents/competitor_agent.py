@@ -1,4 +1,4 @@
-"""A02 Competitor Intelligence Agent — snapshots ka milaan.
+"""A02 Competitor Intelligence Agent — snapshot comparison.
 Catching price changes since the last snapshot and gap analysis — that is the daily job.
 Snapshot data comes from connectors/observations; the agent's brain (analysis) lives here.
 """
@@ -18,7 +18,7 @@ class CompetitorAgent(BaseAgent):
                 change = (price - old) / old * 100
                 if change <= -5:
                     moves.append({"sku": sku, "change_pct": round(change, 1), "type": "PRICE_ATTACK",
-                                  "action": "A07 ko bhejo: coupon/price jawab ka proposal bane"})
+                                  "action": "Send to A07: create a coupon/price response proposal"})
                     self.file_proposal("ALERT", f"Competitor attack: price dropped {change:.0f}% on {sku} — a response is needed")
                 elif change >= 5:
                     moves.append({"sku": sku, "change_pct": round(change, 1), "type": "PRICE_UP",

@@ -11,8 +11,8 @@ from claim_checker import check_listing_text
 def test_listing_generation():
     t = generate_title("California Almonds", "Premium Jumbo", "500g", ["almonds", "badam"])
     assert "Almonds" in t and "500g" in t and len(t) <= 200
-    b = generate_bullets({"origin": "California ke bagh", "grade_detail": "Jumbo size badam",
-                          "nutrition_line": "protein aur fiber", "pack_line": "nitrogen-flush pack",
+    b = generate_bullets({"origin": "California orchards", "grade_detail": "Jumbo size badam",
+                          "nutrition_line": "protein and fibre", "pack_line": "nitrogen-flush pack",
                           "uses": ["snacking", "gifting", "baking"]})
     assert len(b) == 5 and check_listing_text(t + " " + " ".join(b))["can_go_live"]
 
@@ -31,14 +31,14 @@ def test_listing_agent_proposal():
 def test_ads_agent_real_data_only():
     st = Store(":memory:")
     empty = AdsAgent(st).analyze()
-    assert empty["proposals"] == [] and "No search-term data" in empty["note"]   # data nahi to proposal nahi — imaandari
+    assert empty["proposals"] == [] and "No search-term data" in empty["note"]   # no data, no proposal — honesty
     st.add_search_term("cheap combo offer", "Broad", 900, 0, 60, 0, "test")
     st.add_search_term("mamra almonds", "Exact", 500, 5200, 40, 8, "test")
     res = AdsAgent(st).analyze()
     acts = [p["action_type"] for p in res["proposals"]]
     assert "ADD_NEGATIVE" in acts and res["summary"]["action_counts"].get("SCALE_BID_UP_20", 0) >= 1
     neg = [p for p in res["proposals"] if p["action_type"] == "ADD_NEGATIVE"][0]
-    assert neg["status"] == "EXECUTED_AUTO"        # Tier-0 khud lagu
+    assert neg["status"] == "EXECUTED_AUTO"        # Tier-0 applied automatically
     st.close()
 
 def test_governance_cycle():

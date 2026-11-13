@@ -11,7 +11,7 @@ def test_approval_tiers():
     assert decide_tier(Proposal("A04", "LISTING_PATCH", "title upgrade")) == Tier.ONE_TAP
     assert decide_tier(Proposal("A06", "BUDGET_CHANGE", "budget +80%", change_pct=80)) == Tier.DOUBLE
     e = ApprovalEngine(daily_spend_cap=2000)
-    r = e.submit(Proposal("A04", "LISTING_PATCH", "Badam title naya"))
+    r = e.submit(Proposal("A04", "LISTING_PATCH", "Badam title new"))
     assert r["status"] == "WAITING_USER_APPROVAL"
     p = e.log[-1]; assert e.approve(p) == "APPROVED_EXECUTING"
     g = guardrail_check(stock_units=0, rating=4.5, proposed_daily_spend=500, cap=2000)

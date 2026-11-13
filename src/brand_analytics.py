@@ -35,7 +35,7 @@ def detect_type(headers: list) -> str:
 
 def import_brand_analytics(db, path: str, platform: str = "Amazon", account: str = "default",
                            period: tuple = ("", ""), imported_by: str = "brand-analytics") -> dict:
-    """CSV file brand_analytics table me. Return: {ok, report_type, imported, duplicate}."""
+    """CSV file into the brand_analytics table. Return: {ok, report_type, imported, duplicate}."""
     ensure_v12(db)
     h = sha256_file(path)
     dup = db.execute("SELECT id FROM import_batches WHERE platform=? AND seller_account=? AND file_sha256=? AND report_type LIKE 'brand_%'",
@@ -79,7 +79,7 @@ def import_brand_analytics(db, path: str, platform: str = "Amazon", account: str
 def import_dropfolder(db, folder: str = None, platform: str = "Amazon", account: str = "default") -> dict:
     """Scheduled automation (V22): Brand Analytics CSV files in the drop folder are imported automatically.
     The only remaining manual step is exporting SQP/SCP from Seller Central into this folder —
-    folder: env NUTRISCALE_BA_INBOX ya <data>/brand_analytics_inbox. Duplicate files SHA se rukengi."""
+    folder: env NUTRISCALE_BA_INBOX or <data>/brand_analytics_inbox. Duplicate files are blocked by SHA."""
     import glob as _glob
     folder = folder or os.environ.get("NUTRISCALE_BA_INBOX") or os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "brand_analytics_inbox")

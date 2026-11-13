@@ -1,5 +1,5 @@
 """POL-01 Verified Fact Registry — evidence first for every 'fact' in listing copy.
-Template se bane dawe (nitrogen flush, organic, no added sugar, diabetic-friendly, origin)
+Template-generated claims (nitrogen flush, organic, no added sugar, diabetic-friendly, origin)
 never go into copy without a verified fact in the registry — they get NEEDS_EVIDENCE.
 """
 import os, sys, re

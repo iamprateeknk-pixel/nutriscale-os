@@ -125,7 +125,7 @@ class Store:
     def rank_series(self, keyword):
         return [dict(r) for r in self.db.execute("SELECT * FROM rank_history WHERE keyword=? ORDER BY ts", (keyword,))]
 
-    # Rule confidence persistence (OutcomeLearner ka saathi)
+    # Rule confidence persistence (the OutcomeLearner's companion)
     def save_rule(self, key, confidence, wins, losses, enabled):
         self.db.execute("INSERT OR REPLACE INTO rule_stats VALUES (?,?,?,?,?)", (key, confidence, wins, losses, int(enabled))); self.db.commit()
     def load_rules(self):

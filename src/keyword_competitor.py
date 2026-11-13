@@ -17,7 +17,7 @@ def competitor_gap(your_price_per_kg: float, comp_price_per_kg: float,
     gaps = []
     price_gap_pct = round((your_price_per_kg - comp_price_per_kg) / comp_price_per_kg * 100, 1)
     if price_gap_pct > 5: gaps.append(f"PRICE: you are {price_gap_pct}% pricier per kg")
-    if comp_rating - your_rating >= 0.2: gaps.append(f"RATING: competitor {comp_rating} vs tum {your_rating}")
+    if comp_rating - your_rating >= 0.2: gaps.append(f"RATING: competitor {comp_rating} vs you {your_rating}")
     if comp_reviews > your_reviews * 3: gaps.append(f"REVIEWS: competitor {comp_reviews} vs your {your_reviews} — a big trust gap")
     return {"price_gap_pct": price_gap_pct, "gaps": gaps,
-            "attack_plan": "Product Targeting ads + price/coupon match + review gap band karo" if gaps else "Tum aage ho — position defend karo (Brand Defence ads)"}
+            "attack_plan": "Product Targeting ads + price/coupon match + close the review gap" if gaps else "You are ahead — defend the position (Brand Defence ads)"}

@@ -1,6 +1,6 @@
-"""A12 Approval Governor — Approval-Only Autonomous Mode ka dil.
+"""A12 Approval Governor — the heart of Approval-Only Autonomous Mode.
 An agent creates a proposal -> its tier is decided -> Tier0 executes AUTO,
-Tier1 user ka one-tap approval, Tier2 double confirm. Har action audit-log me.
+Tier1 is a one-tap user approval, Tier2 a double confirmation. Every action goes into the audit log.
 """
 from dataclasses import dataclass, field
 from enum import Enum
@@ -8,7 +8,7 @@ from enum import Enum
 class Tier(Enum):
     AUTO = 0          # no approval, the system does it itself
     ONE_TAP = 1       # user: Approve / Reject / Change
-    DOUBLE = 2        # bada paisa/risk — do baar confirm
+    DOUBLE = 2        # big money/risk — confirm twice
 
 @dataclass
 class Proposal:
@@ -41,11 +41,11 @@ class ApprovalEngine:
     def submit(self, p: Proposal) -> dict:
         tier = decide_tier(p)
         if tier == Tier.AUTO:
-            p.status = "EXECUTED_AUTO"; p.audit.append("Tier0: guardrail ke andar, auto-execute")
+            p.status = "EXECUTED_AUTO"; p.audit.append("Tier0: within guardrails, auto-execute")
         elif tier == Tier.ONE_TAP:
-            p.status = "WAITING_USER_APPROVAL"; p.audit.append("Tier1: user ko approval card bheja")
+            p.status = "WAITING_USER_APPROVAL"; p.audit.append("Tier1: approval card sent to the user")
         else:
-            p.status = "WAITING_DOUBLE_CONFIRM"; p.audit.append("Tier2: double confirm chahiye")
+            p.status = "WAITING_DOUBLE_CONFIRM"; p.audit.append("Tier2: double confirmation needed")
         self.log.append(p)
         return {"action": p.action_type, "tier": tier.name, "status": p.status, "desc": p.description}
     def approve(self, p: Proposal) -> str:
@@ -60,6 +60,6 @@ class ApprovalEngine:
 def guardrail_check(stock_units: int, rating: float, proposed_daily_spend: float, cap: float) -> dict:
     blocks = []
     if stock_units <= 0: blocks.append("STOCK_ZERO: ads auto-pause")
-    if rating and rating < 4.0: blocks.append("RATING_LOW: is SKU ka ad spend freeze")
+    if rating and rating < 4.0: blocks.append("RATING_LOW: ad spend for this SKU frozen")
     if proposed_daily_spend > cap: blocks.append(f"SPEND_CAP: proposed {proposed_daily_spend} > cap {cap}")
     return {"allowed": not blocks, "blocks": blocks}

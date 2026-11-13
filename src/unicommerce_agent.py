@@ -1,4 +1,4 @@
-"""A13 Unicommerce Ops Agent — ek stock truth, saare channels sync.
+"""A13 Unicommerce Ops Agent — one stock truth, all channels in sync.
 The biggest job: 3-way reconciliation (Unicommerce vs Amazon vs Flipkart).
 Mismatch = overselling = order cancellations = damaged account health. Never let it happen.
 """

@@ -89,7 +89,7 @@ class AmazonAds:
                 else: rows = raw
                 return rows if isinstance(rows, list) else rows.get("rows", [])
             if status in ("FAILURE", "CANCELLED"):
-                raise RuntimeError(f"Ads report fail ho gayi: {st.get('failureReason', status)}")
+                raise RuntimeError(f"Ads report failed: {st.get('failureReason', status)}")
             sleep(5)
         raise RuntimeError("The Ads report was not ready in time — it will be retried later (job retry)")
 

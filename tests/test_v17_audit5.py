@@ -1,4 +1,4 @@
-"""V17 AUDIT-5 TESTS — asal HTTP regression (360 crash), campaign-map metrics suraksha,
+"""V17 AUDIT-5 TESTS — real HTTP regression (360 crash), campaign-map metrics protection,
 refund line-allocation, scoped reconciliation, backup job."""
 import os, sys, subprocess, time, json, urllib.request, datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -8,7 +8,7 @@ TODAY = datetime.date.today()
 def d(n): return (TODAY - datetime.timedelta(days=n)).isoformat()
 
 def test_http_360_no_crash():
-    """P0 regression: asal HTTP par /360?platform= — pehle NameError se 500 crash hota tha."""
+    """P0 regression: /360?platform= over real HTTP — it used to crash with a 500 from a NameError."""
     dbf = "/tmp/v17_http.db"
     if os.path.exists(dbf): os.remove(dbf)
     env = dict(os.environ, NUTRISCALE_DB=dbf, PORT="8797",
@@ -29,8 +29,8 @@ def test_http_360_no_crash():
                 payload = json.loads(r.read())
                 return payload.get("data", payload)
         tok = call("/api/v1/auth/login", {"username": "boss", "password": "pass1234"})["token"]
-        # product seed (usi DB file me, doosre connection se)
-        seed = Store(dbf); seed.upsert_product("SKU-H", "HTTP wala", "Flipkart", 250); seed.close()
+        # product seed (in the same DB file, over a second connection)
+        seed = Store(dbf); seed.upsert_product("SKU-H", "HTTP item", "Flipkart", 250); seed.close()
         v = call("/api/v1/products/SKU-H/360?platform=Flipkart", token=tok)
         assert v.get("found") and v.get("platform_view") == "Flipkart", v
         v2 = call("/api/v1/products/SKU-H/360", token=tok)
@@ -41,12 +41,12 @@ def test_http_360_no_crash():
 def test_campaign_map_preserves_metrics():
     import sync_service as SS
     st = Store(":memory:")
-    st.upsert_campaign("Hero", "Amazon", 5000, 9000, source="CSV asal")
+    st.upsert_campaign("Hero", "Amazon", 5000, 9000, source="CSV real")
     class FakeAds:
         def list_campaigns(self): return [{"campaignId": "C77", "name": "Hero"}]
     SS.sync_campaign_map(st, ads=FakeAds())
     row = st.db.execute("SELECT spend, sales FROM campaigns WHERE name='Hero'").fetchone()
-    assert row["spend"] == 5000 and row["sales"] == 9000, "asal metrics ₹0 se kuchle nahi jane chahiye"
+    assert row["spend"] == 5000 and row["sales"] == 9000, "real metrics must not be crushed with ₹0"
     from platform_core import campaign_name_for
     assert campaign_name_for(st.db, "Amazon", "C77") == "Hero"
     st.close()
@@ -61,7 +61,7 @@ def test_refund_allocation_lines():
     st.db.commit()
     F.record_refunds(st.db, [{"order_id": "OA", "sku": "SKU-M", "refund": 100}])
     rows = st.db.execute("SELECT line_id, refund FROM order_items ORDER BY line_id").fetchall()
-    assert rows[0]["refund"] == 75.0 and rows[1]["refund"] == 25.0, f"anupaat 75/25 hona chahiye: {[dict(r) for r in rows]}"
+    assert rows[0]["refund"] == 75.0 and rows[1]["refund"] == 25.0, f"the split should be 75/25: {[dict(r) for r in rows]}"
     assert sum(r["refund"] for r in rows) == 100.0
     st.close()
 
@@ -76,7 +76,7 @@ def test_reconciliation_scoped_and_backup_job():
     st.db.commit()
     rep = P.reconciliation_report(st, "Amazon", days=30)
     assert rep["orders_in_window"]["net_revenue"] == 2000
-    assert rep["settlements_overlapping_window"]["gross_full"] == 1980, "purana settlement khidki se bahar rahega"
+    assert rep["settlements_overlapping_window"]["gross_full"] == 1980, "an old settlement stays outside the window"
     assert rep["window_difference_full_amounts"] == 20.0
     st.close()
     # backup job — file DB par

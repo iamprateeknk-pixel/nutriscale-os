@@ -15,7 +15,7 @@ class SKU:
     referral_pct: float = 0.09      # Amazon IN grocery referral ~9% (verify)
     closing_fee: float = 25.0       # Rs per unit, approx
     shipping_fee: float = 65.0      # FBA / Easy Ship, approx
-    return_loss_pct: float = 0.02   # returns/damage ka expected loss
+    return_loss_pct: float = 0.02   # expected loss from returns/damage
     other_cost: float = 0.0
 
 def contribution(sku: SKU) -> dict:

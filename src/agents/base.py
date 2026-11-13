@@ -35,7 +35,7 @@ class LLMProvider:
             return _json.loads(resp.read().decode())
     def generate(self, prompt: str, system: str = "") -> str:
         if not self.available:
-            raise LLMNotConfigured("LLM key/model configured nahi (env: GOS_LLM_API_KEY, GOS_LLM_MODEL). "
+            raise LLMNotConfigured("LLM key/model not configured (env: GOS_LLM_API_KEY, GOS_LLM_MODEL). "
                                    "Until then agents run on the RuleProvider (engines) — this is deliberate.")
         msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
         try:

@@ -50,7 +50,7 @@
 - ✅ **Database layer** (`src/db_store.py`) — the agents' memory is now permanent: knowledge, action results, rank history — a restart forgets nothing (G2 closed)
 - ✅ **Scheduler** (`src/scheduler.py`) — every daily job (learning crawl at 6, result measurement at 7, FBA/health checks, the night report) registered in one place, with a runner ready (G3 closed)
 - ✅ **Backend API** (`backend/app.py`) — War-Room data, approve/reject approvals, health — a real running server, delivered tested (the backend part of G4 closed)
-- ✅ **War-Room dashboard** (`dashboard/war_room.html`) — KPI cards, blended ROAS, approval queue, agent strength, rank chart, FBA stock, seller health, algorithm alerts, learning feed — 12 components (the screen part of G4 closed, with demo data because connectors were not live yet)
+- ✅ **War-Room dashboard** (`dashboard/war_room.html`) — KPI cards, blended ROAS, approval queue, agent strength, rank chart, FBA stock, seller health, algorithm alerts, learning feed — 12 components (the screen part of G4 closed, with demo data because connectors were not live yet; replaced by the real dashboard `dashboard/index.html` in V12 and removed in V27)
 
 ## 5. FINAL VERDICT
 The system is now at the **"design + brain + body"** stage — blueprint, engines, learning, safety, database, backend, dashboard all exist.

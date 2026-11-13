@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Listing:
     title: str
-    bullets: int                 # bullet points ki sankhya
+    bullets: int                 # number of bullet points
     image_count: int
     has_video: bool = False
     has_a_plus: bool = False
@@ -15,7 +15,7 @@ class Listing:
     price_per_kg: float = 0.0
     top3_avg_price_per_kg: float = 0.0
     backend_terms_filled: bool = False
-    main_keywords_in_title: int = 0   # top keywords me se kitne title me hain (out of 5)
+    main_keywords_in_title: int = 0   # how many of the top keywords are in the title (out of 5)
 
 def score_listing(l: Listing) -> dict:
     issues, score = [], 0.0
@@ -25,7 +25,7 @@ def score_listing(l: Listing) -> dict:
     elif len(l.title) >= 80: t += 6
     else: issues.append("Title is too short — add keywords + grade + weight + use case")
     t += min(l.main_keywords_in_title, 5) * 2
-    if l.main_keywords_in_title < 3: issues.append("Top 5 keywords me se 3 se kam title me hain — indexing weak hoga")
+    if l.main_keywords_in_title < 3: issues.append("Fewer than 3 of the top 5 keywords are in the title — indexing will be weak")
     score += t
     # Images 20
     score += min(l.image_count, 7) * 2
@@ -34,7 +34,7 @@ def score_listing(l: Listing) -> dict:
     else: issues.append("No video — listings with video convert better")
     # Bullets 15
     score += min(l.bullets, 5) * 3
-    if l.bullets < 5: issues.append("5 benefit-first bullets pure karo (health, origin, grade, freshness, use)")
+    if l.bullets < 5: issues.append("Complete 5 benefit-first bullets (health, origin, grade, freshness, use)")
     # A+ 10
     if l.has_a_plus: score += 10
     else: issues.append("No A+ Content — add a brand story + comparison chart")

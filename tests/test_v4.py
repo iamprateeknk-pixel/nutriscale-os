@@ -6,7 +6,7 @@ from flow_pipelines import Flow, retention_trigger, seller_health_check
 
 def test_rationalization():
     s = summary(); assert s["agents"] == 9 and s["flows"] == 10
-    assert "A13" not in AGENTS and "F2" in FLOWS          # Unicommerce ab flow hai, agent nahi
+    assert "A13" not in AGENTS and "F2" in FLOWS          # Unicommerce is now a flow, not an agent
     assert classify("copy_writing") == "AGENT" and classify("stock_sync") == "FLOW"
 
 def test_rank_models():
@@ -17,7 +17,7 @@ def test_rank_models():
     f = rank_readiness({"relevance_indexing": 80, "price_competitiveness": 70, "rating_reviews": 60,
                         "flipkart_assured": 0, "sales_velocity": 50, "seller_rating": 70,
                         "dispatch_speed": 80, "low_returns": 90}, "flipkart")
-    assert f["weakest_factor"] == "flipkart_assured"      # Assured nahi to Flipkart rank nahi
+    assert f["weakest_factor"] == "flipkart_assured"      # no Assured badge, no Flipkart rank
 
 def test_buybox_and_algo_change():
     b = buybox_score_amazon(price_rank=1, total_sellers=5, is_fba=True, seller_rating=4.6, in_stock=True)

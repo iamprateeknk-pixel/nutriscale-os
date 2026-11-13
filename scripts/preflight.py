@@ -7,7 +7,7 @@ from db_store import Store
 import pilot as P
 
 def main():
-    # V17 fix: backend ke saath EK hi DB path — db_store.DEFAULT_PATH (data/growth_os.db)
+    # V17 fix: ONE DB path shared with the backend — db_store.DEFAULT_PATH (data/growth_os.db)
     from db_store import DEFAULT_PATH
     db_path = os.environ.get("NUTRISCALE_DB") or DEFAULT_PATH
     store = Store(db_path)

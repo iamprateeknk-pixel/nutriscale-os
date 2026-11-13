@@ -34,4 +34,4 @@ def seller_health_check(metrics: dict) -> dict:
         if v is None: continue
         if v >= limit: alerts.append(f"🔴 {k}: {v}% CROSSED the {limit}% limit — account at risk, act now")
         elif v >= limit * 0.8: alerts.append(f"🟠 {k}: {v}% is close to the {limit}% limit — pay attention")
-    return {"healthy": not any(a.startswith("🔴") for a in alerts), "alerts": alerts or ["🟢 Saare health metrics safe hain"]}
+    return {"healthy": not any(a.startswith("🔴") for a in alerts), "alerts": alerts or ["🟢 All health metrics are safe"]}

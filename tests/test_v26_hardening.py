@@ -1,5 +1,5 @@
-"""V26 TESTS — dashboard se upload, import path suraksha (koi bhi server file nahi), purane ads data par
-autopilot ka rukna, proposal expiry, asal HTTP par upload->preview->commit."""
+"""V26 TESTS — upload from the dashboard, import path safety (no arbitrary server files), the autopilot
+stopping on old ads data, proposal expiry, upload->preview->commit over real HTTP."""
 import os, sys, json, base64, datetime, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
@@ -12,20 +12,20 @@ def test_upload_and_path_safety():
     d = tempfile.mkdtemp(); dbp = os.path.join(d, "g.db")
     raw = open(os.path.join(FIX, "search_terms.csv"), "rb").read()
     up = IW.save_upload(dbp, "../../etc/My Report!.csv", base64.b64encode(raw).decode())
-    assert up["ok"] and up["upload"].endswith("-My_Report_.csv") and "/" not in up["upload"], "naam saaf, folder se bahar nahi"
+    assert up["ok"] and up["upload"].endswith("-My_Report_.csv") and "/" not in up["upload"], "clean name, never outside the folder"
     assert os.path.dirname(up["path"]) == os.path.join(d, "uploads")
     assert IW.resolve_upload(dbp, up["upload"]) == up["path"]
     for bad in ("../g.db", "../../etc/passwd", "", "x/../../y.csv"):
         assert IW.resolve_upload(dbp, bad) is None, bad
     assert IW.allowed_path(dbp, up["path"])
     secret = os.path.join(tempfile.mkdtemp(), "owner.csv"); open(secret, "w").write("a,b\n1,2\n")
-    assert not IW.allowed_path(dbp, secret), "data/ ke bahar ki file import nahi"
+    assert not IW.allowed_path(dbp, secret), "no import of files outside data/"
     assert not IW.allowed_path(dbp, "/etc/passwd")
     link = os.path.join(d, "uploads", "link.csv"); os.symlink(secret, link)
-    assert not IW.allowed_path(dbp, link), "symlink se bahar jaana bhi band"
-    assert not IW.save_upload(dbp, "report.xlsx", base64.b64encode(b"x").decode())["ok"], "sirf CSV/TSV"
+    assert not IW.allowed_path(dbp, link), "escaping via a symlink is blocked too"
+    assert not IW.save_upload(dbp, "report.xlsx", base64.b64encode(b"x").decode())["ok"], "CSV/TSV only"
     assert not IW.save_upload(dbp, "a.csv", "%%%not-b64")["ok"]
-    assert not IW.save_upload(dbp, "a.csv", "")["ok"], "khaali file nahi"
+    assert not IW.save_upload(dbp, "a.csv", "")["ok"], "no empty file"
 
 def test_autopilot_stops_on_stale_ads_data():
     import growth_autopilot as GA, growth_playbook as GP
@@ -34,19 +34,19 @@ def test_autopilot_stops_on_stale_ads_data():
     st.add_search_term("junk", "SP | X | AUTO", 900, 0, 50, 0, "", "b1", old, old)
     assert GA.ads_data_age(st.db) == 40
     r = GA.run(st)
-    assert r["created"] == [] and r["skipped_stale_data"], "40 din purane data par negative nahi"
-    assert any(t["area"] == "data" and t["priority"] == 1 for t in GP.today(st)["tasks"]), "Aaj screen par chetaavni"
+    assert r["created"] == [] and r["skipped_stale_data"], "no negatives on 40-day-old data"
+    assert any(t["area"] == "data" and t["priority"] == 1 for t in GP.today(st)["tasks"]), "a warning on the Today screen"
     fresh = (datetime.date.today() - datetime.timedelta(days=3)).isoformat()
     st.add_search_term("junk2", "SP | X | AUTO", 900, 0, 50, 0, "", "b2", fresh, fresh)
     r2 = GA.run(st)
     assert r2["created"] and r2["ads_data_age_days"] == 3
     p = json.loads(st.db.execute("SELECT payload FROM action_v12 LIMIT 1").fetchone()["payload"])
-    assert p["data_freshness"] == "3 days old", "proposal par data ki umar likhi ho"
+    assert p["data_freshness"] == "3 days old", "the proposal records the data age"
     st.close()
     st2 = Store(":memory:")
     st2.add_search_term("junk", "SP | X | AUTO", 900, 0, 50, 0)
     r3 = GA.run(st2)
-    assert r3["ads_data_age_days"] is None and r3["created"], "bina-tareekh data: chalega, AGE_UNKNOWN label ke saath"
+    assert r3["ads_data_age_days"] is None and r3["created"], "undated data: allowed, with the AGE_UNKNOWN label"
     assert json.loads(st2.db.execute("SELECT payload FROM action_v12").fetchone()["payload"])["data_freshness"] == "AGE_UNKNOWN"
     st2.close()
 
@@ -60,9 +60,9 @@ def test_proposal_expiry():
     assert e["expired"] == 1 and e["ids"] == [r["id"]]
     assert db.execute("SELECT state FROM action_v12 WHERE id=?", (r["id"],)).fetchone()["state"] == "EXPIRED"
     assert db.execute("SELECT state FROM action_v12 WHERE id=?", (keep["id"],)).fetchone()["state"] == "APPROVAL_PENDING"
-    assert not ACT.approve(db, r["id"], {"username": "o", "role": "Owner"})["ok"], "expired approve nahi hota"
-    assert any(x["to_state"] == "EXPIRED" for x in ACT.action_timeline(db, r["id"])), "itihaas bana rehta hai"
-    assert GA.run(st, dry_run=True)["expired_old_proposals"] == 0, "dry run kuch nahi badalta"
+    assert not ACT.approve(db, r["id"], {"username": "o", "role": "Owner"})["ok"], "an expired proposal cannot be approved"
+    assert any(x["to_state"] == "EXPIRED" for x in ACT.action_timeline(db, r["id"])), "history is kept"
+    assert GA.run(st, dry_run=True)["expired_old_proposals"] == 0, "a dry run changes nothing"
     st.close()
 
 def test_v26_http_upload_flow():
@@ -89,19 +89,19 @@ def test_v26_http_upload_flow():
         code, cm = call("/api/v1/imports/commit", {"upload": up["data"]["upload"]}, tok)
         assert code == 200 and cm["data"]["ok"] and cm["data"]["imported"] >= 1
         code, again = call("/api/v1/imports/commit", {"upload": up["data"]["upload"]}, tok)
-        assert again["data"]["duplicate"] is True, "wahi file dobara nahi"
-        # hamle: server ki koi bhi file / folder se bahar ka naam
+        assert again["data"]["duplicate"] is True, "not the same file twice"
+        # attacks: any server file / a name outside the folder
         assert call("/api/v1/imports/preview", {"path": "/etc/passwd"}, tok)[0] == 400
         assert call("/api/v1/imports/commit", {"upload": "../g.db"}, tok)[0] == 400
         assert call("/api/v1/imports/upload", {"filename": "x.exe", "content_b64": "eA=="}, tok)[0] == 400
-        assert call("/api/v1/imports/upload", {"filename": "a.csv", "content_b64": "eA=="})[0] == 401, "bina login upload nahi"
+        assert call("/api/v1/imports/upload", {"filename": "a.csv", "content_b64": "eA=="})[0] == 401, "no upload without login"
     finally:
         p.terminate(); p.wait(5)
 
 def test_dashboard_upload_widget():
     html = open(os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")).read()
     assert "/api/v1/imports/upload" in html and 'type="file"' in html and "uploadFile" in html and "commitUpload" in html
-    assert "Server par file ka poora path" not in html, "purana path-wala form hata"
+    assert "Server par file ka poora path" not in html, "the old path-based form (former Hinglish label) is gone"
     assert "skipped_stale_data" in html and "'EXPIRED'" in html
 
 if __name__ == "__main__":

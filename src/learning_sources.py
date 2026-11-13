@@ -16,7 +16,7 @@ SOURCES = [
     # Community — ground truth, but verify before adopting
     {"name": "Seller Forums / Reddit / FB Groups", "type": "community", "reliability": 0.45, "agents": ["A01", "A08"], "watch": "other sellers' mistakes, account health issues"},
     # News — the big picture
-    {"name": "Ecommerce News (ET Retail, Inc42)", "type": "news", "reliability": 0.7, "agents": ["A01", "A02"], "watch": "category trend, competitor brands ke moves"},
+    {"name": "Ecommerce News (ET Retail, Inc42)", "type": "news", "reliability": 0.7, "agents": ["A01", "A02"], "watch": "category trends, competitor brand moves"},
 ]
 
 def sources_for_agent(agent_id: str) -> list:

@@ -1,5 +1,5 @@
 """A09 FBA + Flipkart Warehouse Planner.
-Rule: Hero SKU = marketplace warehouse (Prime/Assured badge + fast delivery + fix cost).
+Rule: Hero SKU = marketplace warehouse (Prime/Assured badge + fast delivery + fixed cost).
 Slow SKU = your own warehouse (avoid storage fees). Keep 30-45 days of stock; under 15 days = replenish.
 """
 
@@ -12,7 +12,7 @@ def replenishment(stock: int, daily_sales: float, lead_days: int = 7,
     need = max(0, round(daily_sales * target_cover_days - stock))
     urgent = cover < (lead_days + 8)   # lead time + safety
     return {"days_of_cover": cover, "reorder_qty": need if urgent else 0,
-            "status": "REPLENISH_NOW (Tier-1 approval proposal banao)" if urgent else "OK",
+            "status": "REPLENISH_NOW (create a Tier-1 approval proposal)" if urgent else "OK",
             "festival_note": "Keep 45-60 days of cover 45 days before a peak/festival — inbound gets congested"}
 
 def fba_vs_selfship(selling_price: float, fba_fee: float, self_courier: float,
@@ -26,4 +26,4 @@ def fba_vs_selfship(selling_price: float, fba_fee: float, self_courier: float,
 def warehouse_decision(sku_daily_sales: float, shelf_life_days: int) -> str:
     if sku_daily_sales >= 5: return "MARKETPLACE_WAREHOUSE (FBA / Flipkart Assured) — hero SKU"
     if sku_daily_sales >= 1: return "SPLIT — some in FBA, the rest in your own warehouse"
-    return "OWN_GODOWN — slow SKU, storage fee se bachao"
+    return "OWN_GODOWN — slow SKU, avoid storage fees"

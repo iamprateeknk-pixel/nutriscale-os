@@ -1,4 +1,4 @@
-"""V24 TESTS — market research niyam (ads/reviews/A+/events/q-commerce/Flipkart ads), growth playbook
+"""V24 TESTS — market research rules (ads/reviews/A+/events/q-commerce/Flipkart ads), growth playbook
 (break-even ACOS, campaign structure, sale calendar, review plan, today), manual cycle me brain, naya dashboard."""
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -11,18 +11,18 @@ def test_v24_knowledge_rules():
         r = MK.rule(rid)
         if r["status"] != "HEURISTIC": assert len(r["sources"]) >= 1, rid
     assert MK.rule("AMZ-A-06")["status"] == "SINGLE_SOURCE" and MK.rule("AMZ-A-06")["reliability"] <= 0.5, \
-        "ek-source wali salah ko kam bharosa"
-    assert len(MK.rules_for(agent="A06")) >= 8, "Ads agent ke paas ab apna playbook hai"
+        "single-source advice gets lower confidence"
+    assert len(MK.rules_for(agent="A06")) >= 8, "the Ads agent now has its own playbook"
 
 def test_break_even_acos():
     import growth_playbook as GP, finance as F
     st = Store(":memory:")
     st.upsert_product("SKU-K", "Kaju", "Amazon", 650)
-    assert GP.break_even(st.db, "SKU-K")["status"] == "DATA_NEEDED", "cost bina break-even ka number nahi"
+    assert GP.break_even(st.db, "SKU-K")["status"] == "DATA_NEEDED", "no break-even number without cost"
     F.set_cost(st.db, "SKU-K", 300, 20, 0, "test", approved_by="o")
     b = GP.break_even(st.db, "SKU-K")
     assert b["status"] == "OK" and 0 < b["break_even_acos_pct"] < 60
-    assert abs(b["target_acos_pct"] - (b["break_even_acos_pct"] - 10)) < 0.11, "target = break-even − 10% munafa"
+    assert abs(b["target_acos_pct"] - (b["break_even_acos_pct"] - 10)) < 0.11, "target = break-even − 10% profit"
     assert abs(b["break_even_roas"] - 100 / b["break_even_acos_pct"]) < 0.05
     F.set_cost(st.db, "SKU-L", 700, 0, 0, "test", approved_by="o")
     loss = GP.break_even(st.db, "SKU-L", price=500)
@@ -42,14 +42,14 @@ def test_ads_structure_findings():
     assert a["campaign_types"] == {"AUTO": 1, "EXACT": 1}
     msgs = " | ".join(f["message"] for f in a["findings"])
     assert "bidding against yourself" in msgs, "Exact + Auto dono me ek term = self-competition"
-    assert a["harvest_pending"] == 1, "cashew 1kg (3 orders, sirf Auto me) harvest-yogya; kaju w240 pehle se Exact me"
+    assert a["harvest_pending"] == 1, "cashew 1kg (3 orders, only in Auto) is ready to harvest; kaju w240 is already in Exact"
     assert a["wasted_spend"] == 300
     assert 0 <= a["structure_score"] < 100
     st.close()
     st2 = Store(":memory:")
     st2.add_search_term("x", "Campaign 1", 10, 0, 1, 0)
     rids = {f["rule_id"] for f in GP.ads_structure(st2)["findings"]}
-    assert {"AMZ-A-01", "AMZ-A-02"} <= rids, "na Auto na Exact — dono chetaavni"
+    assert {"AMZ-A-01", "AMZ-A-02"} <= rids, "neither Auto nor Exact — warn on both"
     st2.close()
 
 def test_event_calendar():
@@ -59,8 +59,8 @@ def test_event_calendar():
     assert names[0] == "Wedding season" and "Christmas / New Year gifting" in names
     assert all(e["days_to_start"] <= 120 for e in c["events"])
     w = c["events"][0]
-    assert w["fba_stock_by"] < w["ready_by"] < w["start"], "FBA stock pehle, phir taiyaari, phir sale"
-    assert "ESTIMATES" in c["note"], "tareekhein anumaan hain — saaf likha ho"
+    assert w["fba_stock_by"] < w["ready_by"] < w["start"], "FBA stock first, then preparation, then the sale"
+    assert "ESTIMATES" in c["note"], "the dates are estimates — this must be stated clearly"
     conf = GP.event_calendar("2026-11-11", confirmed={"Republic Day Sale": "2027-01-15"})
     rd = [e for e in conf["events"] if e["event"] == "Republic Day Sale"][0]
     assert rd["start"] == "2027-01-15" and rd["confirmed"] is True
@@ -68,13 +68,13 @@ def test_event_calendar():
 def test_review_plan_policy_safe():
     import growth_playbook as GP
     st = Store(":memory:")
-    st.upsert_product("A", "Naya", "Amazon", 500, 0, 4.5, 8)
+    st.upsert_product("A", "New", "Amazon", 500, 0, 4.5, 8)
     st.upsert_product("B", "Purana", "Amazon", 500, 0, 3.6, 400)
-    st.upsert_product("C", "Flipkart wala", "Flipkart", 500, 0, 4.6, 3)
+    st.upsert_product("C", "Flipkart item", "Flipkart", 500, 0, 4.6, 3)
     r = GP.review_plan(st.db)
     by = {(i["sku"], i["action"][:4]) for i in r["items"]}
-    assert ("A", "Vine") in by and ("B", "Rati") in by and not any(s == "C" for s, _ in by), "Vine sirf Amazon"
-    assert "suspend" in r["policy"], "incentive-review ka khatra saaf likha ho"
+    assert ("A", "Vine") in by and ("B", "Rati") in by and not any(s == "C" for s, _ in by), "Vine is Amazon-only"
+    assert "suspend" in r["policy"], "the incentivised-review risk must be stated clearly"
     st.close()
 
 def test_today_aggregator_and_cycle():
@@ -86,12 +86,12 @@ def test_today_aggregator_and_cycle():
     st.add_search_term("badam", "SP | Badam | AUTO", 900, 0, 50, 0)
     t2 = GP.today(st)
     assert any(x["area"] == "ads" and x["rule_id"] == "AMZ-A-03" for x in t2["tasks"])
-    assert t2["tasks"][0]["priority"] == 1, "zaroori kaam sabse upar"
+    assert t2["tasks"][0]["priority"] == 1, "urgent tasks at the top"
     rep = GovernanceAgent(st).daily_cycle()
     jobs = {j["job"]: j for j in rep["jobs"]}
-    assert "Playbook" in jobs["learning_crawl"]["output"], "manual cycle bhi asal seekh-chakra chalaye"
+    assert "Playbook" in jobs["learning_crawl"]["output"], "the manual cycle also runs the real learning cycle"
     assert jobs["backup_restore"]["status"] == "DONE" and "SKIP" in jobs["backup_restore"]["output"], \
-        "backup handler ab manual cycle me bhi (in-memory par imaandaar SKIP)"
+        "the backup handler is in the manual cycle too (an honest SKIP for in-memory)"
     assert st.db.execute("SELECT COUNT(*) c FROM playbook_rules").fetchone()["c"] >= 40
     st.close()
 
@@ -99,8 +99,8 @@ def test_listing_evidence_gate_and_safe_defaults():
     from agents.listing_agent import ListingAgent, generate_bullets
     b = " ".join(generate_bullets({}))
     for claim in ("nitrogen", "FSSAI", "replacement"):
-        assert claim not in b, f"default bullets me bina-saboot dawa '{claim}' nahi hona chahiye"
-    assert "FSSAI lic. 123" in " ".join(generate_bullets({"fssai": "123"})), "tathya diya ho to hi"
+        assert claim not in b, f"unproven claim in the default bullets: '{claim}' must not appear"
+    assert "FSSAI lic. 123" in " ".join(generate_bullets({"fssai": "123"})), "only when the fact is provided"
     st = Store(":memory:")
     r = ListingAgent(st).build_listing("S", "Dry Fruit Farm", "Cashew Nuts", "cashew", "W240", "500g",
                                        facts={"pack_line": "nitrogen-flushed pouch"})
@@ -110,15 +110,15 @@ def test_listing_evidence_gate_and_safe_defaults():
 def test_dashboard_v24():
     html = open(os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")).read()
     for key in ["today", "listingbuilder", "keywordplan", "sqp", "growth", "brain", "knowledge"]:
-        assert f"['{key}'" in html, f"naya screen gayab: {key}"
+        assert f"['{key}'" in html, f"new screen missing: {key}"
     for api in ["/api/v1/today", "/api/v1/listings/build", "/api/v1/keywords/plan", "/api/v1/keywords/sqp",
                 "/api/v1/growth/ads-structure", "/api/v1/growth/events", "/api/v1/growth/break-even", "/api/v1/brain", "/api/v1/knowledge"]:
-        assert api in html, f"dashboard {api} se nahi judta"
+        assert api in html, f"dashboard {api} is not wired up"
     assert "prefers-color-scheme: dark" in html and 'data-theme="dark"' in html, "dark mode"
     assert "alert(" not in html and "prompt(" not in html and "confirm(" not in html, "browser popups ki jagah toast/modal"
     assert "@media (max-width:860px)" in html, "mobile layout"
     import re
-    assert not re.search(r'class="grid g2" style="grid-template-columns', html), "inline grid mobile ko todta hai"
+    assert not re.search(r'class="grid g2" style="grid-template-columns', html), "an inline grid breaks mobile"
 
 def test_v24_http():
     import subprocess, time, urllib.request, socket, tempfile
@@ -144,7 +144,7 @@ def test_v24_http():
         assert "items" in call("/api/v1/growth/reviews", tok=tok)
         assert call("/api/v1/products", tok=tok)["products"] == []
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/today", timeout=5); assert False, "bina login 401"
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/today", timeout=5); assert False, "401 without login"
         except urllib.error.HTTPError as e:
             assert e.code == 401
     finally:

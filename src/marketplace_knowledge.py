@@ -172,7 +172,7 @@ KNOWLEDGE = [
        "Flipkart ranking runs on product-data quality + real shopper behaviour (conversion, reviews, seller performance); "
        "a suppressed listing has no rank. The formula is not published.",
        "MULTI_SOURCE", 0.65, ["fk_42signals", "fk_ecomva", "fk_base"]),
-    # ---------------- FSSAI (India, sab platforms) ----------------
+    # ---------------- FSSAI (India, all platforms) ----------------
     _k("FS-C-01", "ALL", "compliance", ["A04", "A09"],
        "FSSAI Advertising & Claims Regulations 2018 (in force from 1 Jul 2019): claims to prevent/cure disease are banned; e-commerce "
        "platforms are also liable as 'marketers'; deceptive claims are punishable under Section 53 of the FSS Act.",

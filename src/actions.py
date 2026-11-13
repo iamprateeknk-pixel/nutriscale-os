@@ -1,5 +1,5 @@
 """SEC-02 Kill Switch (server-side, persisted in the DB — NOT reset by a restart) +
-SEC-03 Approval State Machine + idempotent execution (API-02 ka core).
+SEC-03 Approval State Machine + idempotent execution (the core of API-02).
 State: DRAFT > PROPOSED > APPROVAL_PENDING > APPROVED > QUEUED > EXECUTING >
        APPLIED_VERIFIED / FAILED / CANCELLED / ROLLED_BACK
 Truth rule: APPLIED_VERIFIED only with proof of vendor/manual confirmation (vendor_ref) —

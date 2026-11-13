@@ -11,7 +11,7 @@ from agents.review_agent import ReviewAgent, analyze_reviews
 def test_market_seasons():
     diwali = season_for_date(datetime.date(2026, 10, 15))
     assert diwali["in_window"] and "Diwali" in diwali["season"]
-    normal = season_for_date(datetime.date(2026, 3, 10))   # March — Ramadan window ya normal, dono chalega lekin structure sahi ho
+    normal = season_for_date(datetime.date(2026, 3, 10))   # March — the Ramadan window or normal, either is fine but the structure must be right
     assert "season" in normal and "prep" in normal
     st = Store(":memory:"); assert "season" in MarketAgent(st).today_brief(datetime.date(2026, 10, 15)); st.close()
 
@@ -45,7 +45,7 @@ def test_pricing_agent():
     st = Store(":memory:")
     assert PricingAgent(st).evaluate_products()["evaluations"] == []
     st.upsert_product("BADAM500", "Almonds 500g", "Amazon", 649, cost=340)
-    st.upsert_product("GHATA500", "Cheap Mix 500g", "Amazon", 299, cost=230)   # patla/ghata margin
+    st.upsert_product("GHATA500", "Cheap Mix 500g", "Amazon", 299, cost=230)   # thin/negative margin
     ev = PricingAgent(st).evaluate_products()["evaluations"]
     by = {e["sku"]: e for e in ev}
     assert by["GHATA500"]["verdict"] in ("THIN", "LOSS_RISK")

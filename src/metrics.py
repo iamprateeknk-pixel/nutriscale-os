@@ -1,6 +1,6 @@
 """DAT-02 Metric reconciliation — matched-period gating.
 Rule: numbers from different time windows are NEVER combined into a confident number.
-Windows ka overlap kam ho to derived metrics (TACOS/organic share) = NOT_COMPARABLE.
+If the windows overlap too little, derived metrics (TACOS/organic share) = NOT_COMPARABLE.
 """
 import datetime
 

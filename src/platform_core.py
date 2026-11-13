@@ -1,4 +1,4 @@
-"""V12 Platform Core — canonical schema (DAT-01), control state (SEC-02), jobs (JOB-01) ki neev.
+"""V12 Platform Core — canonical schema (DAT-01), control state (SEC-02), jobs (JOB-01) — the foundation.
 Old tables are left untouched; this ensures the new V12 tables exist.
 Every table carries platform + seller_account — so tenant data never mixes by mistake.
 """

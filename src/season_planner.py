@@ -43,7 +43,7 @@ def render_markdown(pack: dict) -> str:
     for i, c in enumerate(pack["combos"], 1):
         L += [f"## Combo {i}: {c['name']} — ₹{c['gift_price']:,}",
               f"- Items: {', '.join(c['items'])} (separately ₹{c['parts_total']:,} total, {c['discount_pct']}% off as a combo)",
-              f"- **Ek order ka bill: ₹{c['gift_price']:,} — aaj ke AOV ka {c['aov_multiple']}x**",
+              f"- **One order's bill: ₹{c['gift_price']:,} — {c['aov_multiple']}x today's AOV**",
               f"- Listing title: {c['title']}",
               f"- Photo shot 7 (gifting): {c['brief_shot7']}",
               "- [ ] Create the combo listing (virtual bundle or new SKU) · - [ ] A separate SP-Exact campaign for gift keywords, small budget first",
