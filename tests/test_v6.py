@@ -27,8 +27,8 @@ def test_control_center():
     c.emergency_stop()
     assert not c.can_run_ads(50, 500)["allowed"]          # kill switch sab par bhari
     c.resume(); assert c.can_run_ads(50, 500)["allowed"]
-    assert "ab" in c.set_guardrail("daily_spend_cap", 5000)
-    assert "Galat" in c.set_guardrail("kuch_bhi", 5)
+    assert "is now" in c.set_guardrail("daily_spend_cap", 5000)
+    assert "Unknown control" in c.set_guardrail("anything_else", 5)
     c.agents_enabled["A06"] = False
     assert not c.can_run_ads(50, 500)["allowed"]          # agent band = ads band
 

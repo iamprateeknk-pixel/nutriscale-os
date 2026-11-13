@@ -1,6 +1,6 @@
-"""War-Room Service v2 — SIRF ASAL DATA. Koi demo number nahi banta.
-Data DB me hai (connectors/CSV se aaya) to asal hisaab; nahi hai to connected=False
-ke saath khaali halat — dashboard wahi dikhayega, jhooth kabhi nahi.
+"""War-Room Service v2 — REAL DATA ONLY. No demo numbers are ever generated.
+If data is in the DB (from connectors/CSV) the real numbers are calculated; otherwise connected=False
+with an empty state — the dashboard shows exactly that, never a lie.
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -14,7 +14,7 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
     try:
         if not store.has_real_data():
             return {"connected": False, "demo_data": False,
-                    "message": "Abhi koi asal data nahi hai. Connector configure karo ya CSV report import karo — tareeka CONNECTORS_SETUP.md me hai.",
+                    "message": "No real data yet. Configure a connector or upload a CSV report — see CONNECTORS_SETUP.md.",
                     "connectors_status": cfg.status_all(),
                     "kpis": None, "products": [], "campaigns": [], "inventory": [], "waste_terms": []}
         import analytics as AN
@@ -22,10 +22,10 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
         camp = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COALESCE(SUM(sales),0) sa FROM campaigns" +
                                 (" WHERE platform=?" if platform else ""), (platform,) if platform else ()).fetchone()
         ad_spend, paid_sales = round(camp["sp"], 2), round(camp["sa"], 2)
-        # Organic = kul order sales - paid sales (flywheel ka asal hisaab)
+        # Organic = total order sales - paid sales (the real flywheel calculation)
         organic = max(0.0, st["revenue"] - paid_sales)
-        # V15: TACOS sirf MATCHED khidki par — pichle 30 din ki dated bikri banam usi khidki ka ads kharch;
-        # dono taraf ka dated data na mile to NOT_COMPARABLE (lifetime totals se jhootha ratio nahi)
+        # V15: TACOS only on a MATCHED window — dated sales of the last 30 days vs ad spend in the same window;
+        # without dated data on both sides it is NOT_COMPARABLE (no fake ratio from lifetime totals)
         import datetime as _dt
         _end = _dt.date.today(); _start = _end - _dt.timedelta(days=29)
         _sw = store.db.execute("""SELECT COALESCE(SUM(oi.gross - COALESCE(oi.refund,0)),0) g, COUNT(*) n
@@ -33,7 +33,7 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
             WHERE oh.order_date>=? AND oh.order_date<=? AND COALESCE(oh.status,'') NOT LIKE 'Cancel%'""" +
             (" AND oi.platform=?" if platform else ""),
             ((_start.isoformat(), _end.isoformat()) + ((platform,) if platform else ()))).fetchone()
-        # V17: sirf rows ka hona kaafi nahi — din-ginti coverage + channel-scope bhi parkha jayega
+        # V17: rows existing is not enough — day-count coverage + channel scope are checked too
         _src_like = (platform + "%") if platform else "%"
         _aw = store.db.execute("SELECT COALESCE(SUM(spend),0) sp, COUNT(*) n FROM search_terms WHERE period_start>=? AND period_end<=? AND period_start<>'' AND source LIKE ?",
                                (_start.isoformat(), _end.isoformat(), _src_like)).fetchone()
@@ -53,14 +53,14 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
                 WHERE oh.order_date>=? AND oh.order_date<=? AND oi.platform<>'Amazon'""",
                 (_start.isoformat(), _end.isoformat())).fetchone()["g"]
             if _other and _other > 0:
-                _mix_ok, _mix_reason = False, "bikri me gair-Amazon hissa hai par ads data sirf Amazon ka — platform chun kar dekho"
+                _mix_ok, _mix_reason = False, "sales include non-Amazon channels but ads data is Amazon-only — pick a platform"
         if _sw["n"] >= 5 and _aw["n"] and _sw["g"] and _cov >= 0.8 and _mix_ok:
             tacos_m = {"pct": round(100.0 * _aw["sp"] / _sw["g"], 2), "status": "MATCHED",
                        "ads_coverage_pct": round(100 * _cov, 1),
                        "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
         else:
-            _why = _mix_reason or (f"ads coverage sirf {round(100*_cov)}% hai (80% chahiye)" if _aw["n"] else "period-tagged ads data nahi") \
-                   or (f"bikri lines sirf {_sw['n']} (kam se kam 5 chahiye)")
+            _why = _mix_reason or (f"ads coverage is only {round(100*_cov)}% (80% needed)" if _aw["n"] else "no period-tagged ads data") \
+                   or (f"only {_sw['n']} sales lines (at least 5 needed)")
             tacos_m = {"pct": None, "status": "NOT_COMPARABLE", "reason": _why,
                        "ads_coverage_pct": round(100 * _cov, 1),
                        "window": {"from": _start.isoformat(), "to": _end.isoformat()}}
@@ -70,18 +70,18 @@ def warroom_data(store: Store = None, platform: str = None) -> dict:
                 "connectors_status": cfg.status_all(),
                 "kpis": {**fw, "tacos_pct": tacos_m["pct"], "tacos_status": tacos_m["status"],
                          "tacos_window": tacos_m["window"],
-                         "tacos_spend_basis": "period-tagged search-terms kharch (khidki ke andar ke periods hi)",
-                         "orders_count_basis": "cancelled orders ginati se bahar; cancelled_orders alag se darj",
+                         "tacos_spend_basis": "period-tagged search-term spend (only periods inside the window)",
+                         "orders_count_basis": "cancelled orders excluded from counts; cancelled_orders recorded separately",
                          "revenue": st["revenue"], "total_sales": st["revenue"],
                          "orders": st["orders"], "sales_source": st["source"],
                          "ad_spend": ad_spend, "paid_sales": paid_sales,
                          "organic_sales": round(organic, 2),
-                         "organic_basis": "ANDAAZ — kul bikri me se ads-attributed bikri ghata kar; asal organic alag se maapa nahi jata, attribution khidki reports ki hai",
-                         "tacos_basis": "TACOS tabhi pakka jab bikri aur ads ki samay-khidki mile (matched period) — alag khidkiyon par NOT_COMPARABLE mana jayega"},
+                         "organic_basis": "ESTIMATE — total sales minus ads-attributed sales; real organic is not measured separately, attribution windows come from the reports",
+                         "tacos_basis": "TACOS is only reliable when sales and ads share the same time window (matched period) — different windows are NOT_COMPARABLE"},
                 "products": [p for p in store.all_products() if not platform or p.get("platform") == platform],
                 "campaigns": [c for c in store.all_campaigns() if not platform or c.get("platform") == platform],
                 "inventory": store.all_inventory(),
                 "waste_terms": store.waste_terms(),
-                "note": "Ye saare numbers DB ke asal records se bane hain (connectors/CSV sync se)."}
+                "note": "All these numbers come from real DB records (connector/CSV sync)."}
     finally:
         if own: store.close()

@@ -1,7 +1,7 @@
-"""CSV Import — jo rasta AAJ se asal kaam karega, API manzoori ka intezaar kiye bina.
-Seller Central / Ads Console / Flipkart Seller Hub se download ki hui asal reports
-ko parse karke DB me bharta hai. Column ke naam dono platforms ke asal export se liye hain;
-mismatch ho to flexible mapping se milata hai.
+"""CSV Import — the path that does real work TODAY, without waiting for API approval.
+Parses real reports downloaded from Seller Central / Ads Console / Flipkart Seller Hub
+into the DB. Column names come from both platforms' real exports;
+mismatches are handled with flexible mapping.
 """
 import csv, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -23,8 +23,8 @@ def _find(row: dict, *names):
 def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
                             period_start: str = "", period_end: str = "", batch_id: str = "") -> int:
     """Amazon Ads Console -> Reports -> Search Term Report CSV.
-    V12.2 dedup: (1) file ke ANDAR ek hi term+campaign ki kai rows jod kar ek banti hai;
-    (2) period diya ho to usi source+period ki purani rows pehle hat ti hain — dobara import par totals double NAHI honge."""
+    V12.2 dedup: (1) multiple rows of the same term+campaign WITHIN a file are summed into one;
+    (2) with a period, old rows of the same source+period are removed first — re-imports never double the totals."""
     agg = {}
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
@@ -50,8 +50,8 @@ def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
 
 def import_campaign_report(path: str, store: Store, platform: str = "Amazon") -> int:
     """Ads Console Campaign Report CSV -> campaigns table.
-    Ek hi campaign ki kai rows ho sakti hain (alag-alag date ranges) — pehle jodkar phir bharo,
-    warna aakhiri row pichli saari ko mita degi."""
+    One campaign can have several rows (different date ranges) — sum them first, then store,
+    otherwise the last row would wipe out all the previous ones."""
     agg, n = {}, 0
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
@@ -67,7 +67,7 @@ def import_campaign_report(path: str, store: Store, platform: str = "Amazon") ->
     return n
 
 def import_sales_orders(path: str, store: Store, platform: str = "Amazon") -> int:
-    """Amazon: All Orders report (tab-separated bhi chalega) / Flipkart: Orders export CSV."""
+    """Amazon: All Orders report (tab-separated also works) / Flipkart: Orders export CSV."""
     n = 0
     with open(path, newline="", encoding="utf-8-sig") as f:
         sample = f.read(2048); f.seek(0)
@@ -84,8 +84,8 @@ def import_sales_orders(path: str, store: Store, platform: str = "Amazon") -> in
 
 def import_orders_canonical(path: str, store, platform: str = "Amazon", account: str = "default",
                             period: tuple = ("", ""), imported_by: str = "system") -> dict:
-    """DAT-01: line-level canonical import + batch hash. Wahi file dobara = duplicate receipt,
-    numbers nahi badlenge (QA-02). Do-item order = do line rows."""
+    """DAT-01: line-level canonical import + batch hash. The same file again = duplicate receipt,
+    numbers do not change (QA-02). A two-item order = two line rows."""
     import sys as _s
     _s.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from platform_core import ensure_v12, sha256_file, now_utc
@@ -94,7 +94,7 @@ def import_orders_canonical(path: str, store, platform: str = "Amazon", account:
     dup = db.execute("""SELECT * FROM import_batches WHERE platform=? AND seller_account=? AND file_sha256=?
                         AND report_type='orders'""", (platform, account, h)).fetchone()
     if dup: return {"duplicate": True, "batch_id": dup["id"], "rows_ok": dup["rows_ok"],
-                    "note": "Ye file pehle import ho chuki hai — duplicate roka gaya, numbers wahi rahenge"}
+                    "note": "This file was already imported — duplicate blocked, numbers unchanged"}
     n = bad = 0
     with open(path, newline="", encoding="utf-8-sig") as f:
         sample = f.read(2048); f.seek(0)
@@ -121,11 +121,11 @@ def import_orders_canonical(path: str, store, platform: str = "Amazon", account:
                (platform, account, period[0], period[1], h, n, bad, imported_by, now_utc(), f"canonical orders import: {n} lines"))
     db.commit()
     return {"duplicate": False, "rows_ok": n, "rows_bad": bad, "sha256": h[:12],
-            "note": "Line-level canonical import ho gaya (order_items me har line alag)"}
+            "note": "Line-level canonical import done (each line separate in order_items)"}
 
 
 def import_inventory_csv(path: str, store: Store, location: str = "Own Warehouse") -> int:
-    """Simple stock sheet: sku, quantity columns (Unicommerce export se bhi chalega)."""
+    """Simple stock sheet: sku, quantity columns (a Unicommerce export also works)."""
     n = 0
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
