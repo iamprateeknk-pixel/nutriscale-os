@@ -42,7 +42,7 @@ def test_outcome_engine_loop():
 def test_sku_exact_fees():
     import finance as F
     st = Store(":memory:")
-    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-X','Exact Wala','Amazon',400,0,0,0,'t')"); st.db.commit()
+    st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-X','Exact Item','Amazon',400,0,0,0,'t')"); st.db.commit()
     F.set_cost(st.db, "SKU-X", 150, 20, approved_by="owner")
     F.import_order_fees(st.db, [{"order_id": "O1", "sku": "SKU-X", "gross": 20000, "fees": 5000}])
     c = F.contribution_v2(st.db, "SKU-X", 400)
