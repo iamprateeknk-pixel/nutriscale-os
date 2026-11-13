@@ -1,5 +1,44 @@
 # NutriScale OS — STATUS (sach ki diary)
-_Updated: 23 Oct 2026 (V21+V22 — audit-9 closure + marketplace data automation)_
+_Updated: 12 Nov 2026 (V25 — Growth Autopilot: seekh ka chakra poora; kul 30 suites pass)_
+
+## 🤖 V25 — Growth Autopilot: kamiyaan khud proposals bante hain, chakra poora (12 Nov 2026)
+(saboot: test_v25_autopilot.py — 7 tests; kul **30 suites pass**; browser me Autopilot → Approval Inbox flow chala)
+- **Pehle**: playbook kamiyaan *dikhata* tha, par proposals nahi banata — isliye ads ke niyamo ka bharosa kabhi asli nateejo se nahi badal sakta tha.
+- **Ab** (`src/growth_autopilot.py`, roz **07:45** — nateeje maapne ke baad): bekaar kharch wale terms → negative-exact; jeetne wale terms → Exact me harvest; apni hi bid se ladai → Auto/Broad me negative; SQP "scale karo" / "click nahi" queries; stock 0 wale SKU ke ads pause — sab **approval-wale proposals** (`rule_ids` + `campaign` ke saath) → approve → 7/14 din me maap → brain me us niyam ka bharosa upar/neeche.
+- **Suraksha**: khud kuch live nahi (ONE_TAP + kill switch); ek kaam ek hafte me ek hi baar (idempotent); ek run me max 15, aur seema me har prakar ko baari-baari jagah (negatives kamai wale harvest ko nahi dabaate); brain me DISABLED niyam par proposal nahi; jo term kahin bhi convert hua uspar negative kabhi nahi; stock-out pause sirf tab jab campaign naam me SKU ho.
+- **Haftawar report** — har Sunday 21:00 IST, `data/reports/weekly-<date>.md` (proposals, nateeje, brain ka badlav, ads structure, agle 45 din ke events); API `/api/v1/reports/weekly`. (Pehle scheduler haftawar jobs chalata hi nahi tha.)
+- **Dashboard**: Growth screen par Autopilot panel (preview + "proposals banao"), Approval Inbox me har proposal ka **"kya aur kyun"** + rule chips, Aaj screen par autopilot ka kaam.
+
+## 🚀 V24 — Naya dashboard + market research se agents ke naye playbook (11 Nov 2026)
+(saboot: test_v24_growth.py — 9 tests incl. asal HTTP; kul **29 suites pass**; Chromium me saare 23 screen bina JS error, mobile 390px par koi horizontal scroll nahi)
+- **Dashboard naye sire se** (`dashboard/index.html`): grouped navigation (Aaj / Badhao / Paisa / Dimaag / System), **"Aaj ka kaam" home** (zaroori kaam pehle, setup progress, agla sale event, brain), light + **dark mode**, mobile drawer, **Ctrl+K** se screen dhoondho, browser `alert/prompt` ki jagah toast + modal, khaali screen par "agla kadam" button, har sifarish ke saath **rule chip** (dabao to niyam + source).
+- **Naye screens**: Listing Builder (live akshar/byte ginti, copy button, jaanch score), Keyword Plan (meva chuno → title/highlights/backend/negative), SQP Funnel, Growth Playbook, Agent Brain, Knowledge Base. Purane 16 screen sab maujud.
+- **15 naye research niyam** (kul 42) — sab source ke saath: Amazon ads structure (Auto=khoj, Exact=kamai, harvest chakra, haftawar negatives), **break-even ACOS** formula, launch par TACOS, Vine + review policy, A+ content, Great Indian Festival ki taiyaari (FBA 15-20 din pehle, coupons/deals ~7 din pehle), India dry-fruit bazaar ka aakar, **quick commerce** (Blinkit/Zepto/Instamart), Flipkart PLA.
+- **Growth Playbook engine** (`src/growth_playbook.py`) — niyam tumhare data par: SKU ka break-even/target ACOS, campaign structure score (apni hi bid se ladai, harvest baaki, bekaar kharch), sale calendar countdown (tareekhein ANUMAAN — saaf likha), policy-safe review plan, aur home screen ka `today()`.
+- **Fixes**: (1) manual `run_cycle` ab wahi asal seekh-chakra + backup + Brand Analytics import chalata hai jo 24×7 scheduler; (2) default bullets me bina-saboot dawe the ("nitrogen flush", "FSSAI licensed", "return/replacement niti") — hata diye; (3) Listing Builder ab fact-registry bhi jaanchta hai (NS-P-01) — bina saboot ka dawa pehle hi BLOCK, approve par nahi.
+- **Imaandaari**: Amazon.in ne Box ke browser ko bhi search page nahi diya (bot-rok) — isliye top listings ka asli data nahi liya gaya, sirf research niyam. Brand-wise market share ka koi bharose-layak public source nahi mila. Sale tareekhein anumaan hain.
+
+## 🧠 V23 — Agents ko listing/keyword ka gyaan + khud seekhna (11 Nov 2026)
+(saboot: test_v23_brain.py — 9 tests incl. asal HTTP; kul **28 suites pass**)
+- **Marketplace Knowledge Base** (`src/marketplace_knowledge.py`): web research (11 Nov 2026) se 26 niyam, **har niyam ke saath source URL + status** (OFFICIAL / MULTI_SOURCE / SINGLE_SOURCE / HEURISTIC) + bharosa. Mukhya:
+  - Amazon **title ab 75 akshar** (27 Jul 2026 se, media chhod sab category) — lamba title Amazon ka AI khud badal deta hai; naya **Item Highlights** field 125 akshar
+  - Title me koi shabd 2 se zyada nahi (plural bhi gina), `! $ ? _ { } ^` mana
+  - Amazon.in backend **200 BYTES** (Hindi akshar = 3 byte), spaces, title ke shabd dohrao mat, competitor brand/ASIN mana
+  - Bullets me emoji, ™ ®, refund/guarantee vaade, website mana
+  - Main image shuddh safed 255, ~85% bharo, 1000px+ (zoom ke liye 2000)
+  - SQP funnel padhne ka tareeka (dikhta nahi / click nahi / bikri nahi / scale karo)
+  - FSSAI 2018: bimari-dawa mana; natural/fresh/pure/traditional/authentic shart-wale shabd
+  - Dry-fruit shabdkosh: 8 meve, Hinglish + Hindi + grades (W240, Mamra...) — **search volume jaan-bujh kar nahi** (sirf SQP/licensed se)
+- **Listing Rules Engine** (`src/listing_rules.py`): title/highlights/bullets/backend/images/FSSAI ka audit (BLOCK/WARN/TIP + rule_id), aur builders jo niyam ke andar title (≤75), highlights (≤125), backend (≤200 bytes, dohraav-rahit, sirf usi grade/weight ke shabd) banate hain.
+- **Keyword Intelligence** (`src/keyword_intel.py`): Ads search terms + Brand Analytics SQP + shabdkosh ek suchi me, har term ka saboot-label; **placement plan** (TITLE / HIGHLIGHTS / BACKEND / NEGATIVE).
+- **Agent Brain** (`src/agent_brain.py`) — asal self-learning:
+  - Research niyam `playbook_rules` me; bharosa **sirf VERIFIED nateejo** se Bayesian tareeke se badalta hai; lagatar 3 haar = DISABLED (insaan hi chalu kare)
+  - Apne data se khud sabak: kaunse terms bechte hain (OWN-KW-WINNERS), kaunse paisa khaate hain (OWN-KW-WASTE), SQP ki bimariyan — roz update, dohraav nahi
+  - Roz ka `learning_crawl` job ab placeholder nahi, asal seekh-chakra chalata hai; `measure_results` ke baad playbook turant update
+  - ListingAgent ka naya `build_listing()` proposal `action_v12` me **rule_ids** ke saath daalta hai — 7/14 din ka nateeja seedha un niyamo ke bharose ko badalta hai
+- **API**: GET `/api/v1/knowledge`, `/api/v1/brain`, `/api/v1/keywords/plan?nut=`, `/api/v1/keywords/sqp`; POST `/api/v1/listings/audit`, `/api/v1/listings/build`
+- **Bug fixes**: (1) `claim_checker` "cure" pakadta tha par "cures/cured/heals/prevents" nahi — ab pakadta hai; (2) purana `generate_title` 200-akshar + "Fresh" wala title banata tha — ab 75 ke andar; (3) `test_v14` ki hardcoded dates purani pad gayi thi (velocity khidki aaj se bandhi hai) — dates ab relative; (4) in-memory DB par backup job repo me `backups/` bana deta tha — ab SKIP.
+- **Imaandaari**: Amazon/Flipkart ka ranking formula publish nahi hota — niyam disha hain, formula nahi. Zyadatar niyam seller-guides se hain (Seller Central help login ke peeche hai, is session se nahi khula) — isliye har niyam ka status saaf likha hai, aur 90 din purane niyam `stale` dikhte hain. Asal sales/search data Google par nahi milta — woh tumhare Seller Central (SQP/Ads reports) se hi aayega.
 
 ## 🔧 V21 — Naven audit ke 5 calculation/data issues band (23 Oct 2026)
 (saboot: test_v21_v22_fixes.py + purane suites naye basis par update; kul 27 suites pass)

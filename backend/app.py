@@ -98,7 +98,16 @@ class H(BaseHTTPRequestHandler):
                 from jobrunner import jobs_status
                 return self._env(200, {"jobs": jobs_status(s.db)})
             if p == "/api/v1/proposals":
-                rows = [dict(r) for r in s.db.execute("SELECT id,kind,platform,tier,state,created_by,created_at,vendor_ref FROM action_v12 ORDER BY id DESC LIMIT 100")]
+                rows = []
+                for r in s.db.execute("SELECT id,kind,platform,tier,state,created_by,created_at,vendor_ref,payload,predicted FROM action_v12 ORDER BY id DESC LIMIT 100"):
+                    d = dict(r)
+                    try: pl = json.loads(d.pop("payload") or "{}")
+                    except Exception: pl = {}
+                    # V25: inbox me seedha 'kya aur kyun' — payload kholne ki zaroorat nahi
+                    what = pl.get("term") or pl.get("query") or pl.get("title") or pl.get("campaign") or ""
+                    d["summary"] = (f"{what} — {pl['why']}" if pl.get("why") else what)[:180]
+                    d["rule_ids"] = pl.get("rule_ids", [])
+                    rows.append(d)
                 return self._env(200, {"proposals": rows})
             if p.startswith("/api/v1/actions/"):
                 aid = int(p.split("/")[-1])
@@ -113,6 +122,47 @@ class H(BaseHTTPRequestHandler):
                                                          FROM search_terms GROUP BY term ORDER BY spend DESC LIMIT 200""")]
                 return self._env(200, {"keywords": rows, "search_volume": None,
                                         "note": "Search volume koi licensed provider nahi — 'unknown' hai, andaaz nahi dikhaya jayega"})
+            # V24: aaj ka kaam + growth playbook (research niyam tumhare data par)
+            if p == "/api/v1/today":
+                import growth_playbook as GP
+                return self._env(200, GP.today(s))
+            if p == "/api/v1/growth/ads-structure":
+                import growth_playbook as GP
+                return self._env(200, GP.ads_structure(s))
+            if p == "/api/v1/growth/events":
+                import growth_playbook as GP
+                return self._env(200, GP.event_calendar())
+            if p == "/api/v1/growth/reviews":
+                import growth_playbook as GP
+                return self._env(200, GP.review_plan(s.db))
+            if p == "/api/v1/growth/break-even":
+                import growth_playbook as GP
+                pr = _q.get("price")
+                return self._env(200, GP.break_even(s.db, _q.get("sku", ""), float(pr) if pr else None, _q.get("platform") or "Amazon"))
+            if p == "/api/v1/autopilot/preview":
+                import growth_autopilot as GA
+                return self._env(200, GA.run(s, dry_run=True))
+            if p == "/api/v1/reports/weekly":
+                import growth_autopilot as GA
+                return self._env(200, GA.weekly_report(s))
+            if p == "/api/v1/products":
+                rows = [dict(r) for r in s.db.execute("SELECT sku, name, platform, price, rating, reviews FROM products ORDER BY sku LIMIT 500")]
+                return self._env(200, {"products": rows})
+            # V23: seekhne wala dimaag + marketplace niyam + keyword plan
+            if p == "/api/v1/knowledge":
+                import marketplace_knowledge as MK
+                return self._env(200, {"rules": MK.rules_for(_q.get("agent"), _q.get("platform"), _q.get("topic")),
+                                        "checked_on": MK.CHECKED, "stale": MK.stale_rules()})
+            if p == "/api/v1/brain":
+                import agent_brain as AB
+                return self._env(200, {"report": AB.brain_report(s.db),
+                                        "advice": AB.advise(s.db, _q.get("agent"), _q.get("topic"), _q.get("platform"))})
+            if p == "/api/v1/keywords/plan":
+                import keyword_intel as KI
+                return self._env(200, KI.placement_plan(s, _q.get("nut") or "almond", platform=_q.get("platform") or "Amazon"))
+            if p == "/api/v1/keywords/sqp":
+                import keyword_intel as KI
+                return self._env(200, KI.sqp_funnel(s.db, _q.get("platform") or "Amazon"))
             if p == "/api/v1/keywords/matrix":
                 from keyword_lab import opportunity_matrix
                 return self._env(200, {"matrix": opportunity_matrix(s), "evidence": "Observed (apne search terms); volume sirf licensed provider se"})
@@ -218,6 +268,13 @@ class H(BaseHTTPRequestHandler):
                 b = self._body()
                 return self._env(200, act.set_kill(s.db, bool(b.get("engaged")), user["username"], b.get("reason", "")))
             finally: s.close()
+        if p == "/api/v1/autopilot/run":
+            s, user, err = self._auth("propose")
+            if err: s.close(); return
+            try:
+                import growth_autopilot as GA
+                return self._env(200, GA.run(s))
+            finally: s.close()
         if p == "/api/v1/stock/channel-map":
             s, user, err = self._auth("propose")
             if err: s.close(); return
@@ -238,7 +295,7 @@ class H(BaseHTTPRequestHandler):
             finally: s.close()
         if p in ("/api/v1/competitors/peers", "/api/v1/competitors/snapshots", "/api/v1/costs",
                  "/api/v1/listings/draft", "/api/v1/listings/approve", "/api/v1/listings/publish", "/api/v1/imports/preview",
-                 "/api/v1/imports/commit", "/api/v1/experiments"):
+                 "/api/v1/imports/commit", "/api/v1/experiments", "/api/v1/listings/audit", "/api/v1/listings/build"):
             perm = "import" if "imports" in p else ("costs" if p.endswith("costs") else ("execute" if p.endswith("publish") else "propose"))
             s, user, err = self._auth(perm)
             if err: s.close(); return
@@ -262,6 +319,17 @@ class H(BaseHTTPRequestHandler):
                     return self._env(200, F.set_cost(s.db, b["sku"], float(b["cogs"]), float(b.get("packaging", 0)),
                                                      float(b.get("other_variable", 0)), b.get("source", "manual"),
                                                      approved_by=user["username"]))
+                if p == "/api/v1/listings/audit":
+                    import listing_rules as LR
+                    return self._env(200, LR.audit_listing(b.get("platform", "Amazon"), b.get("title", ""), b.get("bullets", []),
+                                                           b.get("backend_terms", ""), b.get("item_highlights"), b.get("images"),
+                                                           b.get("competitor_brands", [])))
+                if p == "/api/v1/listings/build":
+                    from agents.listing_agent import ListingAgent
+                    return self._env(200, ListingAgent(s).build_listing(
+                        b["sku"], b.get("brand", ""), b["product"], b.get("nut", "almond"), b.get("grade", ""),
+                        b.get("weight", ""), b.get("form", ""), b.get("facts", {}), b.get("platform", "Amazon"),
+                        b.get("competitor_brands", []), b.get("images")))
                 if p == "/api/v1/listings/draft":
                     import listing_v2 as L2
                     return self._env(200, L2.save_draft(s.db, b["sku"], b.get("platform", "Amazon"), b.get("title", ""),

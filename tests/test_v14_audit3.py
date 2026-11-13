@@ -18,7 +18,9 @@ def test_velocity_span():
     from platform_core import ensure_v12
     st = Store(":memory:"); ensure_v12(st.db)
     # 10 units, pehli-aakhri bikri 10 din ke antar par — sirf 2 selling-days ginne se 5/din galat aata tha
-    for i, d in enumerate(["2026-10-01", "2026-10-10"]):
+    # Dates aaj se relative — velocity khidki 'aaj' se bandhi hai, hardcoded dates kuch hafto me khidki se bahar gir jaati thi
+    _t = datetime.date.today()
+    for i, d in enumerate([(_t - datetime.timedelta(days=12)).isoformat(), (_t - datetime.timedelta(days=3)).isoformat()]):
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',500,'INR')", (f"V{i}", d))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?, 'SKU-V','B0',5,500,0)", (f"V{i}", f"L{i}"))
     st.db.commit()

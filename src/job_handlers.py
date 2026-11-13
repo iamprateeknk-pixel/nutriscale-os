@@ -49,6 +49,9 @@ def _measure_results(store):
     conf = OE.rule_confidence(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM outcomes").fetchone()["c"]
     s = "; ".join(f"{c['kind']}: jeet-dar {c['win_rate']} ({c['measured']} maap)" for c in conf) or "abhi koi maapa nateeja nahi"
+    import agent_brain as AB
+    lb = AB.learn_from_outcomes(store.db)  # V23: naye nateeje turant playbook ke bharose me
+    s += f"; playbook update {lb['applied']}"
     return f"Is chakra me {r['measured']} naye nateeje khidki-maap se bane (data-aparyapt: {r['insufficient_data']}); kul {n}. Seekh: {s}"
 
 def _seller_health(store):
@@ -100,8 +103,14 @@ def _rank_probe(store):
             "source se hi aayenge, system khud bazaar ghurega nahi (policy)")
 
 def _learning_crawl(store):
-    from learning_sources import SOURCES
-    return f"Seekh ke {len(SOURCES)} sources registry me parkhe gaye — fee/policy badlav ki jaankari inhi se aati hai"
+    """V23: placeholder ki jagah asal seekh-chakra — research playbook taaza, VERIFIED nateejo se bharosa,
+    apne data (search terms / SQP) se naye sabak. Purane research niyam (90+ din) ki chetaavni."""
+    import agent_brain as AB, marketplace_knowledge as MK
+    r = AB.daily_learning_cycle(store)
+    stale = MK.stale_rules()
+    msg = (f"Playbook: +{r['playbook']['added']} naye, {r['playbook']['refreshed']} taaza; "
+           f"nateejo se {r['outcomes']['applied']} update; apne data se {r['own_data']['lessons_updated']} sabak")
+    return msg + (f"; DOBARA RESEARCH karo: {', '.join(stale[:5])}" if stale else "")
 
 def _learning_summary(store):
     ensure_v12(store.db)
@@ -115,7 +124,10 @@ def _backup(store):
     import ops_finance as OF
     from db_store import DEFAULT_PATH
     db_path = getattr(store, "path", None) or DEFAULT_PATH
-    dest_dir = os.path.join(os.path.dirname(db_path), "backups"); os.makedirs(dest_dir, exist_ok=True)
+    if db_path == ":memory:":
+        # In-memory DB (tests) ka file backup nahi banta — pehle ye cwd me 'backups/' bana deta tha (repo me kachra)
+        return "SKIP: in-memory DB — file backup ka matlab nahi"
+    dest_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), "backups"); os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, f"growth_os-{datetime.date.today().isoformat()}.db")
     r = OF.create_backup(db_path, dest)
     return f"Backup taiyaar: {os.path.basename(dest)} ({r['tables']} tables, restore-parikshan ke saath)" if r["ok"] else "Backup fail"
@@ -127,8 +139,27 @@ def _brand_analytics_import(store):
     if not r["available"]: return r["note"]
     return f"Brand Analytics: {r['files_seen']} file(s) dekhi, {r['imported_files']} nayi import ({r['rows_imported']} rows)"
 
+def _growth_autopilot(store):
+    """V25: playbook ki kamiyon se approval-wale proposals — khud kuch live nahi."""
+    import growth_autopilot as GA
+    r = GA.run(store)
+    return (f"Autopilot: {len(r['created'])} naye proposals, {r['already_proposed_this_week']} is hafte pehle se"
+            + (f", {r['capped']} agle run ke liye" if r["capped"] else "")
+            + (f", {len(r['skipped_disabled_rules'])} disabled niyam ki wajah se chhode" if r["skipped_disabled_rules"] else ""))
+
+def _weekly_report(store, today=None):
+    """V25: scheduler sirf daily jobs chalata hai — haftawar report Sunday (IST) ko hi banti hai."""
+    import datetime
+    t = today or (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).date()
+    if t.weekday() != 6: return "SKIP: aaj Sunday nahi — report Sunday ko banegi"
+    import growth_autopilot as GA
+    r = GA.weekly_report(store, t)
+    return f"Haftawar report bani: {r['saved_to'] or 'in-memory'}"
+
 def build_handlers(store) -> dict:
     return {
+        "growth_autopilot": lambda: _growth_autopilot(store),
+        "weekly_report": lambda: _weekly_report(store),
         "brand_analytics_import": lambda: _brand_analytics_import(store),
         "backup_restore": lambda: _backup(store),
         "learning_crawl": lambda: _learning_crawl(store),

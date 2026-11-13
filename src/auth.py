@@ -35,6 +35,18 @@ def create_user(db, username: str, password: str, role: str) -> dict:
                (username, _hash(password, salt), salt.hex(), role, now_utc())); db.commit()
     return {"ok": True, "username": username, "role": role}
 
+def change_password(db, username: str, new_password: str) -> dict:
+    """Naya salt + hash; purane saare login sessions band (purana token ab kaam nahi karega)."""
+    ensure_v12(db)
+    if len(new_password) < 8: return {"ok": False, "error": "Password kam se kam 8 akshar ka ho"}
+    if not db.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
+        return {"ok": False, "error": f"User '{username}' mila nahi"}
+    salt = secrets.token_bytes(16)
+    db.execute("UPDATE users SET pass_hash=?, salt=? WHERE username=?", (_hash(new_password, salt), salt.hex(), username))
+    db.execute("DELETE FROM sessions WHERE username=?", (username,))
+    db.commit()
+    return {"ok": True, "username": username, "sessions_revoked": True}
+
 # ---------------- TOTP MFA (SEC-01 ka baki hissa, V12.1) ----------------
 import base64, hmac, struct, time as _time
 

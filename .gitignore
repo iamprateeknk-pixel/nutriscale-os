@@ -6,3 +6,7 @@ data/
 *.csv
 !tests/fixtures/*.csv
 __pycache__/
+backups/
+*.db
+logs/
+PUBLIC_URL.txt
