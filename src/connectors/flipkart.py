@@ -1,7 +1,7 @@
 """Flipkart Seller API Connector.
-Token: app_id/app_secret se OAuth. Listings, Orders, Returns, Inventory.
-Note: Flipkart API access har seller ko khula nahi milta — Seller Hub se API access ki
-manzuri lagti hai (guide CONNECTORS_SETUP.md me). Na mile to CSV import ka rasta hamesha khula hai.
+Token: OAuth from app_id/app_secret. Listings, Orders, Returns, Inventory.
+Note: Flipkart API access is not open to every seller — API access needs approval
+in Seller Hub (guide in CONNECTORS_SETUP.md). Without it, the CSV route is always available.
 Docs: https://seller.flipkart.com/api-docs/
 """
 from urllib.parse import urlencode
@@ -40,7 +40,7 @@ class Flipkart:
 
     def update_inventory(self, sku_id: str, quantity: int, location_id: str = "") -> dict:
         body = {sku_id: {"price": None, "locations": [{"id": location_id, "quantity": quantity}]}}
-        # sirf quantity badalna hai to price purana rakhna padta hai — pehle listing padho
+        # to change only the quantity the old price must be kept — read the listing first
         cur = self.get_listing(sku_id)
         body[sku_id]["price"] = {"mrp": cur.get("mrp"), "sellingPrice": cur.get("sellingPrice")}
         return request_json("POST", f"{ENDPOINT}/sellers/listings/v3/update/inventory",

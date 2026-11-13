@@ -1,13 +1,14 @@
-# CI Setup — ek chhota manual kadam (sirf ek baar)
+# CI Setup
 
-GitHub ki suraksha ke kaaran koi bhi app/API `.github/workflows/` folder me file **nahi** daal sakta —
-ye file sirf repo ke malik (tum) web se add kar sakte ho. 1 minute lagega:
+The CI workflow is already in the repo at `.github/workflows/tests.yml`. On every push to `main` and every pull
+request into `main`, GitHub Actions runs all test suites; a green tick means everything passed.
 
-1. Repo kholo: https://github.com/iamprateeknk-pixel/nutriscale-os
-2. **Add file → Create new file** → naam likho: `.github/workflows/tests.yml`
-3. Neeche wala pura code paste karke **Commit** kar do.
+If the file is ever missing: GitHub only lets the repository owner add files under `.github/workflows/`
+from the web (apps and tokens without workflow permission cannot). It takes a minute:
 
-Uske baad har push par saare tests apne aap GitHub par chala karenge (hari tick = sab pass).
+1. Open the repo: https://github.com/iamprateeknk-pixel/nutriscale-os
+2. **Add file → Create new file** → name it `.github/workflows/tests.yml`
+3. Paste the YAML below and **Commit**.
 
 ```yaml
 name: NutriScale OS Tests
@@ -26,7 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Saare test suites chalao
+      - name: Run all test suites
         run: |
           fail=0
           for t in tests/test_*.py; do
@@ -36,4 +37,4 @@ jobs:
           exit $fail
 ```
 
-_Note: Yahi file local project me `.github/workflows/tests.yml` par bhi rakhi hai._
+Locally the same check is `python3 run_tests.py`.

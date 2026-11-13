@@ -1,79 +1,142 @@
 openapi: 3.0.3
 info:
   title: NutriScale OS API
-  version: v1-v12
+  version: v1-v26
   description: >
-    Saare endpoints par login (Bearer token) lazmi hai — sirf /health aur
-    /api/v1/auth/login khule hain. Har jawab envelope me aata hai:
+    Every endpoint requires login (Bearer token) — only /health and
+    /api/v1/auth/login are open. Every response comes in an envelope:
     {data, meta:{request_id, computed_at}, errors:[]}.
-    Jo data uplabdh nahi, woh null/UNAVAILABLE ke saath aayega — kabhi banaya hua number nahi.
+    Unavailable data is returned as null/UNAVAILABLE — never a made-up number.
 paths:
   /health:
-    get: {summary: Service zinda hai ya nahi, security: []}
+    get: {summary: Whether the service is alive, security: []}
   /api/v1/auth/login:
-    post: {summary: Username/password -> token (12 ghante), security: []}
-  /api/v1/warroom:
-    get: {summary: War Room KPI — sirf asal data; khaali DB = connected false}
+    post: {summary: "Username/password (+ TOTP if MFA is on) -> token (12 hours); 5 failures = 10-minute lock", security: []}
+  /api/v1/auth/mfa/enable:
+    post: {summary: Enable TOTP MFA for the logged-in user (returns the secret once)}
+  /api/v1/today:
+    get: {summary: "Home screen: prioritised tasks, setup checklist, next sale event, brain stats, data freshness"}
+  /api/warroom:
+    get: {summary: "War Room KPIs — real data only; empty DB = connected false. ?platform="}
+  /api/v1/system/health:
+    get: {summary: Kill switch / jobs / capabilities / alerts}
+  /api/v1/products:
+    get: {summary: Product catalog (sku, name, platform, price, rating, reviews)}
+  /api/v1/products/{sku}/360:
+    get: {summary: "SKU 360°: sales, profit with fee precision, stock cover, listing versions. ?platform="}
   /api/v1/campaigns:
-    get: {summary: Campaigns (source + observed_at ke saath)}
+    get: {summary: Campaigns (with source + observed_at)}
+  /api/v1/keywords:
+    get: {summary: Search terms summed per term (search volume is null without a licensed provider)}
   /api/v1/keywords/matrix:
-    get: {summary: Keyword opportunity matrix — volume null jab provider na ho}
+    get: {summary: Keyword opportunity matrix — volume is null without a provider}
+  /api/v1/keywords/plan:
+    get: {summary: "Keyword placement plan per nut (?nut=): title / highlights / backend / negative, with evidence labels"}
+  /api/v1/keywords/sqp:
+    get: {summary: "Brand Analytics SQP funnel: share per query + diagnosis (scale / not visible / no clicks / no sales)"}
+  /api/v1/brand-analytics:
+    get: {summary: Top SQP queries with brand share + top SCP ASINs}
   /api/v1/ads/health:
     get: {summary: Campaign health, pacing alerts, harvest/negative candidates, budget scenarios}
+  /api/v1/growth/ads-structure:
+    get: {summary: "Campaign structure check against research rules: score, self-competition, harvest pending, wasted spend"}
+  /api/v1/growth/break-even:
+    get: {summary: "Break-even / target ACOS for a SKU (?sku=&price=) — DATA_NEEDED without cost"}
+  /api/v1/growth/events:
+    get: {summary: Upcoming sale events with FBA-stock and readiness deadlines (estimated dates)}
+  /api/v1/growth/reviews:
+    get: {summary: Policy-safe review plan (Vine-eligible SKUs, low-rated SKUs)}
+  /api/v1/autopilot/preview:
+    get: {summary: What the Growth Autopilot would propose now (dry run)}
+  /api/v1/autopilot/run:
+    post: {summary: Create the autopilot's approval-gated proposals (never applies anything live)}
+  /api/v1/reports/weekly:
+    get: {summary: Weekly growth report (markdown)}
+  /api/v1/knowledge:
+    get: {summary: "Marketplace rules with sources, status and confidence. ?agent=&platform=&topic="}
+  /api/v1/brain:
+    get: {summary: "Agent brain report + trusted rules (?agent=&topic=&platform=)"}
   /api/v1/competitors:
-    get: {summary: Peers + taazaa snapshots}
+    get: {summary: Peers + latest snapshots}
   /api/v1/competitors/peers:
-    post: {summary: Peer jodo (manual verified URL)}
+    post: {summary: Add a peer (manually verified URL)}
   /api/v1/competitors/snapshots:
-    post: {summary: Dated snapshot darj karo — jawab me change events}
+    post: {summary: Record a dated snapshot — returns change events}
   /api/v1/competitors/packet:
     get: {summary: "Decision packet: ?sku=&peer=&grade=&pack_g=&nut="}
   /api/v1/rank:
-    get: {summary: "Rank trend: ?term=&sku= (kam se kam 3 points bina natija nahi)"}
+    get: {summary: "Rank trend: ?term=&sku= (no conclusion with fewer than 3 points)"}
+  /api/v1/rank/diagnostic:
+    get: {summary: "Rank-drop hypotheses with evidence: ?term=&sku="}
+  /api/v1/rank/funnel:
+    get: {summary: "Query -> clicks/orders -> SKU contribution: ?term=&sku="}
   /api/v1/proposals:
-    get: {summary: V12 proposals (state machine wale)}
-    post: {summary: Naya proposal (DRAFT->APPROVAL_PENDING, idempotency_key ke saath)}
+    get: {summary: Proposals (state machine) with a 'what & why' summary and rule_ids}
+    post: {summary: New proposal (DRAFT->APPROVAL_PENDING, with idempotency_key)}
   /api/v1/proposals/{id}/approve:
-    post: {summary: Tier-2 par do ALAG Owner pushtiyaan}
+    post: {summary: Approve; Tier-2 needs two DIFFERENT Owner approvals; expired proposals cannot be approved}
   /api/v1/proposals/{id}/dry-run:
-    post: {summary: Vendor ko chhue bina diff/risk purvavalokan}
+    post: {summary: Diff/risk preview without touching the vendor}
   /api/v1/proposals/{id}/queue:
-    post: {summary: APPROVED -> QUEUED (kill switch ON ho to rukega)}
+    post: {summary: APPROVED -> QUEUED (blocked while the kill switch is ON)}
   /api/v1/proposals/{id}/execute:
-    post: {summary: Sirf pushti (manual_ref) mile to APPLIED_VERIFIED, warna FAILED}
+    post: {summary: APPLIED_VERIFIED only with confirmation (manual_ref), otherwise FAILED}
   /api/v1/actions/{id}:
-    get: {summary: Action + poori state timeline (audit)}
+    get: {summary: Action + full state timeline (audit)}
+  /api/approvals:
+    get: {summary: Legacy agent proposals waiting for a decision}
+  /api/approvals/{id}/approve:
+    post: {summary: Approve a legacy proposal}
+  /api/approvals/{id}/reject:
+    post: {summary: Reject a legacy proposal}
+  /api/cycle/run:
+    post: {summary: Run the full daily cycle now}
+  /api/action-plan:
+    get: {summary: "Ready action list from real data: pause, scale, lower bids, negatives"}
+  /api/season-pack:
+    get: {summary: Festival gift combos built from catalog prices}
+  /api/connectors/status:
+    get: {summary: Which connectors are configured and what is missing}
   /api/v1/control/kill:
-    get: {summary: Kill switch ki halat (DB-persist)}
+    get: {summary: Kill switch status (persisted in the DB)}
     post: {summary: "Owner only: {engaged, reason}"}
   /api/v1/jobs/status:
     get: {summary: Durable jobs — next/last run, status}
+  /api/v1/imports/upload:
+    post: {summary: "Upload a report from the dashboard: {filename, content_b64} (CSV/TSV, max 20MB) -> stored in data/uploads + preview"}
   /api/v1/imports/preview:
-    post: {summary: "CSV wizard preview: {path} -> hash/kind/rows/duplicate"}
+    post: {summary: "Preview {upload} or a {path} inside data/ -> hash/kind/rows/duplicate (other server paths -> 400)"}
   /api/v1/imports/commit:
-    post: {summary: Wizard commit — duplicate block ke saath receipt}
+    post: {summary: "Commit {upload | path, kind?} — receipt, duplicates blocked"}
+  /api/v1/stock/channel-map:
+    get: {summary: Explicit stock-location -> channel map}
+    post: {summary: "Map a location to a channel: {location, channel}"}
   /api/v1/costs:
     get: {summary: Versioned costs}
-    post: {summary: "Nayi cost darj: {sku, cogs, packaging}"}
+    post: {summary: "Record a new cost: {sku, cogs, packaging}"}
   /api/v1/finance/reconciliation:
     get: {summary: Order GMV vs settlement — MATCHED/EXCEPTION}
   /api/v1/listings/versions:
     get: {summary: Listing versions}
   /api/v1/listings/draft:
-    post: {summary: Draft banao}
+    post: {summary: Create a draft}
   /api/v1/listings/approve:
-    post: {summary: Approve — fact registry ke saboot bina NEEDS_EVIDENCE}
+    post: {summary: Approve — NEEDS_EVIDENCE without fact-registry evidence}
+  /api/v1/listings/publish:
+    post: {summary: "Publish an APPROVED version: VALIDATION_PREVIEW, or live only with a certified capability"}
+  /api/v1/listings/audit:
+    post: {summary: "Audit a listing against marketplace + FSSAI rules: {title, bullets, backend_terms, item_highlights?, images?}"}
+  /api/v1/listings/build:
+    post: {summary: "Build a rule-compliant listing (title ≤75, highlights ≤125, backend ≤200 bytes) + audit + proposal"}
   /api/v1/experiments:
     get: {summary: Experiment registry}
-    post: {summary: Naya experiment}
+    post: {summary: New experiment}
   /api/v1/agency/scorecard:
-    get: {summary: Agency — saboot wale kaam + fees}
-  /api/v1/system/health:
-    get: {summary: Kill/jobs/capabilities/alerts}
+    get: {summary: Agency — evidence-backed work + fees}
   /api/v1/capabilities:
-    get: {summary: Platform capability registry (Flipkart write_ads = unavailable aadi)}
+    get: {summary: Platform capability registry (e.g. Flipkart write_ads = unavailable)}
   /api/v1/inventory/gate:
-    get: {summary: "?sku= — stock gate (STOCKOUT par scale band)"}
+    get: {summary: "?sku= — stock gate (scaling blocked on STOCKOUT)"}
   /api/v1/creative/brief:
     get: {summary: "?product=&grade=&weight= — 7-shot image brief"}
 components:

@@ -1,7 +1,7 @@
-"""SEC-04 ka hissa: repo me galti se ghusi hui chaabiyan pakdo.
+"""Part of SEC-04: catch keys that slipped into the repo by mistake.
 Chalana: python3 scripts/secret_scan.py [path] — masla mile to exit code 1.
-Patterns: AWS keys, private keys, lambe token-jaise strings, password= assignments.
-Jhoothe alarm kam rakhne ke liye test/example shabdon wali lines chhodi jati hain."""
+Patterns: AWS keys, private keys, long token-like strings, password= assignments.
+Lines with test/example words are skipped to keep false alarms low."""
 import os, re, sys
 
 PATTERNS = [
@@ -9,7 +9,7 @@ PATTERNS = [
     (r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----", "private key"),
     (r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_\-/+]{16,}['\"]", "hardcoded secret jaisa assignment"),
     (r"ghp_[A-Za-z0-9]{30,}", "GitHub token"),
-    (r"sk-[A-Za-z0-9]{24,}", "OpenAI-jaisa key"),
+    (r"sk-[A-Za-z0-9]{24,}", "OpenAI-style key"),
 ]
 SKIP_WORDS = ("example", "placeholder", "your-", "xxxx", "test", "dummy", "namuna", "env", "getenv", "os.environ")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "data"}
@@ -36,4 +36,4 @@ if __name__ == "__main__":
     hits = scan(root)
     if hits:
         print("⚠️ SECRET JAISI CHEEZEIN MILI:"); [print(" ", h) for h in hits]; sys.exit(1)
-    print("✔ Secret scan saaf hai — koi chaabi repo me nahi mili")
+    print("✔ Secret scan clean — no keys found in the repo")

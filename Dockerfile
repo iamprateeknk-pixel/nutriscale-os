@@ -1,5 +1,5 @@
 # NutriScale OS — Backend container
-# Koi bahari Python library nahi chahiye (sab stdlib hai) — isiliye image halki hai.
+# No external Python libraries needed (stdlib only) — so the image is light.
 FROM python:3.12-slim
 WORKDIR /app
 COPY src/ ./src/
@@ -10,6 +10,6 @@ COPY scripts/ ./scripts/
 COPY CONNECTORS_SETUP.md ./
 ENV PORT=8765
 EXPOSE 8765
-# Data ke liye volume: docker run -v nutriscale-data:/app/data ...
+# Volume for data: docker run -v nutriscale-data:/app/data ...
 VOLUME ["/app/data"]
 CMD ["python3", "backend/app.py"]

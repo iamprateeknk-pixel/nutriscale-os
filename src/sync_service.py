@@ -1,6 +1,6 @@
-"""Sync Service V2 — F1 Data Sync ka asal roop (V12.1 me sudhara gaya).
-Purani kami (audit me pakdi gayi): SP orders bina SKU ke ghus rahe the, Ads search-term
-sync CLI me tha hi nahi, Flipkart ka koi branch nahi tha. Ab:
+"""Sync Service V2 — the real F1 Data Sync (fixed in V12.1).
+Old gaps (caught in an audit): SP orders were loaded without SKUs, the Ads search-term
+sync was missing from the CLI, and there was no Flipkart branch. Now:
   python3 src/sync_service.py --status
   python3 src/sync_service.py --csv-orders file [--platform Flipkart]   (wizard/canonical)
   python3 src/sync_service.py --csv-search-terms file.csv | --csv-campaigns file.csv | --csv-inventory file.csv
@@ -8,7 +8,7 @@ sync CLI me tha hi nahi, Flipkart ka koi branch nahi tha. Ab:
   python3 src/sync_service.py --connector amazon_ads_terms --start 2026-10-01 --end 2026-10-07
   python3 src/sync_service.py --connector flipkart --from 2026-10-01 --to 2026-10-07      (orders + listings)
   python3 src/sync_service.py --connector unicommerce
-Credentials na hon to saaf mana — jhootha sync kabhi nahi.
+Without credentials it refuses plainly — never a fake sync.
 """
 import argparse, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -17,7 +17,7 @@ from connectors import config as cfg
 from platform_core import ensure_v12, now_utc
 
 def sync_amazon_orders(store, since: str, sp=None) -> dict:
-    """SP-API orders + unke items — canonical order_headers/order_items me (line-level)."""
+    """SP-API orders + their items — into canonical order_headers/order_items (line-level)."""
     from connectors.amazon_sp import AmazonSP
     sp = sp or AmazonSP()
     db = store.db; ensure_v12(db)
@@ -25,7 +25,7 @@ def sync_amazon_orders(store, since: str, sp=None) -> dict:
     for o in orders:
         oid = o.get("AmazonOrderId", "")
         total = float((o.get("OrderTotal") or {}).get("Amount", 0) or 0)
-        # V15: IGNORE nahi, UPSERT — order ki halat (Shipped->Cancelled) aur rakam badal sakti hai
+        # V15: UPSERT, not IGNORE — an order's status (Shipped->Cancelled) and amount can change
         db.execute("""INSERT INTO order_headers VALUES (?,?,?,?,?,?,?)
                       ON CONFLICT(platform,seller_account,external_order_id)
                       DO UPDATE SET status=excluded.status, total=excluded.total""",
@@ -39,10 +39,10 @@ def sync_amazon_orders(store, since: str, sp=None) -> dict:
                         it.get("ASIN", ""), float(it.get("QuantityOrdered", 1) or 1), amt, 0))
             n_items += 1
     db.commit()
-    return {"orders": len(orders), "items": n_items, "note": "Canonical line-level sync ho gaya"}
+    return {"orders": len(orders), "items": n_items, "note": "Canonical line-level sync done"}
 
 def sync_campaign_map(store, ads=None) -> dict:
-    """Ads API se campaign ID -> naam ka naksha (V15): outcome maap ID se naam tak pakka pahunche."""
+    """Campaign ID -> name map from the Ads API (V15): outcome measurement can resolve IDs to names reliably."""
     from connectors.amazon_ads import AmazonAds
     from platform_core import map_campaign
     ads = ads or AmazonAds()
@@ -50,7 +50,7 @@ def sync_campaign_map(store, ads=None) -> dict:
     for c in camps:
         if c.get("campaignId") and c.get("name"): map_campaign(store.db, "Amazon", c["campaignId"], c["name"])
         if c.get("name"):
-            # V17 fix: metrics wali asal row ko ₹0 se KUCHALNA band — naam sirf tab ghusaao jab row hi na ho
+            # V17 fix: never CRUSH a real row's metrics with ₹0 — only insert the name when the row does not exist
             store.db.execute("""INSERT INTO campaigns(name, platform, spend, sales, clicks, impressions, source)
                                 VALUES (?, 'Amazon', 0, 0, 0, 0, 'Ads API (naam-matra)')
                                 ON CONFLICT(name, platform) DO NOTHING""", (c["name"],))
@@ -58,14 +58,14 @@ def sync_campaign_map(store, ads=None) -> dict:
     return {"campaigns": len(camps), "mapped": sum(1 for c in camps if c.get("campaignId"))}
 
 def sync_order_fees(store, days: int = 3, sp=None) -> dict:
-    """SP Finances: taaza orders ki per-order fees order_fees me (SKU-exact dar ke liye, V14 scheduled)."""
+    """SP Finances: per-order fees for recent orders into order_fees (for the SKU-exact rate, V14 scheduled)."""
     import datetime
     from connectors.amazon_sp import AmazonSP
     import finance as F
     sp = sp or AmazonSP()
     db = store.db; ensure_v12(db)
     cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
-    # V20: fees har order ke APNE seller_account par darj hongi — khaate kabhi mix nahi honge
+    # V20: fees are recorded under each order's OWN seller_account — accounts are never mixed
     rows = db.execute(
         "SELECT external_order_id, seller_account FROM order_headers WHERE platform='Amazon' AND order_date>=?",
         (cutoff,)).fetchall()
@@ -78,10 +78,10 @@ def sync_order_fees(store, days: int = 3, sp=None) -> dict:
             refunds += F.record_refunds(db, sp.get_order_refunds(oid),
                                         seller_account=row["seller_account"] or "default")["updated_lines"]
     return {"orders_checked": len(rows), "fee_rows": total, "refund_lines": refunds,
-            "note": "Fees + refunds SP Finances se aaye — revenue ab NET ginega"}
+            "note": "Fees + refunds came from SP Finances — revenue is now counted NET"}
 
 def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:
-    """Flipkart orders (canonical) + listings (catalog). Ads Flipkart par report-only hai (capability registry)."""
+    """Flipkart orders (canonical) + listings (catalog). Flipkart ads are report-only (capability registry)."""
     from connectors.flipkart import Flipkart
     fk = fk or Flipkart()
     db = store.db; ensure_v12(db)
@@ -110,7 +110,7 @@ def sync_flipkart(store, from_date: str, to_date: str, fk=None) -> dict:
                    (sku, str(l.get("title") or l.get("productTitle") or sku), float(l.get("sellingPrice") or l.get("mrp") or 0)))
     db.commit()
     return {"orders_items": n, "listings": len(listings),
-            "note": "Flipkart sync ho gaya; ads ke liye CSV/report rasta hi hai (write API uplabdh nahi)"}
+            "note": "Flipkart sync done; ads only via CSV/report (no write API available)"}
 
 def main():
     ap = argparse.ArgumentParser(description="NutriScale Sync Service V2")
@@ -124,7 +124,7 @@ def main():
     a = ap.parse_args()
     if a.status:
         for name, s in cfg.status_all().items():
-            print(f"{name}: {'✔ CONFIGURED' if s['configured'] else '✘ baki hai — missing: ' + ', '.join(s['missing'])}")
+            print(f"{name}: {'✔ CONFIGURED' if s['configured'] else '✘ not configured — missing: ' + ', '.join(s['missing'])}")
         return
     store = Store()
     try:
@@ -159,9 +159,9 @@ def main():
                 code = fac.get("code", "")
                 for snap in uc.inventory_snapshot(code):
                     store.set_inventory(snap.get("itemTypeSKU", ""), code, int(snap.get("inventory", 0) or 0), source="Unicommerce API")
-            print("Unicommerce inventory DB me sync ho gaya")
+            print("Unicommerce inventory synced to the DB")
         elif a.connector:
-            print(f"Connector '{a.connector}' ke liye sync function CONNECTORS_SETUP.md ke hisaab se chalega — pehle --status dekho")
+            print(f"The sync function for connector '{a.connector}' runs per CONNECTORS_SETUP.md — check --status first")
     except cfg.NotConfigured as e:
         print(f"⛔ {e}"); sys.exit(2)
     finally:

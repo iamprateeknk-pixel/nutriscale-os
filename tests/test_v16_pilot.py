@@ -1,4 +1,4 @@
-"""V16 TESTS — Acceptance Gates Kit: preflight imaandaari, drill ke taale, poora drill saboot ke saath."""
+"""V16 TESTS — Acceptance Gates Kit: preflight honesty, the drill's locks, a full drill with evidence."""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
@@ -8,7 +8,7 @@ def test_preflight_honest():
     st = Store(":memory:")
     pf = P.preflight(st.db)
     names = {c["check"]: c["ok"] for c in pf["checks"]}
-    assert names["owner_user"] is False and pf["ready_for_pilot"] is False, "khaali DB par taiyaari HAAN nahi honi chahiye"
+    assert names["owner_user"] is False and pf["ready_for_pilot"] is False, "an empty DB must not report READY"
     assert names["https_pack"] is True
     import auth as A
     A.create_user(st.db, "boss", "pass1234", "Owner")
@@ -47,7 +47,7 @@ def test_drill_full_pass():
     r = P.controlled_drill(st.db, {"kind": "PAUSE_CAMPAIGN", "campaign_id": "C9", "platform": "Amazon"},
                            owner, live=True, adapter=ad, store=st)
     assert r["verdict"] == "DRILL_PASS", r
-    assert state["camp"]["state"] == "ENABLED", "drill ke baad campaign purani halat par hona chahiye"
+    assert state["camp"]["state"] == "ENABLED", "after the drill the campaign must be back in its previous state"
     assert all(s["ok"] for s in r["steps"])
     st.close()
 
@@ -60,7 +60,7 @@ def test_reconciliation_report():
     st.db.commit()
     rep = P.reconciliation_report(st)
     assert rep["orders_in_window"]["net_revenue"] == 1000
-    assert rep["window_status"] == "EXCEPTION", "settlement na ho to EXCEPTION saaf dikhna chahiye"
+    assert rep["window_status"] == "EXCEPTION", "without a settlement an EXCEPTION must be clearly shown"
     st.close()
 
 if __name__ == "__main__":

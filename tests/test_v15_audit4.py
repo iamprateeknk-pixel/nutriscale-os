@@ -16,9 +16,9 @@ def test_period_boundary_day():
     def ins(ps, pe, sp):
         return lambda: (st.add_search_term("kaju", "C", sp, sp * 2, 5, 1, source="SRC", period_start=ps, period_end=pe), 1)[1]
     assert apply_period_rows(st.db, "SRC", d(13), d(7), ins(d(13), d(7), 100))["status"] == "INSERTED"
-    # boundary din (d(7)) dono me hai — takraav, block hona chahiye
+    # the boundary day (d(7)) is in both — an overlap, must be blocked
     assert apply_period_rows(st.db, "SRC", d(7), d(1), ins(d(7), d(1), 50))["status"] == "BLOCKED_PARTIAL_OVERLAP"
-    # agle din se shuru — saaf
+    # starts the next day — clean
     assert apply_period_rows(st.db, "SRC", d(6), d(1), ins(d(6), d(1), 50))["status"] == "INSERTED"
     st.close()
 
@@ -32,15 +32,15 @@ def test_order_status_upsert_and_refund_net():
     sp = FakeSP()
     SS.sync_amazon_orders(st, "x", sp=sp)
     assert AN.sales_totals(st.db)["revenue"] == 500
-    sp.status = "Cancelled"   # order baad me cancel ho gaya — purana IGNORE isey kabhi na pakadta
+    sp.status = "Cancelled"   # the order was cancelled later — the old INSERT OR IGNORE would never pick that up
     SS.sync_amazon_orders(st, "x", sp=sp)
     hdr = st.db.execute("SELECT status FROM order_headers WHERE external_order_id='O1'").fetchone()
     assert hdr["status"] == "Cancelled"
-    assert AN.sales_totals(st.db)["revenue"] == 0, "cancelled order ki bikri ginati se bahar"
+    assert AN.sales_totals(st.db)["revenue"] == 0, "a cancelled order's sales are excluded from the count"
     # refund: doosra order, 500 me se 200 wapas
     _order(st, "O2", 1, "SKU-R", 500)
     F.record_refunds(st.db, [{"order_id": "O2", "sku": "SKU-R", "refund": 200}])
-    assert AN.sales_totals(st.db)["revenue"] == 300, "revenue NET (gross - refund) honi chahiye"
+    assert AN.sales_totals(st.db)["revenue"] == 300, "revenue must be NET (gross - refund)"
     st.close()
 
 def test_outcome_campaign_id_and_coverage():
@@ -51,7 +51,7 @@ def test_outcome_campaign_id_and_coverage():
     st = Store(":memory:"); ensure_v12(st.db)
     A.create_user(st.db, "own", "pass1234", "Owner"); owner = {"username": "own", "role": "Owner"}
     map_campaign(st.db, "Amazon", "CAMP-42", "Hero Campaign")
-    # khidkiyaan: applied = 8 din pehle; pehle [15..9], baad [8..2] — 7-7 din ke periods
+    # windows: applied = 8 days ago; before [15..9], after [8..2] — 7-day periods each
     st.add_search_term("kaju", "Hero Campaign", 100, 150, 10, 1, source="T", period_start=d(15), period_end=d(9))
     st.add_search_term("kaju", "Hero Campaign", 100, 320, 10, 3, source="T", period_start=d(8), period_end=d(2))
     p = create_proposal(st.db, "BID_DOWN", "Amazon", "acc", {"campaign_id": "CAMP-42", "platform": "Amazon"}, "ONE_TAP", "t", "v15-1")
@@ -62,10 +62,10 @@ def test_outcome_campaign_id_and_coverage():
     applied = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8)).isoformat()
     st.db.execute("UPDATE action_events SET at=? WHERE action_id=? AND to_state='APPLIED_VERIFIED'", (applied, p["id"])); st.db.commit()
     out = OE.measure_due(st.db, windows=(7,))
-    assert out["measured"] == 1, f"campaign_id se naam milkar maap hona chahiye: {out}"
+    assert out["measured"] == 1, f"the campaign_id must resolve to a name and be measured: {out}"
     row = st.db.execute("SELECT * FROM outcomes WHERE action_id=?", (p["id"],)).fetchone()
     assert row["metric"] == "campaign_roas_window" and row["success"] == 1
-    # coverage gate: sirf 2 order-lines wala SKU action — nateeja nahi banna chahiye
+    # coverage gate: a SKU action with only 2 order lines — no outcome must be created
     _order(st, "C1", 12, "SKU-SPARSE", 100); _order(st, "C2", 3, "SKU-SPARSE", 200)
     p2 = create_proposal(st.db, "PRICE_TEST", "Amazon", "acc", {"sku": "SKU-SPARSE"}, "ONE_TAP", "t", "v15-2")
     approve(st.db, p2["id"], owner); queue_action(st.db, p2["id"], owner)
@@ -73,7 +73,7 @@ def test_outcome_campaign_id_and_coverage():
     old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=20)).isoformat()
     st.db.execute("UPDATE action_events SET at=? WHERE action_id=? AND to_state='APPLIED_VERIFIED'", (old, p2["id"])); st.db.commit()
     out2 = OE.measure_due(st.db, windows=(7,))
-    assert out2["measured"] == 0 and out2["insufficient_data"] >= 1, f"kam data par jhootha nateeja nahi: {out2}"
+    assert out2["measured"] == 0 and out2["insufficient_data"] >= 1, f"no false outcome on thin data: {out2}"
     st.close()
 
 def test_warroom_matched_tacos():
@@ -84,8 +84,8 @@ def test_warroom_matched_tacos():
     st.db.commit()
     wr = war_room(st)
     assert wr["kpis"]["tacos_status"] == "NOT_COMPARABLE" and wr["kpis"]["tacos_pct"] is None, \
-        f"ads period data bina TACOS nahi banna chahiye: {wr['kpis'].get('tacos_status')}"
-    # V17: MATCHED ke liye 30-din khidki ki >=80% din-coverage chahiye — roz ke periods bharo (kul kharch ₹2000)
+        f"no TACOS without ads period data: {wr['kpis'].get('tacos_status')}"
+    # V17: MATCHED needs >=80% day coverage of the 30-day window — fill daily periods (total spend ₹2000)
     for k in range(30):
         st.add_search_term("badam", "C", round(2000 / 30, 2), 100, 2, 0, source="Amazon Ads API (Reporting v3)",
                            period_start=d(29 - k), period_end=d(29 - k))

@@ -9,20 +9,20 @@ def test_ads_studio_profit_bid():
     # cost unknown -> bid sifarish band
     r = AS.recommend_bid(st.db, "UNKNOWN-SKU", 500, 12.0, clicks=200, orders=10)
     assert r["blocked"] and "cost" in r["reason"].lower()
-    # sample chhota -> band
+    # sample too small -> blocked
     F.set_cost(st.db, "KAJU200", 90, 10, approved_by="o")
     r2 = AS.recommend_bid(st.db, "KAJU200", 279, 12.0, clicks=10, orders=1)
     assert r2["blocked"] and "Sample" in r2["reason"]
-    # sahi case: margin healthy -> max_cpc hisaab se suggested <= current ka 20% band
+    # good case: healthy margin -> suggestion from max_cpc, within a 20% band of the current bid
     r3 = AS.recommend_bid(st.db, "KAJU200", 279, 12.0, clicks=200, orders=20)
     assert not r3.get("blocked") and abs(r3["change_pct"]) <= 20 and r3["max_cpc"] > 0
-    # harvest: convert hua term negative NAHI banega
+    # harvest: a converting term is NEVER made negative
     st.add_search_term("kaju 1 kg", "BroadKaju", 300, 0, 50, 0, "t")
     st.add_search_term("kaju 1 kg", "ExactKaju", 200, 600, 30, 3, "t")
-    st.add_search_term("bekar cheez", "BroadKaju", 150, 0, 40, 0, "t")
+    st.add_search_term("useless thing", "BroadKaju", 150, 0, 40, 0, "t")
     h = AS.harvest_candidates(st)
     neg_terms = [n["term"] for n in h["negatives"]]
-    assert "kaju 1 kg" not in neg_terms and "bekar cheez" in neg_terms
+    assert "kaju 1 kg" not in neg_terms and "useless thing" in neg_terms
     assert any(x["term"] == "kaju 1 kg" for x in h["harvest"])
     st.close()
 
@@ -33,11 +33,11 @@ def test_keyword_honesty():
     st.add_search_term("badam 500g", "C1", 100, 300, 40, 4, "t")
     m = opportunity_matrix(st, intel=IntelProvider())
     row = m[0]
-    assert row["search_volume"] is None and row["volume_status"] == "UNAVAILABLE", "volume invent nahi hona chahiye (QA-09)"
+    assert row["search_volume"] is None and row["volume_status"] == "UNAVAILABLE", "volume must never be invented (QA-09)"
     assert any("almond" in v for v in term_variants("badam 500g"))
     record_rank(st.db, "Amazon", "brazil nuts", "SKU1", 12)
     t1 = rank_trend(st.db, "brazil nuts", "SKU1")
-    assert t1["status"] == "INSUFFICIENT_DATA", "1 point par rank natija mana hai"
+    assert t1["status"] == "INSUFFICIENT_DATA", "a rank verdict from 1 point is not allowed"
     record_rank(st.db, "Amazon", "brazil nuts", "SKU1", 9)
     record_rank(st.db, "Amazon", "brazil nuts", "SKU1", 6)
     t2 = rank_trend(st.db, "brazil nuts", "SKU1")
@@ -49,19 +49,19 @@ def test_competitor_lab():
     own = {"nut_type": "cashew", "grade": "W320", "pack_g": 200, "processing": "raw"}
     assert CL.classify_peer(own, {"nut_type": "cashew", "grade": "W320", "pack_g": 200, "processing": "raw"})["class"] == "STRICT"
     w240 = CL.classify_peer(own, {"nut_type": "cashew", "grade": "W240", "pack_g": 200, "processing": "raw"})
-    assert w240["class"] != "STRICT", "W240 ko W320 ka exact peer kehna galti hai (QA-08)"
+    assert w240["class"] != "STRICT", "calling W240 an exact peer of W320 is wrong (QA-08)"
     assert CL.price_per_100g(259, 200) == 129.5
     st = Store(":memory:")
     pid = CL.add_peer(st.db, "Amazon", "B0PEER", "https://x", "Peer Kaju W320 200g", "cashew", "W320", 200)
     CL.add_snapshot(st.db, pid, price=279, rating=4.2, reviews=100, image_count=5, in_stock=1, capture_id="c1")
-    assert CL.detect_changes(st.db, pid) == [], "ek snapshot par change event nahi banta"
+    assert CL.detect_changes(st.db, pid) == [], "a single snapshot does not create a change event"
     CL.add_snapshot(st.db, pid, price=259, rating=4.2, reviews=110, image_count=5, in_stock=1, capture_id="c2")
     ev = CL.detect_changes(st.db, pid)
     assert any(e["change_type"] == "Price" and e["delta"] == -20 for e in ev)
-    pack = CL.decision_packet(st.db, {"sku": "KAJU200", "name": "Apna Kaju W320 200g", "price": 279,
+    pack = CL.decision_packet(st.db, {"sku": "KAJU200", "name": "Our Kaju W320 200g", "price": 279,
                                       "nut_type": "cashew", "grade": "W320", "pack_g": 200}, pid)
     assert pack["status"] == "OK" and not pack["financial_guardrail"]["cost_known"]
-    assert "cost" in pack["recommended_action"], "cost unknown par price faisla nahi — packet yahi kahe"
+    assert "cost" in pack["recommended_action"], "no price decision when cost is unknown — the packet must say so"
     st.close()
 
 def test_listing_v2_and_versions():
@@ -73,10 +73,10 @@ def test_listing_v2_and_versions():
     st = Store(":memory:")
     d = L2.save_draft(st.db, "KAJU200", "Amazon", "Kaju W320 200g | Snacking", ["b1"], "terms", "analyst")
     ap = L2.approve_version(st.db, d["id"], "owner")
-    assert ap["ok"], "saaf copy approve honi chahiye"
+    assert ap["ok"], "clean copy must be approved"
     d2 = L2.save_draft(st.db, "KAJU200", "Amazon", "Kaju nitrogen flush pack", ["b1"], "terms", "analyst")
     ap2 = L2.approve_version(st.db, d2["id"], "owner")
-    assert not ap2["ok"] and ap2["status"] == "NEEDS_EVIDENCE", "bina saboot ka dawa rukna chahiye (QA-10)"
+    assert not ap2["ok"] and ap2["status"] == "NEEDS_EVIDENCE", "a claim without evidence must be blocked (QA-10)"
     rb = L2.rollback_to(st.db, "KAJU200", "Amazon", 1, "owner")
     assert rb["version"] == 3 and rb["status"] == "DRAFT"
     st.close()
@@ -84,9 +84,9 @@ def test_listing_v2_and_versions():
 def test_experiments_and_learning():
     import experiments as EX
     st = Store(":memory:")
-    e = EX.create_experiment(st.db, "Nayi main image", "KAJU200", "Amazon", "Size-proof photo CVR badhayegi", "CVR", "image change", "owner")
+    e = EX.create_experiment(st.db, "New main image", "KAJU200", "Amazon", "Size-proof photo CVR badhayegi", "CVR", "image change", "owner")
     r_small = EX.evaluate(st.db, e["id"], {"rate": 0.03, "n": 40}, {"rate": 0.06, "n": 40})
-    assert r_small["verdict"] == "INCONCLUSIVE", "chhote sample par jeet ka elaan mana hai"
+    assert r_small["verdict"] == "INCONCLUSIVE", "declaring a win on a small sample is not allowed"
     e2 = EX.create_experiment(st.db, "Title test", "BRAZIL200", "Amazon", "h", "CVR", "title", "owner")
     r_big = EX.evaluate(st.db, e2["id"], {"rate": 0.03, "n": 2000}, {"rate": 0.05, "n": 2000})
     assert r_big["verdict"] == "WIN"
@@ -104,12 +104,12 @@ def test_settlements_bom_agency_llm_ops():
     g = OF.stock_gate(st, "GHAYAB-SKU")
     assert not g["scale_allowed"] and g["status"] == "STOCKOUT"
     t = AG.add_task(st.db, "Cranberry listing update")
-    assert not AG.complete_task(st.db, t["id"])["ok"], "saboot bina task done nahi"
+    assert not AG.complete_task(st.db, t["id"])["ok"], "no task is done without evidence"
     assert AG.complete_task(st.db, t["id"], "screenshot-ref-1")["ok"]
     AG.add_fee(st.db, "2026-10", 15000)
     sc = AG.scorecard(st.db)
     assert sc["tasks_done_with_evidence"] == 1 and sc["fees_total"] == 15000
-    # LLM budget: chhota budget set karke block parkho
+    # LLM budget: set a small budget and check that it blocks
     OF.LLM_BUDGET["daily_inr"] = 1.0
     class FakeLLM:
         def generate(self, p, system=""): return "ok"
@@ -125,10 +125,10 @@ def test_rank_diagnostic_and_funnel():
     st.db.execute("INSERT OR REPLACE INTO products VALUES ('SKU-R','Rank Wala', 'Amazon', 300, 0, 3.8, 40, 't')"); st.db.commit()
     d = rank_diagnostic(st, "kaju", "SKU-R")
     hyps = " ".join(h["hypothesis"] for h in d["hypotheses"])
-    assert "Stock" in hyps, "stockout sabse pehle parakhna chahiye"
+    assert "Stock" in hyps, "a stock-out must be checked first"
     st.set_inventory("SKU-R", "WH", 100)
     d2 = rank_diagnostic(st, "kaju", "SKU-R")
-    assert any("Rating" in h["hypothesis"] for h in d2["hypotheses"]), "3.8 rating par trust-wali parikalpana aani chahiye"
+    assert any("Rating" in h["hypothesis"] for h in d2["hypotheses"]), "a 3.8 rating must produce a trust hypothesis"
     st.add_search_term("kaju", "C", 50, 300, 25, 3, "t")
     f = rank_funnel(st, "kaju", "SKU-R")
     assert f["clicks"] == 25 and f["orders"] == 3 and "UNAVAILABLE" in f["rank_data"]

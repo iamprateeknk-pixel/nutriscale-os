@@ -4,7 +4,7 @@ from db_store import Store
 
 def test_sp_lwa_only_no_aws():
     from connectors.config import missing_keys
-    assert "aws_access_key" not in missing_keys("amazon_sp"), "V12 me AWS keys lazmi nahi honi chahiye"
+    assert "aws_access_key" not in missing_keys("amazon_sp"), "AWS keys must not be required in V12"
     from connectors.amazon_sp import AmazonSP
     seen = {}
     def transport(req):
@@ -15,7 +15,7 @@ def test_sp_lwa_only_no_aws():
     sp = AmazonSP(cfg=cfg, transport=transport)
     orders = sp.get_orders("2026-10-01T00:00:00Z")
     assert len(orders) == 1 and "x-amz-access-token" in seen["headers"]
-    assert "Authorization" not in seen["headers"] or "AWS4" not in str(seen["headers"]), "SigV4 nahi hona chahiye"
+    assert "Authorization" not in seen["headers"] or "AWS4" not in str(seen["headers"]), "there must be no SigV4"
 
 def test_ads_reporting_pipeline():
     from connectors.amazon_ads import AmazonAds
@@ -55,10 +55,10 @@ def test_capabilities_and_intel():
     from capabilities import capability, all_capabilities, IntelProvider
     st = Store(":memory:")
     fk = capability(st.db, "Flipkart", "write_ads")
-    assert fk["status"] == "unavailable", "Flipkart ads write fictional nahi hona chahiye"
+    assert fk["status"] == "unavailable", "Flipkart ads write must not be fictional"
     ip = IntelProvider()
     v = ip.keyword_volume("kaju 1kg")
-    assert v["status"] == "UNAVAILABLE" and v["volume"] is None, "provider bina volume kabhi invent nahi"
+    assert v["status"] == "UNAVAILABLE" and v["volume"] is None, "never invent volume without a provider"
     rk = ip.reverse_keywords("B0XXXX")
     assert rk["status"] == "UNAVAILABLE" and rk["keywords"] == []
     assert len(all_capabilities(st.db)) >= 8

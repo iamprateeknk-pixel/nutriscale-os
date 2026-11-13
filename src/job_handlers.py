@@ -1,7 +1,7 @@
-"""JOB-01 sudhar (V12.1): har job ka APNA handler — pehle daemon sab ko ek hi
-daily_cycle() se chalata tha (audit me sahi pakda gaya). Ab:
-- data_sync asal sync chalata hai (connector configured ho tab; warna imaandaar SKIP)
-- baaki jobs apne-apne asal function se judte hain; jo data maangta hai aur data na ho to SKIP.
+"""JOB-01 fix (V12.1): every job has ITS OWN handler — previously the daemon ran everything through a single
+daily_cycle() (correctly caught in an audit). Now:
+- data_sync runs a real sync (when a connector is configured; otherwise an honest SKIP)
+- other jobs call their own real functions; a job that needs data SKIPs when there is none.
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -11,7 +11,7 @@ def _data_sync(store):
     from connectors import config as cfg
     ready = [n for n, s in cfg.status_all().items() if s["configured"]]
     if not ready:
-        return "SKIP: koi connector configured nahi — aaj data CSV import se aayega (ye nakli sync nahi chalega)"
+        return "SKIP: no connector configured — today's data comes from CSV upload (no fake sync is run)"
     out = []
     import datetime
     today = datetime.date.today()
@@ -19,14 +19,14 @@ def _data_sync(store):
         from connectors.amazon_ads import AmazonAds
         import sync_service
         yday = (today - datetime.timedelta(days=1)).isoformat()
-        # V14: ek-din ki khidki — roz wahi din ek hi baar, overlap ka sawal hi nahi
+        # V14: one-day window — each day exactly once, so overlaps cannot happen
         r = AmazonAds().sync_search_terms(store, yday, yday)
         out.append(f"ads terms {r['imported']} ({r.get('overlap_status', '')})")
         try:
             m = sync_service.sync_campaign_map(store)
-            out.append(f"campaign naksha {m['mapped']}")
+            out.append(f"campaign map {m['mapped']}")
         except Exception as e:
-            out.append(f"campaign naksha skip: {type(e).__name__}")
+            out.append(f"campaign map skipped: {type(e).__name__}")
     if "amazon_sp" in ready:
         import sync_service
         since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)).isoformat()
@@ -41,120 +41,120 @@ def _data_sync(store):
         import sync_service
         r = sync_service.sync_flipkart(store, (today - datetime.timedelta(days=2)).isoformat(), today.isoformat())
         out.append(f"flipkart items {r['orders_items']}")
-    return "Sync hua: " + ", ".join(out) if out else "SKIP: configured connector ka sync function is job me nahi joda"
+    return "Synced: " + ", ".join(out) if out else "SKIP: the configured connector's sync function is not wired into this job"
 
 def _measure_results(store):
     import outcome_engine as OE
     r = OE.measure_due(store.db)
     conf = OE.rule_confidence(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM outcomes").fetchone()["c"]
-    s = "; ".join(f"{c['kind']}: jeet-dar {c['win_rate']} ({c['measured']} maap)" for c in conf) or "abhi koi maapa nateeja nahi"
+    s = "; ".join(f"{c['kind']}: win rate {c['win_rate']} ({c['measured']} measured)" for c in conf) or "no measured outcomes yet"
     import agent_brain as AB
-    lb = AB.learn_from_outcomes(store.db)  # V23: naye nateeje turant playbook ke bharose me
+    lb = AB.learn_from_outcomes(store.db)  # V23: new outcomes go straight into playbook confidence
     s += f"; playbook update {lb['applied']}"
-    return f"Is chakra me {r['measured']} naye nateeje khidki-maap se bane (data-aparyapt: {r['insufficient_data']}); kul {n}. Seekh: {s}"
+    return f"This cycle: {r['measured']} new window-measured outcomes (insufficient data: {r['insufficient_data']}); total {n}. Learning: {s}"
 
 def _seller_health(store):
     ensure_v12(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM order_headers").fetchone()["c"]
-    if not n: return "SKIP: orders ka data hi nahi — seller health ka andaaz nahi lagega"
-    return f"Canonical orders maujud: {n} — ODR/cancel ki asal ginati SP-API sync ke baad milegi (abhi report-import par nirbhar)"
+    if not n: return "SKIP: no order data — seller health cannot be assessed"
+    return f"Canonical orders present: {n} — real ODR/cancel counts arrive after SP-API sync (currently relies on report imports)"
 
 def _stock_reconcile(store):
     from unicommerce_agent import reconcile
     inv = store.db.execute("SELECT COUNT(*) c FROM inventory").fetchone()["c"]
-    if not inv: return "SKIP: inventory data nahi — milaan mumkin nahi"
+    if not inv: return "SKIP: no inventory data — reconciliation not possible"
     master = {r["sku"]: r["q"] for r in store.db.execute("SELECT sku, SUM(qty) q FROM inventory GROUP BY sku")}
     channel = {r["sku"]: r["q"] for r in store.db.execute(
         "SELECT sku, SUM(qty) q FROM inventory WHERE location LIKE '%FBA%' OR location LIKE '%Amazon%' GROUP BY sku")}
     r = reconcile(master, channel)
-    return f"Stock milaan hua (master vs FBA/Amazon channel): {str(r)[:180]}"
+    return f"Stock reconciled (master vs FBA/Amazon channel): {str(r)[:180]}"
 
 def _war_room(store):
     from warroom_service import warroom_data
     w = warroom_data(store)
-    if not w.get("connected"): return "SKIP: asal data nahi — khaali report nahi bhejunga"
-    store.add_knowledge("War room report bani (roz ka snapshot)", "job:war_room_report", "high", "F8")
-    return "War Room report taiyaar — dashboard par taaza hai"
+    if not w.get("connected"): return "SKIP: no real data — an empty report is not sent"
+    store.add_knowledge("War room report created (daily snapshot)", "job:war_room_report", "high", "F8")
+    return "War Room report ready — fresh on the dashboard"
 
 def _fba_cover(store):
-    """V12.2: asal days-of-cover — roz ki bikri (canonical) se kitne din chalega stock.
-    Purana '<50 units' andaaz hata diya: 40 units agar 1/din bikte hain to 40 din surakshit hai."""
+    """V12.2: real days of cover — how many days stock lasts at the daily sales rate (canonical).
+    The old '<50 units' guess is gone: 40 units selling 1/day is 40 safe days."""
     inv = store.db.execute("SELECT COUNT(*) c FROM inventory").fetchone()["c"]
-    if not inv: return "SKIP: inventory nahi — cover ka hisaab nahi banega"
+    if not inv: return "SKIP: no inventory — cover cannot be calculated"
     import analytics as AN
     from fba_planner import days_of_cover
     alerts, ok = [], 0
     for r in store.db.execute("SELECT sku, SUM(qty) q FROM inventory GROUP BY sku"):
         vel = AN.sku_velocity_per_day(store.db, r["sku"])
         if vel <= 0:
-            continue  # bikri ka data nahi — cover ka dawa nahi karenge
+            continue  # no sales data — no claim about cover
         cover = days_of_cover(int(r["q"]), vel)
-        if cover < 21: alerts.append(f"{r['sku']}: {cover:.0f} din (stock {int(r['q'])}, bikri {vel:.1f}/din)")
+        if cover < 21: alerts.append(f"{r['sku']}: {cover:.0f} days (stock {int(r['q'])}, sales {vel:.1f}/day)")
         else: ok += 1
     if alerts:
-        return "FBA cover CHETAVNI (21 din se kam): " + "; ".join(alerts[:5]) + " — replenishment ka samay hai"
-    return f"FBA cover theek hai ({ok} SKU 21+ din par hain)"
+        return "FBA cover WARNING (under 21 days): " + "; ".join(alerts[:5]) + " — time to replenish"
+    return f"FBA cover is fine ({ok} SKUs at 21+ days)"
 
 def _rank_probe(store):
     ensure_v12(store.db)
     n = store.db.execute("SELECT COUNT(*) c FROM rank_observations").fetchone()["c"]
-    return (f"Rank observations darj: {n}. Licensed rank feed connected nahi — naye points manual/licensed "
-            "source se hi aayenge, system khud bazaar ghurega nahi (policy)")
+    return (f"Rank observations recorded: {n}. No licensed rank feed connected — new points only come from a manual/licensed "
+            "source; the system does not scrape the marketplace itself (policy)")
 
 def _learning_crawl(store):
-    """V23: placeholder ki jagah asal seekh-chakra — research playbook taaza, VERIFIED nateejo se bharosa,
-    apne data (search terms / SQP) se naye sabak. Purane research niyam (90+ din) ki chetaavni."""
+    """V23: the real learning cycle instead of a placeholder — refresh the research playbook, confidence from VERIFIED
+    outcomes, new lessons from your data (search terms / SQP). Warns about stale research rules (90+ days)."""
     import agent_brain as AB, marketplace_knowledge as MK
     r = AB.daily_learning_cycle(store)
     stale = MK.stale_rules()
-    msg = (f"Playbook: +{r['playbook']['added']} naye, {r['playbook']['refreshed']} taaza; "
-           f"nateejo se {r['outcomes']['applied']} update; apne data se {r['own_data']['lessons_updated']} sabak")
-    return msg + (f"; DOBARA RESEARCH karo: {', '.join(stale[:5])}" if stale else "")
+    msg = (f"Playbook: +{r['playbook']['added']} new, {r['playbook']['refreshed']} refreshed; "
+           f"{r['outcomes']['applied']} updates from outcomes; {r['own_data']['lessons_updated']} lessons from your data")
+    return msg + (f"; RE-RESEARCH: {', '.join(stale[:5])}" if stale else "")
 
 def _learning_summary(store):
     ensure_v12(store.db)
     runs = store.db.execute("SELECT status, COUNT(*) c FROM job_runs WHERE date(started_at)=date('now') GROUP BY status").fetchall()
-    s = ", ".join(f"{r['status']}:{r['c']}" for r in runs) or "aaj ke runs abhi darj ho rahe hain"
-    return f"Din ka saar — jobs: {s}"
+    s = ", ".join(f"{r['status']}:{r['c']}" for r in runs) or "today's runs are still being recorded"
+    return f"Daily summary — jobs: {s}"
 
 def _backup(store):
-    """Roz ka backup data/backups/ me — restore parikshan create_backup ke andar hi hota hai."""
+    """Daily backup into data/backups/ — the restore test runs inside create_backup."""
     import os, datetime
     import ops_finance as OF
     from db_store import DEFAULT_PATH
     db_path = getattr(store, "path", None) or DEFAULT_PATH
     if db_path == ":memory:":
-        # In-memory DB (tests) ka file backup nahi banta — pehle ye cwd me 'backups/' bana deta tha (repo me kachra)
-        return "SKIP: in-memory DB — file backup ka matlab nahi"
+        # An in-memory DB (tests) has no file to back up — it used to create 'backups/' in the cwd (junk in the repo)
+        return "SKIP: in-memory DB — nothing to back up to a file"
     dest_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), "backups"); os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, f"growth_os-{datetime.date.today().isoformat()}.db")
     r = OF.create_backup(db_path, dest)
-    return f"Backup taiyaar: {os.path.basename(dest)} ({r['tables']} tables, restore-parikshan ke saath)" if r["ok"] else "Backup fail"
+    return f"Backup ready: {os.path.basename(dest)} ({r['tables']} tables, restore-tested)" if r["ok"] else "Backup failed"
 
 def _brand_analytics_import(store):
-    """V22: drop-folder automation — nayi SQP/SCP files khud import, purani SHA se rukengi."""
+    """V22: drop-folder automation — new SQP/SCP files are imported automatically; already-seen files are blocked by SHA."""
     import brand_analytics as BA
     r = BA.import_dropfolder(store.db)
     if not r["available"]: return r["note"]
-    return f"Brand Analytics: {r['files_seen']} file(s) dekhi, {r['imported_files']} nayi import ({r['rows_imported']} rows)"
+    return f"Brand Analytics: {r['files_seen']} file(s) seen, {r['imported_files']} new imported ({r['rows_imported']} rows)"
 
 def _growth_autopilot(store):
-    """V25: playbook ki kamiyon se approval-wale proposals — khud kuch live nahi."""
+    """V25: approval-gated proposals from playbook findings — never changes anything live itself."""
     import growth_autopilot as GA
     r = GA.run(store)
-    return (f"Autopilot: {len(r['created'])} naye proposals, {r['already_proposed_this_week']} is hafte pehle se"
-            + (f", {r['capped']} agle run ke liye" if r["capped"] else "")
-            + (f", {len(r['skipped_disabled_rules'])} disabled niyam ki wajah se chhode" if r["skipped_disabled_rules"] else ""))
+    return (f"Autopilot: {len(r['created'])} new proposals, {r['already_proposed_this_week']} already proposed this week"
+            + (f", {r['capped']} left for the next run" if r["capped"] else "")
+            + (f", {len(r['skipped_disabled_rules'])} skipped because their rule is disabled" if r["skipped_disabled_rules"] else ""))
 
 def _weekly_report(store, today=None):
-    """V25: scheduler sirf daily jobs chalata hai — haftawar report Sunday (IST) ko hi banti hai."""
+    """V25: the scheduler only runs daily jobs — the weekly report is only built on Sunday (IST)."""
     import datetime
     t = today or (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).date()
-    if t.weekday() != 6: return "SKIP: aaj Sunday nahi — report Sunday ko banegi"
+    if t.weekday() != 6: return "SKIP: today is not Sunday — the report is built on Sunday"
     import growth_autopilot as GA
     r = GA.weekly_report(store, t)
-    return f"Haftawar report bani: {r['saved_to'] or 'in-memory'}"
+    return f"Weekly report created: {r['saved_to'] or 'in-memory'}"
 
 def build_handlers(store) -> dict:
     return {

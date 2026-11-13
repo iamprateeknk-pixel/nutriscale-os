@@ -1,6 +1,6 @@
 """Listing V2 (LST-01/02/04) — versioned score, content audit, listing versions.
-Score v2 'Amazon ka ranking formula' NAHI hai — ye kharidaar + policy ki quality ka map hai,
-weights version ke saath darj hain taaki kal badlein to purana hisaab bhi samajh aaye.
+Score v2 is NOT 'Amazon's ranking formula' — it maps buyer + policy quality;
+weights are recorded with a version so the old calculation still makes sense if they change later.
 """
 import os, sys, json
 sys.path.insert(0, os.path.dirname(__file__))
@@ -31,11 +31,11 @@ def score_v2(listing: dict, facts_verified: bool = True) -> dict:
     parts["compliance"] = WEIGHTS_V2["compliance"] if facts_verified else 0
     total = round(sum(parts.values()), 1)
     return {"version": VERSION, "score": total, "breakdown": {k: round(v, 1) for k, v in parts.items()},
-            "note": "Ye NutriScale ka quality score hai — Amazon/Flipkart ke ranking formula ka dawa NAHI hai"}
+            "note": "This is NutriScale's quality score — NOT a claim about the Amazon/Flipkart ranking formula"}
 
 def content_audit(own: dict, peer_titles: list) -> dict:
-    """LST-02: peers ke titles me jo tathya/keywords dikhte hain aur apne me nahi — wahi gap.
-    Dhyaan: peer ke dawe apne product ke liye saboot nahi bante — sirf jaanch ki disha hai."""
+    """LST-02: facts/keywords visible in peers' titles but missing in yours — that is the gap.
+    Caution: a peer's claims are not evidence for your product — they only point at what to check."""
     own_t = (own.get("title") or "").lower()
     checks = {"grade": ["w240", "w320", "mamra", "california", "a++"], "pack": ["200g", "500g", "1kg", "250g"],
               "use": ["snacking", "gifting", "baking", "trail mix"], "form": ["raw", "roasted", "salted", "unsweetened", "dried"]}
@@ -44,7 +44,7 @@ def content_audit(own: dict, peer_titles: list) -> dict:
         peer_has = [w for w in words if any(w in (t or "").lower() for t in peer_titles)]
         for w in peer_has:
             if w not in own_t: gaps.append({"category": cat, "missing": w, "seen_in_peers": True})
-    return {"gaps": gaps, "note": "Gap matlab sirf 'jaanch karo' — pehle apne product ka tathya pakka karo, phir copy me daalo"}
+    return {"gaps": gaps, "note": "A gap only means 'check this' — confirm the fact for your own product first, then add it to the copy"}
 
 def save_draft(db, sku, platform, title, bullets: list, backend_terms: str, created_by: str) -> dict:
     ensure_v12(db)
@@ -56,32 +56,32 @@ def save_draft(db, sku, platform, title, bullets: list, backend_terms: str, crea
 def approve_version(db, vid: int, approver: str) -> dict:
     ensure_v12(db)
     r = db.execute("SELECT * FROM listing_versions WHERE id=?", (vid,)).fetchone()
-    if not r: return {"ok": False, "error": "Version mila nahi"}
+    if not r: return {"ok": False, "error": "Version not found"}
     chk = FR.check_copy(db, r["sku"], (r["title"] or "") + " " + " ".join(json.loads(r["bullets"] or "[]")))
     if not chk["can_publish"]:
         return {"ok": False, "status": "NEEDS_EVIDENCE", "needs_evidence": chk["needs_evidence"],
-                "error": "Dawo ke saboot nahi — publish/approve roka gaya (POL-01)"}
+                "error": "No evidence for the claims — publish/approve blocked (POL-01)"}
     db.execute("UPDATE listing_versions SET status='APPROVED', approved_by=? WHERE id=?", (approver, vid)); db.commit()
     return {"ok": True, "status": "APPROVED", "claim_check": chk}
 
 def publish(db, vid: int, product_type: str, sp=None, live: bool = False) -> dict:
-    """LST publish path (V13): APPROVED version hi jayega; pehle VALIDATION_PREVIEW (parkh),
-    live sirf tab jab capability write_listings=certified ho. Amazon ke issues jaise-aaye waise darj."""
+    """LST publish path (V13): only an APPROVED version goes out; VALIDATION_PREVIEW (check) first,
+    live only when the write_listings capability is certified. Amazon's issues are recorded as returned."""
     import capabilities as caps
     ensure_v12(db)
     r = db.execute("SELECT * FROM listing_versions WHERE id=?", (vid,)).fetchone()
-    if not r: return {"ok": False, "error": "Version mila nahi"}
+    if not r: return {"ok": False, "error": "Version not found"}
     if r["status"] != "APPROVED":
-        return {"ok": False, "error": f"Version {r['status']} hai — pehle approve hoga, phir publish"}
+        return {"ok": False, "error": f"Version is {r['status']} — it must be approved before publishing"}
     if r["platform"] != "Amazon":
-        return {"ok": False, "error": "Abhi publish sirf Amazon (SP-API Listings) ke liye hai; Flipkart listing CSV/portal se jati hai"}
+        return {"ok": False, "error": "Publishing currently only supports Amazon (SP-API Listings); Flipkart listings go via CSV/portal"}
     bullets = json.loads(r["bullets"] or "[]")
     attributes = {"item_name": [{"value": r["title"], "marketplace_id": "A21TJRUUN4KGV"}],
                   "bullet_point": [{"value": b, "marketplace_id": "A21TJRUUN4KGV"} for b in bullets]}
     if live:
         c = caps.capability(db, "Amazon", "write_listings")
         if c["status"] != "certified":
-            return {"ok": False, "error": f"Live publish band hai — write_listings capability '{c['status']}' hai. Pehle VALIDATION_PREVIEW parkho, phir pilot sign-off se certified karo."}
+            return {"ok": False, "error": f"Live publish is off — the write_listings capability is '{c['status']}'. Run VALIDATION_PREVIEW first, then certify it via pilot sign-off."}
     if sp is None:
         from connectors.amazon_sp import AmazonSP
         sp = AmazonSP()
@@ -92,11 +92,11 @@ def publish(db, vid: int, product_type: str, sp=None, live: bool = False) -> dic
         db.execute("UPDATE listing_versions SET status='PUBLISHED' WHERE id=?", (vid,)); db.commit()
     return {"ok": True, "mode": mode, "submission": resp.get("submissionId"),
             "vendor_status": resp.get("status"), "issues": issues,
-            "note": "VALIDATION_PREVIEW me kuch live nahi hua — sirf Amazon ki parakh hai" if not live else "Live publish bhej diya gaya"}
+            "note": "Nothing went live in VALIDATION_PREVIEW — it is only Amazon's check" if not live else "Live publish sent"}
 
 def rollback_to(db, sku, platform, version, by) -> dict:
-    """LST-04: purana version naya DRAFT bankar wapas — itihaas kabhi mita nahi."""
+    """LST-04: an old version comes back as a new DRAFT — history is never deleted."""
     ensure_v12(db)
     r = db.execute("SELECT * FROM listing_versions WHERE sku=? AND platform=? AND version=?", (sku, platform, version)).fetchone()
-    if not r: return {"ok": False, "error": "Woh version mila nahi"}
+    if not r: return {"ok": False, "error": "That version was not found"}
     return save_draft(db, sku, platform, r["title"], json.loads(r["bullets"] or "[]"), r["backend_terms"], by)

@@ -1,18 +1,18 @@
 """SEC-01 Auth + RBAC — stdlib PBKDF2 password, token sessions, role matrix.
-Roles: Owner (sab kuch), GrowthLead (proposals/approve Tier-1), Analyst (read+draft),
-AgencyViewer (sirf read, koi action nahi), Operations (imports/jobs), Developer (read + ops status).
+Roles: Owner (everything), GrowthLead (proposals/approve Tier-1), Analyst (read+draft),
+AgencyViewer (read only, no actions), Operations (imports/jobs), Developer (read + ops status).
 """
 import os, sys, hashlib, secrets, datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12, now_utc
 
 ROLES = ["Owner", "GrowthLead", "Analyst", "AgencyViewer", "Operations", "Developer"]
-# permission: kaun kya kar sakta hai
+# permissions: who can do what
 PERMS = {
     "read":            {"Owner", "GrowthLead", "Analyst", "AgencyViewer", "Operations", "Developer"},
     "propose":         {"Owner", "GrowthLead", "Analyst"},
     "approve_tier1":   {"Owner", "GrowthLead"},
-    "approve_tier2":   {"Owner"},                      # Tier-2 sirf Owner, do alag pushtiyaan
+    "approve_tier2":   {"Owner"},                      # Tier-2 Owner only, two different approvals
     "execute":         {"Owner", "GrowthLead"},
     "kill":            {"Owner"},
     "import":          {"Owner", "Operations", "GrowthLead"},
@@ -28,26 +28,26 @@ def _hash(pw: str, salt: bytes) -> str:
 
 def create_user(db, username: str, password: str, role: str) -> dict:
     ensure_v12(db)
-    if role not in ROLES: return {"ok": False, "error": f"Role galat hai: {role}"}
-    if len(password) < 8: return {"ok": False, "error": "Password kam se kam 8 akshar ka ho"}
+    if role not in ROLES: return {"ok": False, "error": f"Invalid role: {role}"}
+    if len(password) < 8: return {"ok": False, "error": "Password must be at least 8 characters"}
     salt = secrets.token_bytes(16)
     db.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,1,?)",
                (username, _hash(password, salt), salt.hex(), role, now_utc())); db.commit()
     return {"ok": True, "username": username, "role": role}
 
 def change_password(db, username: str, new_password: str) -> dict:
-    """Naya salt + hash; purane saare login sessions band (purana token ab kaam nahi karega)."""
+    """New salt + hash; all existing login sessions are revoked (old tokens stop working)."""
     ensure_v12(db)
-    if len(new_password) < 8: return {"ok": False, "error": "Password kam se kam 8 akshar ka ho"}
+    if len(new_password) < 8: return {"ok": False, "error": "Password must be at least 8 characters"}
     if not db.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
-        return {"ok": False, "error": f"User '{username}' mila nahi"}
+        return {"ok": False, "error": f"User '{username}' not found"}
     salt = secrets.token_bytes(16)
     db.execute("UPDATE users SET pass_hash=?, salt=? WHERE username=?", (_hash(new_password, salt), salt.hex(), username))
     db.execute("DELETE FROM sessions WHERE username=?", (username,))
     db.commit()
     return {"ok": True, "username": username, "sessions_revoked": True}
 
-# ---------------- TOTP MFA (SEC-01 ka baki hissa, V12.1) ----------------
+# ---------------- TOTP MFA (rest of SEC-01, V12.1) ----------------
 import base64, hmac, struct, time as _time
 
 def _ensure_totp_col(db):
@@ -66,15 +66,15 @@ def _totp_codes(secret_b32: str) -> set:
     return out
 
 def enable_totp(db, username: str) -> dict:
-    """Authenticator app (Google/Microsoft Authenticator) ke liye secret — ek baar dikhega, sambhal kar rakho."""
+    """Secret for an authenticator app (Google/Microsoft Authenticator) — shown once, keep it safe."""
     ensure_v12(db); _ensure_totp_col(db)
     secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
     db.execute("UPDATE users SET totp_secret=? WHERE username=?", (secret, username)); db.commit()
     return {"secret": secret, "uri": f"otpauth://totp/NutriScale:{username}?secret={secret}&issuer=NutriScaleOS",
-            "note": "Is secret ko authenticator app me daalo — iske baad login par 6-ank ka code bhi lagega"}
+            "note": "Add this secret to your authenticator app — from now on login also needs the 6-digit code"}
 
 def _failed_logins(db, username: str) -> int:
-    """Pichli safal login ke baad, pichle 10 minute me kitni galat koshishein (rate-limit, V12.2)."""
+    """Failed attempts in the last 10 minutes since the last successful login (rate limit, V12.2)."""
     import datetime as _dt
     ensure_v12(db)
     cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(minutes=10)).isoformat(timespec="seconds")
@@ -91,7 +91,7 @@ def verify_login(db, username: str, password: str, totp_code: str = None):
     ensure_v12(db); _ensure_totp_col(db)
     if _failed_logins(db, username) >= 5:
         return {"locked": True, "username": username,
-                "message": "Bohot galat koshishein — khaata 10 minute ke liye band hai (rate limit)"}
+                "message": "Too many failed attempts — the account is locked for 10 minutes (rate limit)"}
     r = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not r or _hash(password, bytes.fromhex(r["salt"])) != r["pass_hash"]:
         _record_attempt(db, username, False); return None
@@ -99,7 +99,7 @@ def verify_login(db, username: str, password: str, totp_code: str = None):
     if secret:
         if not totp_code or str(totp_code) not in _totp_codes(secret):
             return {"mfa_required": True, "username": username,
-                    "message": "Is khaate par MFA chalu hai — authenticator ka 6-ank code bhi do"}
+                    "message": "MFA is enabled on this account — also enter the 6-digit authenticator code"}
     _record_attempt(db, username, True)
     token = secrets.token_urlsafe(32)
     exp = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)).isoformat()
@@ -116,11 +116,11 @@ def user_from_token(db, token: str):
     return dict(r) if r else None
 
 def require(db, headers: dict, perm: str):
-    """Backend ke liye: (user, error_response). error None ho to aage badho."""
+    """For the backend: (user, error_response). Proceed when error is None."""
     auth = headers.get("Authorization", "")
     token = auth[7:] if auth.startswith("Bearer ") else ""
     user = user_from_token(db, token)
-    if not user: return None, (401, {"error": "LOGIN_REQUIRED", "message": "Pehle login karo — bina pehchan ke koi data nahi dikhega."})
+    if not user: return None, (401, {"error": "LOGIN_REQUIRED", "message": "Please log in first — no data is shown without authentication."})
     if not can(user["role"], perm):
-        return None, (403, {"error": "FORBIDDEN", "message": f"{user['role']} ko '{perm}' ki ijazat nahi hai."})
+        return None, (403, {"error": "FORBIDDEN", "message": f"{user['role']} does not have '{perm}' permission."})
     return user, None

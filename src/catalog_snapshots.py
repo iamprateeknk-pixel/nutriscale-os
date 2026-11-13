@@ -1,9 +1,9 @@
-"""Catalog ASIN/BSR Snapshots (V22) — apne aur bazaar ke ASINs ki samay-ke-saath tasveer.
-Ab tak BSR/rank ka koi dated record nahi banta tha — trend dekhna namumkin tha.
-Rasta: Catalog/BSR CSV (Seller Central / Keepa export) import → catalog_snapshots table;
-har ASIN ki pehli-aakhri tasveer aur BSR badlav summary me. SP Catalog API se live pull
-credentials aane par isi table me aayega — table aur hisaab wahi rahega.
-Dedup: file SHA (import_batches) — ek file dobara nahi ghusegi; invent kuch nahi hoga."""
+"""Catalog ASIN/BSR Snapshots (V22) — a picture over time of your own and the market's ASINs.
+Until now no dated BSR/rank record existed — trends were impossible to see.
+Path: Catalog/BSR CSV (Seller Central / Keepa export) import → catalog_snapshots table;
+each ASIN's first and last snapshot and BSR change in a summary. A live pull from the SP Catalog API
+lands in the same table once credentials arrive — the table and calculations stay the same.
+Dedup: file SHA (import_batches) — a file is never imported twice; nothing is invented."""
 import os, sys, csv
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12, sha256_file, now_utc
@@ -15,12 +15,12 @@ def import_catalog_csv(db, path: str, platform: str = "Amazon", account: str = "
     h = sha256_file(path)
     dup = db.execute("SELECT id FROM import_batches WHERE platform=? AND seller_account=? AND file_sha256=? AND report_type='catalog_snapshot'",
                      (platform, account, h)).fetchone()
-    if dup: return {"ok": False, "duplicate": True, "imported": 0, "note": "Ye catalog file pehle aa chuki hai — duplicate roka gaya"}
+    if dup: return {"ok": False, "duplicate": True, "imported": 0, "note": "This catalog file was already imported — duplicate blocked"}
     with open(path, newline="", encoding="utf-8-sig") as f:
         sample = f.read(3000); f.seek(0)
         delim = "\t" if "\t" in sample.split("\n")[0] else ","
         rows = list(csv.DictReader(f, delimiter=delim))
-    if not rows: return {"ok": False, "imported": 0, "note": "File khaali hai"}
+    if not rows: return {"ok": False, "imported": 0, "note": "File is empty"}
     import datetime as _dt
     cap = captured_date or _dt.date.today().isoformat()
     batch = "cat:" + h[:16]
@@ -47,7 +47,7 @@ def import_catalog_csv(db, path: str, platform: str = "Amazon", account: str = "
     return {"ok": True, "duplicate": False, "imported": n, "bad_rows": bad, "captured_date": cap, "batch_id": batch}
 
 def bsr_trend(db, platform: str = "Amazon") -> dict:
-    """Har ASIN ki pehli aur aakhri tasveer — BSR badlav (gira = behtar) saaf dikhega."""
+    """First and last snapshot of each ASIN — BSR change (lower = better) shown clearly."""
     ensure_v12(db)
     out = []
     for a in db.execute("SELECT DISTINCT asin FROM catalog_snapshots WHERE platform=?", (platform,)):
@@ -61,4 +61,4 @@ def bsr_trend(db, platform: str = "Amazon") -> dict:
                     "bsr_change": (l["bsr"] - f["bsr"]) if (f["bsr"] is not None and l["bsr"] is not None) else None,
                     "price_last": l["price"], "rating_last": l["rating"], "reviews_last": l["reviews"]})
     return {"available": bool(out), "asins": out,
-            "note": "BSR ghatna = rank behtar. Data catalog CSV import ke baad hi aayega" if not out else "Catalog snapshots se asal trend"}
+            "note": "Falling BSR = better rank. Data only appears after a catalog CSV import" if not out else "Real trend from catalog snapshots"}

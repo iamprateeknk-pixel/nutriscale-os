@@ -10,10 +10,10 @@ def test_auth_rbac():
     st = Store(":memory:")
     assert A.create_user(st.db, "owner1", "password123", "Owner")["ok"]
     assert A.create_user(st.db, "agency1", "password123", "AgencyViewer")["ok"]
-    assert not A.verify_login(st.db, "owner1", "galat-pass")
+    assert not A.verify_login(st.db, "owner1", "wrong-pass")
     lg = A.verify_login(st.db, "owner1", "password123"); assert lg and lg["role"] == "Owner"
     assert A.user_from_token(st.db, lg["token"])["username"] == "owner1"
-    assert A.user_from_token(st.db, "nakli-token") is None
+    assert A.user_from_token(st.db, "fake-token") is None
     assert A.can("AgencyViewer", "read") and not A.can("AgencyViewer", "execute")
     assert not A.can("GrowthLead", "approve_tier2") and A.can("Owner", "kill")
     user, err = A.require(st.db, {}, "read"); assert err and err[0] == 401
@@ -27,23 +27,23 @@ def test_kill_and_state_machine():
     dup = ACT.create_proposal(st.db, "BID_CHANGE", "Amazon", "acc", {"term": "x"}, "DOUBLE", "o1", "key-1")
     assert dup["duplicate"] and dup["id"] == p["id"], "idempotency fail"
     r1 = ACT.approve(st.db, p["id"], owner)
-    assert r1["state"] == "APPROVAL_PENDING" and r1["needed"] == 2, "double confirm ka pehla kadam"
-    r1b = ACT.approve(st.db, p["id"], owner)   # wahi aadmi dobara — ginti nahi badhegi
+    assert r1["state"] == "APPROVAL_PENDING" and r1["needed"] == 2, "the first step of the double confirmation"
+    r1b = ACT.approve(st.db, p["id"], owner)   # the same person again — the count does not increase
     assert r1b["approvals"] == 1
     r2 = ACT.approve(st.db, p["id"], owner2)
     assert r2["state"] == "APPROVED"
     assert ACT.queue_action(st.db, p["id"], owner)["state"] == "QUEUED"
-    # bina manual saboot ke execute -> FAILED, APPLIED kabhi nahi
+    # execute without manual proof -> FAILED, never APPLIED
     ex = ACT.execute(st.db, p["id"], owner, ACT.ManualAdapter())
     assert ex["state"] == "FAILED"
-    # kill on: queue hi nahi hoga
+    # kill on: nothing is even queued
     ACT.set_kill(st.db, True, "o1", "test")
     p2 = ACT.create_proposal(st.db, "PAUSE", "Amazon", "acc", {}, "ONE_TAP", "o1", "key-2")
     ACT.approve(st.db, p2["id"], owner)
     assert "KILL" in ACT.queue_action(st.db, p2["id"], owner)["error"]
-    assert ACT.kill_status(st.db)["engaged"]  # persist (DB me hai, restart-safe)
+    assert ACT.kill_status(st.db)["engaged"]  # persisted (in the DB, restart-safe)
     ACT.set_kill(st.db, False, "o1")
-    # manual saboot ke saath verified
+    # verified with manual proof
     ACT.queue_action(st.db, p2["id"], owner)
     ex2 = ACT.execute(st.db, p2["id"], owner, ACT.ManualAdapter({"key-2": "AMZ-CONSOLE-REF-123"}))
     assert ex2["state"] == "APPLIED_VERIFIED"
@@ -62,7 +62,7 @@ def test_canonical_import_idempotent(tmp="/tmp/uc_orders.txt"):
     r2 = import_orders_canonical(tmp, st, period=("2026-10-01", "2026-10-01"))
     assert r1["rows_ok"] == 2 and r2["duplicate"]
     n = st.db.execute("SELECT COUNT(*) c FROM order_items").fetchone()["c"]
-    assert n == 2, "do line items rehne chahiye, duplicate nahi"
+    assert n == 2, "two line items must remain, no duplicate"
     st.close()
 
 def test_metrics_gating():
@@ -74,7 +74,7 @@ def test_metrics_gating():
 def test_finance_cost_gate():
     st = Store(":memory:")
     r = F.contribution_v2(st.db, "NAYA-SKU", 500)
-    assert not r["known"] and not r["scale_allowed"], "cost unknown par scale band hona chahiye (QA-07)"
+    assert not r["known"] and not r["scale_allowed"], "scaling must be blocked when cost is unknown (QA-07)"
     F.set_cost(st.db, "BADAM500", 340, 20, approved_by="owner")
     r2 = F.contribution_v2(st.db, "BADAM500", 649)
     assert r2["known"] and r2["unit_cost"] == 360
@@ -104,7 +104,7 @@ def test_jobrunner_durable():
     out = run_due_jobs(st.db, handlers, now=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))))
     by = {r["job"]: r["status"] for r in out}
     assert by["data_sync"] == "FAILED" and by["learning_crawl"] == "DONE" and calls["n"] >= 1
-    assert jobs_status(st.db), "state DB me persist hona chahiye"
+    assert jobs_status(st.db), "the state must persist in the DB"
     st.close()
 
 if __name__ == "__main__":

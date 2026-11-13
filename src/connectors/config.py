@@ -1,6 +1,6 @@
-"""Connector Config — credentials ek jagah, code me kabhi nahi.
+"""Connector Config — credentials in one place, never in code.
 Order: environment variables > config/connectors.json file.
-File banana hai to: config/connectors.example.json ko copy karke connectors.json banao aur apni keys bharo.
+To create the file: copy config/connectors.example.json to connectors.json and fill in your keys.
 """
 import json, os
 
@@ -8,8 +8,8 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONFIG_PATH = os.path.join(ROOT, "config", "connectors.json")
 
 REQUIRED = {
-    # V12/INT-01: Amazon ke naye niyam (2023 ke baad bane apps) — SP-API ke liye AWS keys NAHI chahiye,
-    # sirf LWA (client_id/secret/refresh_token) kaafi hai. Purani aws keys config me hon to ignore hongi.
+    # V12/INT-01: Amazon's new rules (apps built after 2023) — SP-API does NOT need AWS keys,
+    # LWA alone (client_id/secret/refresh_token) is enough. Old AWS keys in the config are ignored.
     "amazon_sp":  ["client_id", "client_secret", "refresh_token", "marketplace_id"],
     "amazon_ads": ["client_id", "client_secret", "refresh_token", "profile_id"],
     "flipkart":   ["app_id", "app_secret"],
@@ -17,7 +17,7 @@ REQUIRED = {
 }
 
 class NotConfigured(Exception):
-    """Jab credentials na hon — system rukega, jhootha data nahi banayega."""
+    """When credentials are missing — the system stops; it never invents data."""
     pass
 
 def _load_file() -> dict:
@@ -25,7 +25,7 @@ def _load_file() -> dict:
         with open(CONFIG_PATH) as f: return json.load(f)
     return {}
 
-DEFAULTS = {"amazon_sp": {"marketplace_id": "A21TJRUUN4KGV"}}  # Amazon India — public jaankari, secret nahi
+DEFAULTS = {"amazon_sp": {"marketplace_id": "A21TJRUUN4KGV"}}  # Amazon India — public information, not a secret
 
 def get_section(name: str) -> dict:
     data = dict(DEFAULTS.get(name, {})); data.update(_load_file().get(name, {}))
@@ -44,8 +44,8 @@ def require(name: str) -> dict:
     miss = missing_keys(name)
     if miss:
         raise NotConfigured(
-            f"'{name}' connector configured nahi hai. Missing: {', '.join(miss)}. "
-            f"config/connectors.json me ye bharo — tareeka CONNECTORS_SETUP.md me hai.")
+            f"'{name}' connector is not configured. Missing: {', '.join(miss)}. "
+            f"Fill these in config/connectors.json — see CONNECTORS_SETUP.md.")
     return get_section(name)
 
 def status_all() -> dict:

@@ -4,7 +4,7 @@ from db_store import Store
 import finance as F, competitor_lab as CL, listing_v2 as L2, actions as ACT
 
 def uc01_cashew_diagnosis():
-    """UC-01: Cashew W320 — peer tulna + munafa parkh + draft/QA gate."""
+    """UC-01: Cashew W320 — peer comparison + profit check + draft/QA gate."""
     st = Store(":memory:")
     F.set_cost(st.db, "9W-TDTG-A8CQ", 130, 12, approved_by="owner")
     pid = CL.add_peer(st.db, "Amazon", "B0PEER1", "https://x", "Peer Kaju W320 200g", "cashew", "W320", 200)
@@ -19,7 +19,7 @@ def uc01_cashew_diagnosis():
     st.close()
 
 def uc02_almond_keywords():
-    """UC-02: Badam keyword vistar — wholesale/galat-grade bahar, variants andar."""
+    """UC-02: Almond keyword expansion — wholesale/wrong grade out, variants in."""
     from keyword_lab import opportunity_matrix, term_variants
     from capabilities import IntelProvider
     st = Store(":memory:")
@@ -33,20 +33,20 @@ def uc02_almond_keywords():
     st.close()
 
 def uc03_cranberry_restructure():
-    """UC-03: Cranberry zyada kharch — bid sifarish munafa-gate se, seedha scale kabhi nahi."""
+    """UC-03: Cranberry overspend — bid advice through the profit gate, never a direct scale-up."""
     import ads_studio as AS
     st = Store(":memory:")
     r = AS.recommend_bid(st.db, "CRAN-SKU", 219, 9.0, clicks=300, orders=11)
-    assert r["blocked"], "cost bina bid ka faisla nahi hona chahiye"
+    assert r["blocked"], "no bid decision without cost"
     F.set_cost(st.db, "CRAN-SKU", 80, 10, approved_by="owner")
     r_floor = AS.recommend_bid(st.db, "CRAN-SKU", 219, 9.0, clicks=300, orders=11)
-    assert r_floor["blocked"], "margin floor (10%) se neeche ho to koi CPC sifarish nahi — yahi UC-03 ki seekh hai"
+    assert r_floor["blocked"], "below the margin floor (10%) there is no CPC advice — that is the lesson of UC-03"
     r2 = AS.recommend_bid(st.db, "CRAN-SKU", 219, 9.0, clicks=300, orders=11, profit_floor_pct=5.0)
-    assert not r2.get("blocked") and r2["change_pct"] == -20.0, "kamzor ROAS par sirf ghataav, woh bhi 20% cap ke saath"
+    assert not r2.get("blocked") and r2["change_pct"] == -20.0, "weak ROAS only allows a decrease, and only within the 20% cap"
     st.close()
 
 def uc04_brazil_scale_gate():
-    """UC-04: Brazil scale se pehle stock + margin dono gate."""
+    """UC-04: before scaling Brazil, both the stock and margin gates."""
     import ops_finance as OF
     st = Store(":memory:")
     assert OF.stock_gate(st, "5I-18V6-HZ5V")["status"] == "STOCKOUT"
@@ -56,20 +56,20 @@ def uc04_brazil_scale_gate():
     st.close()
 
 def uc05_price_drop_packet():
-    """UC-05: Peer ke price girne par packet — auto price-cut kabhi nahi."""
+    """UC-05: a packet when a peer cuts its price — never an automatic price cut."""
     st = Store(":memory:")
     pid = CL.add_peer(st.db, "Amazon", "B0P2", "https://x", "Peer Badam 200g", "almond", "California", 200)
     CL.add_snapshot(st.db, pid, price=499, rating=4.3, reviews=90, image_count=6, in_stock=1, capture_id="p1")
     CL.add_snapshot(st.db, pid, price=449, rating=4.3, reviews=95, image_count=6, in_stock=1, capture_id="p2")
     ev = CL.detect_changes(st.db, pid)
     assert any(e["change_type"] == "Price" and e["delta"] == -50 for e in ev)
-    pack = CL.decision_packet(st.db, {"sku": "BADAM200", "name": "Apna Badam", "price": 479,
+    pack = CL.decision_packet(st.db, {"sku": "BADAM200", "name": "Our Badam", "price": 479,
                                       "nut_type": "almond", "grade": "California", "pack_g": 200}, pid)
     assert pack["playbook"] in ("CP-01", "CP-02") and "cost" in pack["recommended_action"]
     st.close()
 
 def uc06_flipkart_report_only():
-    """UC-06: Flipkart ads write fictional nahi — capability registry saaf kehta hai."""
+    """UC-06: Flipkart ads write is not fictional — the capability registry says so clearly."""
     from capabilities import capability
     st = Store(":memory:")
     assert capability(st.db, "Flipkart", "write_ads")["status"] == "unavailable"
@@ -77,7 +77,7 @@ def uc06_flipkart_report_only():
     st.close()
 
 def uc07_two_sku_order_twice():
-    """UC-07: Do-SKU order do baar import — do lines, kul yog wahi."""
+    """UC-07: a two-SKU order imported twice — two lines, the same total."""
     from connectors.csv_import import import_orders_canonical
     path = "/tmp/uc07.txt"
     with open(path, "w", newline="") as f:
@@ -91,7 +91,7 @@ def uc07_two_sku_order_twice():
     st.close()
 
 def uc08_risky_claim_blocked():
-    """UC-08: 'Diabetes-friendly' bina saboot — QA gate rokega."""
+    """UC-08: 'Diabetes-friendly' without evidence — the QA gate blocks it."""
     st = Store(":memory:")
     d = L2.save_draft(st.db, "NUTS1", "Amazon", "Diabetes friendly healthy nuts", ["x"], "", "llm")
     r = L2.approve_version(st.db, d["id"], "owner")
@@ -99,25 +99,25 @@ def uc08_risky_claim_blocked():
     st.close()
 
 def uc09_kill_during_queue():
-    """UC-09: Queue me khade badlav — kill lagte hi koi lagu nahi; khulne par hi aage."""
+    """UC-09: changes waiting in the queue — nothing is applied once the kill switch is on; they proceed only after it is released."""
     st = Store(":memory:")
     owner = {"username": "o", "role": "Owner"}
     ids = []
     for i in (1, 2):
         p = ACT.create_proposal(st.db, "BID_CHANGE", "Amazon", "acc", {"n": i}, "ONE_TAP", "o", f"uc9-{i}")
         ACT.approve(st.db, p["id"], owner); ACT.queue_action(st.db, p["id"], owner); ids.append(p["id"])
-    ACT.set_kill(st.db, True, "o", "UC-09 parikshan")
+    ACT.set_kill(st.db, True, "o", "UC-09 test")
     r = ACT.execute(st.db, ids[0], owner, ACT.ManualAdapter({f"uc9-1": "REF"}))
     assert not r["ok"] and "KILL" in r["error"]
     states = [st.db.execute("SELECT state FROM action_v12 WHERE id=?", (i,)).fetchone()["state"] for i in ids]
-    assert states == ["QUEUED", "QUEUED"], "kill ke dauraan queue karantine me rehni chahiye"
+    assert states == ["QUEUED", "QUEUED"], "the queue must stay quarantined while the kill switch is on"
     ACT.set_kill(st.db, False, "o")
     r2 = ACT.execute(st.db, ids[0], owner, ACT.ManualAdapter({"uc9-1": "REF-OK"}))
     assert r2["state"] == "APPLIED_VERIFIED"
     st.close()
 
 def uc10_hamper_bom():
-    """UC-10: Hamper — ghatak stock se hi feasibility; box ki laagat munafe me."""
+    """UC-10: Hamper — feasibility from component stock; the box cost is included in profit."""
     import ops_finance as OF
     from season_planner import build_season_pack
     st = Store(":memory:")
@@ -129,9 +129,9 @@ def uc10_hamper_bom():
     st.set_inventory("SKU-BRAZIL", "WH", 40); st.set_inventory("SKU-CRAN", "WH", 40)
     OF.set_bom(st.db, "HAMPER-DIWALI", {"SKU-BRAZIL": 1, "SKU-CRAN": 1})
     f = OF.bom_feasibility(st, "HAMPER-DIWALI", 50)
-    assert f["feasible_units"] == 40 and not f["enough"], "50 chahiye the, 40 hi ban sakte hain — yahi sach dikhna chahiye"
+    assert f["feasible_units"] == 40 and not f["enough"], "50 were wanted, only 40 can be made — that truth must be shown"
     pack = build_season_pack(st)
-    assert pack["combos"], "catalog se combos bane rehne chahiye"
+    assert pack["combos"], "combos from the catalog must still be built"
     st.close()
 
 if __name__ == "__main__":

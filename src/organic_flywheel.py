@@ -1,7 +1,7 @@
 """Organic Flywheel — Blended ROAS / TACOS engine.
-Sach: Ads Console ka ROAS sirf paid sales ginta hai.
-Blended ROAS = Total Sales / Ad Spend. Jaise-jaise organic rank badhta hai,
-wahi spend dugni total sales lata hai — yahi ROAS 8-10 ka asal rasta hai.
+Truth: the Ads Console ROAS only counts paid sales.
+Blended ROAS = Total Sales / Ad Spend. As organic rank grows,
+the same spend brings twice the total sales — that is the real path to ROAS 8-10.
 """
 
 def flywheel(ad_spend: float, paid_sales: float, organic_sales: float) -> dict:
@@ -17,12 +17,12 @@ def flywheel(ad_spend: float, paid_sales: float, organic_sales: float) -> dict:
     }
 
 def ad_spend_for_target_blended(total_sales_target: float, target_blended_roas: float) -> float:
-    """Target total sales aur blended ROAS se ulta hisaab: kitna ad spend chahiye."""
+    """Reverse calculation from target total sales and blended ROAS: how much ad spend is needed."""
     return round(total_sales_target / target_blended_roas, 2)
 
 def rank_mode(organic_rank: int | None, hero_keyword: bool) -> str:
-    """A06 ka mode: rank nahi mila to RANK_PUSH (breakeven ads, maksad page-1),
-    rank mil gaya to HARVEST (spend ghatao, free organic sales uthao)."""
+    """A06 mode: without rank, RANK_PUSH (break-even ads, aim for page 1),
+    with rank, HARVEST (cut spend, collect free organic sales)."""
     if not hero_keyword: return "NORMAL"
     if organic_rank is None or organic_rank > 10: return "RANK_PUSH"
     return "HARVEST"

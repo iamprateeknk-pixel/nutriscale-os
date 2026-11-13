@@ -1,30 +1,30 @@
-"""Scheduler (G3 fix) — roz ke kaam ab sirf likhe hue nahi, registered + chalne wale hain.
-Production me yehi jobs cron/Celery-beat par jayengi; yahan runner unhe kram se chalata hai,
-koi job fail ho to baaki nahi rukenge — error record hoga aur A09 ko escalate hoga.
+"""Scheduler (G3 fix) — daily jobs are not just listed but registered and actually run.
+In production these jobs move to cron/Celery-beat; here the runner executes them in order,
+and one failing job never stops the others — the error is recorded and escalated to A09.
 """
 
 DAILY_JOBS = [
-    {"time": "06:00", "job": "learning_crawl",        "owner": "A09 Governance", "desc": "Saare sources se nayi seekh, fee/policy alerts pehle"},
-    {"time": "06:30", "job": "data_sync",             "owner": "F1 Data Sync",   "desc": "Amazon/Flipkart/Unicommerce ka taaza data"},
-    {"time": "06:45", "job": "brand_analytics_import", "owner": "F1 Data Sync",  "desc": "Brand Analytics drop-folder (SQP/SCP) ki nayi files khud import"},
-    {"time": "07:00", "job": "measure_results",       "owner": "A09 Governance", "desc": "Kal/7-din/14-din purane actions ke results — confidence up/down"},
-    {"time": "07:15", "job": "seller_health_check",   "owner": "F10 Health",     "desc": "ODR/cancellation/late dispatch — limit ke paas laal alert"},
-    {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock milaan — mismatch = oversell rokna"},
-    {"time": "07:45", "job": "growth_autopilot",      "owner": "A06/A03",        "desc": "Playbook ki kamiyan -> approval-wale proposals (negatives, harvest, SQP scale, stock-out pause)"},
-    {"time": "08:00", "job": "war_room_report",        "owner": "F8 Report",      "desc": "Roz ki 1-page report tumhe (dashboard + WhatsApp)"},
-    {"time": "12:00", "job": "fba_cover_check",        "owner": "F3 Inventory",   "desc": "Days-of-cover — 15 din se kam par replenishment proposal"},
-    {"time": "18:00", "job": "rank_probe",             "owner": "A03/A09",        "desc": "Hero keywords ki rank + CTR/CVR record (algorithm seekh)"},
-    {"time": "21:00", "job": "weekly_report",          "owner": "A09 Governance", "desc": "Sirf Sunday: haftawar growth report (data/reports/)"},
-    {"time": "23:00", "job": "daily_learning_summary", "owner": "A09 Governance", "desc": "Aaj kya seekha, kal kya hoga — summary"},
-    {"time": "23:30", "job": "backup_restore",       "owner": "OPS-01",         "desc": "Roz raat ka DB backup (data/backups/) restore-parikshan ke saath"},
+    {"time": "06:00", "job": "learning_crawl",        "owner": "A09 Governance", "desc": "Refresh rules + learn from outcomes and your data; fee/policy alerts first"},
+    {"time": "06:30", "job": "data_sync",             "owner": "F1 Data Sync",   "desc": "Fresh Amazon/Flipkart/Unicommerce data"},
+    {"time": "06:45", "job": "brand_analytics_import", "owner": "F1 Data Sync",  "desc": "Auto-import new files from the Brand Analytics drop folder (SQP/SCP)"},
+    {"time": "07:00", "job": "measure_results",       "owner": "A09 Governance", "desc": "Results of actions from yesterday/7/14 days ago — confidence up/down"},
+    {"time": "07:15", "job": "seller_health_check",   "owner": "F10 Health",     "desc": "ODR/cancellation/late dispatch — red alert near the limits"},
+    {"time": "07:30", "job": "stock_reconcile",       "owner": "F2 Unicommerce", "desc": "3-way stock reconciliation — a mismatch = prevent overselling"},
+    {"time": "07:45", "job": "growth_autopilot",      "owner": "A06/A03",        "desc": "Playbook findings -> approval-gated proposals (negatives, harvest, SQP scale, stock-out pause)"},
+    {"time": "08:00", "job": "war_room_report",        "owner": "F8 Report",      "desc": "Your daily one-page report (dashboard)"},
+    {"time": "12:00", "job": "fba_cover_check",        "owner": "F3 Inventory",   "desc": "Days of cover — replenishment alert under 21 days"},
+    {"time": "18:00", "job": "rank_probe",             "owner": "A03/A09",        "desc": "Record hero keyword rank + CTR/CVR (algorithm learning)"},
+    {"time": "21:00", "job": "weekly_report",          "owner": "A09 Governance", "desc": "Sundays only: weekly growth report (data/reports/)"},
+    {"time": "23:00", "job": "daily_learning_summary", "owner": "A09 Governance", "desc": "What was learned today, what happens tomorrow — summary"},
+    {"time": "23:30", "job": "backup_restore",       "owner": "OPS-01",         "desc": "Nightly DB backup (data/backups/) with restore test"},
 ]
 WEEKLY_JOBS = [
-    {"day": "Sunday", "job": "agent_strength_report", "desc": "Har agent ka Strength Score — pichle Sunday se upar jana chahiye"},
-    {"day": "Sunday", "job": "playbook_review",       "desc": "Algorithm playbook + seekhe hue rules ki samiksha"},
+    {"day": "Sunday", "job": "agent_strength_report", "desc": "Strength score per agent — should rise week over week"},
+    {"day": "Sunday", "job": "playbook_review",       "desc": "Review the algorithm playbook + learned rules"},
 ]
 
 def run_jobs(handlers: dict, jobs: list = DAILY_JOBS) -> list:
-    """handlers: {job_name: callable}. Ek fail ho to baaki chalte rahenge."""
+    """handlers: {job_name: callable}. If one fails the rest keep running."""
     results = []
     for j in jobs:
         fn = handlers.get(j["job"])

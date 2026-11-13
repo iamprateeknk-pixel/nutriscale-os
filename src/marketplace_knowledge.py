@@ -1,17 +1,17 @@
-"""Marketplace Knowledge Base (V23) — listing + keyword ke niyam, web research se, SOURCE ke saath.
+"""Marketplace Knowledge Base (V23) — listing and keyword rules from web research, each WITH ITS SOURCE.
 
-Imaandaari ke niyam (is file ki reedh):
-- Har niyam ke saath `sources` (URL), `checked_on` aur `status` hai:
-    OFFICIAL      = Amazon/Flipkart/FSSAI ke apne page ya announcement se
-    MULTI_SOURCE  = 3+ swatantra seller-guides ek hi baat kahte hain, official page login ke peeche hai
-    SINGLE_SOURCE = ek hi guide ne kaha — disha hai, pakka niyam nahi
-    HEURISTIC     = hamara apna tajurba/anuman — sirf apne data se pakka hoga
-- `reliability` (0-1) self-learning ka PRIOR hai. Asal nateeje (outcomes) isse upar/neeche le jaate hain —
-  agent_brain.py dekho. Sirf padh lene se koi niyam 'sach' nahi banta.
-- Amazon/Flipkart apna ranking formula publish nahi karte. Ranking ke baare me jo bhi likha hai woh
-  disha-suchak hai, formula ka dawa nahi.
-- Research date: 11 Nov 2026. Niyam badalte hain — `checked_on` purana ho to dobara parkho
-  (stale_rules() yahi batata hai).
+Honesty rules (the backbone of this file):
+- Every rule carries `sources` (URLs), `checked_on` and a `status`:
+    OFFICIAL      = from Amazon/Flipkart/FSSAI's own page or announcement
+    MULTI_SOURCE  = 3+ independent seller guides say the same thing; the official page is behind a login
+    SINGLE_SOURCE = only one guide says it — a direction, not a firm rule
+    HEURISTIC     = our own experience/assumption — only your own data can confirm it
+- `reliability` (0-1) is the PRIOR for self-learning. Real outcomes move it up or down —
+  see agent_brain.py. Reading a rule does not make it true.
+- Amazon/Flipkart do not publish their ranking formulas. Anything written about ranking is
+  directional, not a claim about the formula.
+- Research date: 11 Nov 2026. Rules change — re-check anything whose `checked_on` is old
+  (stale_rules() reports these).
 """
 import datetime
 
@@ -82,193 +82,192 @@ def _k(rid, platform, topic, agents, rule, status, reliability, sources, value=N
 KNOWLEDGE = [
     # ---------------- AMAZON: TITLE ----------------
     _k("AMZ-T-01", "Amazon", "title", ["A04"],
-       "27 Jul 2026 se media ko chhod har category me title 75 akshar (spaces sahit) ya kam. Lamba title Amazon ka AI "
-       "dheere-dheere khud badal deta hai — listing live rehti hai, par shabd tumhare haath se nikal jaate hain.",
+       "From 27 Jul 2026 titles in every category except media must be 75 characters or fewer (including spaces). Amazon's AI "
+       "gradually rewrites longer titles — the listing stays live, but you lose control of the wording.",
        "OFFICIAL", 0.95, ["amz_title_jul26", "amz_title_jul26_in", "salesduo_75"], value={"max_chars": 75},
-       action="Title khud 75 ke andar likho — sabse zaroori keyword + product + grade + weight; baaki Item Highlights/bullets me"),
+       action="Write the title yourself within 75 chars — top keyword + product + grade + weight; everything else goes in Item Highlights/bullets"),
     _k("AMZ-T-02", "Amazon", "title", ["A04"],
-       "Naya field 'Item Highlights' — 125 akshar tak, material/upyog jaisi tulna ki baatein. Sirf tab milta hai jab title <=75 ho.",
+       "New 'Item Highlights' field — up to 125 characters for comparison details such as material/use. Only available when the title is <=75.",
        "MULTI_SOURCE", 0.85, ["amz_title_jul26", "salesduo_75", "amz_title_jul26_in"], value={"max_chars": 125},
-       action="Use-case (gifting, daily snacking, baking) aur pack/grade ke tathya yahan; search-weight abhi saaf nahi, isliye hero keyword title me hi rakho"),
+       action="Put use cases (gifting, daily snacking, baking) and pack/grade facts here; its search weight is unclear, so keep the hero keyword in the title"),
     _k("AMZ-T-03", "Amazon", "title", ["A04"],
-       "Ek shabd title me 2 baar se zyada nahi (a/an/the/and/for/with jaise chhote shabd chhod kar). Plural/doosre roop bhi "
-       "dohraav gine jaate hain (almond/almonds).",
+       "No word may appear more than twice in a title (except short words like a/an/the/and/for/with). Plurals and other "
+       "forms count as repeats (almond/almonds).",
        "OFFICIAL", 0.9, ["amz_title_jan25", "sel_title_jan25", "m4e_repeat"], value={"max_repeat": 2},
-       action="'Almonds Badam Almond' jaisa stuffing hatao — ek roop English, ek Hinglish kaafi hai"),
+       action="Remove stuffing like 'Almonds Badam Almond' — one English form and one Hinglish form is enough"),
     _k("AMZ-T-04", "Amazon", "title", ["A04"],
-       "Title me non-brand special characters mana: ! $ ? _ { } ^ ¬ ¦; ~ # < > * sirf naap/style-number me. "
-       "Pipe | aur dash - chalte hain. Brand ke naam ka hissa ho to chhoot.",
+       "Non-brand special characters are banned in titles: ! $ ? _ { } ^ ¬ ¦; ~ # < > * only in measurements/style numbers. "
+       "Pipe | and dash - are allowed. Exempt if part of the brand name.",
        "MULTI_SOURCE", 0.8, ["amz_title_jan25", "sel_title_jan25", "m4e_repeat"],
        value={"banned": list("!$?_{}^¬¦"), "restricted": list("~#<>*")}),
     _k("AMZ-T-05", "Amazon", "title", ["A04", "A03"],
-       "Title ab search-matching field hai, prachaar ka nahi: brand + product type + mukhya fark (grade/variety) + size/weight. "
-       "'Best', 'No.1', 'sale', 'offer' jaise shabd title me nahi.",
+       "The title is now a search-matching field, not marketing: brand + product type + key differentiator (grade/variety) + size/weight. "
+       "No words like 'Best', 'No.1', 'sale', 'offer' in the title.",
        "MULTI_SOURCE", 0.8, ["amz_title_jul26_in", "salesduo_75", "fk_42signals"]),
     # ---------------- AMAZON: BULLETS ----------------
     _k("AMZ-B-01", "Amazon", "bullets", ["A04"],
-       "Bullets me emoji aur ™ ® © jaise symbols mana (Aug 2024 se); niyam todne wale bullets Amazon khud edit/chhupa sakta hai.",
+       "Emojis and symbols like ™ ® © are banned in bullets (since Aug 2024); Amazon may edit or hide bullets that break the rules.",
        "MULTI_SOURCE", 0.8, ["bullets_emoji", "bullets_rules"]),
     _k("AMZ-B-02", "Amazon", "bullets", ["A04"],
-       "Guarantee/refund vaade ('full refund', 'pasand na aaye to wapas'), company contact, website link bullets me mana.",
+       "Guarantee/refund promises ('full refund', 'send it back if not satisfied'), company contact details and website links are banned in bullets.",
        "MULTI_SOURCE", 0.75, ["bullets_rules", "bullets_emoji"]),
     _k("AMZ-B-03", "Amazon", "bullets", ["A04"],
-       "5 bullets; seller account par lambai ~500 tak dikhti hai, par mobile par pehle ~250 akshar hi dikhte hain — "
-       "fayda shuru me likho. Bullet ke ant me poorn-viram na lagana aam salah hai.",
+       "5 bullets; seller accounts allow ~500 characters, but mobile shows only the first ~250 — "
+       "lead with the benefit. Common advice is to skip the full stop at the end of a bullet.",
        "SINGLE_SOURCE", 0.6, ["bullets_emoji", "backend_bytes"], value={"count": 5, "soft_max": 255, "hard_max": 500}),
     # ---------------- AMAZON: BACKEND SEARCH TERMS ----------------
     _k("AMZ-K-01", "Amazon", "backend", ["A03", "A04"],
-       "Amazon.in backend 'search terms' ki seema 200 BYTES (akshar nahi). Hindi/Devanagari ka ek akshar 3 byte leta hai. "
-       "Seema paar = field poora ya aanshik roop se index nahi hota.",
+       "The Amazon.in backend 'search terms' limit is 200 BYTES (not characters). One Hindi/Devanagari character takes 3 bytes. "
+       "Over the limit = the field is not indexed, fully or partly.",
        "MULTI_SOURCE", 0.85, ["backend_200", "backend_bytes", "backend_in_forum"], value={"max_bytes": 200}),
     _k("AMZ-K-02", "Amazon", "backend", ["A03"],
-       "Backend me shabd spaces se alag karo (comma nahi), title/bullets me pehle se maujood shabd dohrao mat, "
-       "competitor brand ka naam kabhi nahi, ASIN nahi, 'best/cheap/new' jaise subjective/temporary shabd nahi.",
+       "Separate backend words with spaces (not commas), do not repeat words already in the title/bullets, "
+       "never use competitor brand names or ASINs, and no subjective/temporary words like 'best/cheap/new'.",
        "MULTI_SOURCE", 0.8, ["backend_bp", "backend_200", "backend_bytes"]),
     _k("AMZ-K-03", "Amazon", "backend", ["A03"],
-       "Synonyms aur doosri bhasha ke shabd (badam, kaju, kishmish, akhrot, anjeer) backend ki sabse achhi jagah hain. "
-       "Galat spelling daalne ki zaroorat nahi — Amazon khud sambhalta hai.",
+       "Synonyms and other-language words (badam, kaju, kishmish, akhrot, anjeer) belong in the backend. "
+       "No need to add misspellings — Amazon handles those itself.",
        "MULTI_SOURCE", 0.75, ["backend_bp", "backend_200"]),
     # ---------------- AMAZON: IMAGES ----------------
     _k("AMZ-I-01", "Amazon", "images", ["A05", "A04"],
-       "Main image: shuddh safed background (RGB 255,255,255), product frame ka ~85% bhare, koi text/logo/watermark/props nahi. "
-       "Off-white (#FAFAFA) bhi automated check me fail hota hai.",
+       "Main image: pure white background (RGB 255,255,255), product fills ~85% of the frame, no text/logo/watermark/props. "
+       "Even off-white (#FAFAFA) fails the automated check.",
        "MULTI_SOURCE", 0.85, ["img_main", "img_main2"]),
     _k("AMZ-I-02", "Amazon", "images", ["A05"],
-       "Lambi taraf kam se kam 1000px (zoom ke liye 2000px salah). 6-7 images: pack-front, dana close-up (size proof), "
-       "nutrition panel, use-case, pack sizes, trust (FSSAI/pack date).",
+       "At least 1000px on the longest side (2000px recommended for zoom). 6-7 images: pack front, kernel close-up (size proof), "
+       "nutrition panel, use case, pack sizes, trust (FSSAI/pack date).",
        "MULTI_SOURCE", 0.8, ["img_main", "img_main2"], value={"min_px": 1000, "zoom_px": 2000, "target_count": 7}),
     # ---------------- AMAZON: SEMANTIC / AI SEARCH ----------------
     _k("AMZ-S-01", "Amazon", "semantic", ["A04", "A03"],
-       "COSMO (Amazon ka common-sense knowledge system, SIGMOD 2024) kharidaar ke IRADE (upyog, mauka, kiske liye) ko product "
-       "se jodta hai. Structured attributes poore bharna aur use-case saaf likhna zaroori — Rufus se seedha jod Amazon ne pakka nahi kiya.",
+       "COSMO (Amazon's common-sense knowledge system, SIGMOD 2024) links shopper INTENT (use, occasion, who it is for) to products. "
+       "Fill structured attributes completely and state use cases clearly — Amazon has not confirmed a direct link to Rufus.",
        "SINGLE_SOURCE", 0.6, ["cosmo", "rufus"],
-       action="Attributes (variety, grade, pack size, diet type, storage) 100% bharo; bullets me 'kiske liye/kab' ke saaf jawab"),
+       action="Fill 100% of attributes (variety, grade, pack size, diet type, storage); bullets clearly answer 'who is it for / when'"),
     _k("AMZ-S-02", "Amazon", "semantic", ["A04", "A08"],
-       "AI shopping assistant reviews aur Q&A bhi padhta hai — jo sawal baar-baar aate hain unke jawab listing me hone chahiye.",
+       "The AI shopping assistant also reads reviews and Q&A — answers to frequently asked questions should be in the listing.",
        "SINGLE_SOURCE", 0.55, ["rufus"]),
     # ---------------- AMAZON: KEYWORD RESEARCH (SQP) ----------------
     _k("AMZ-Q-01", "Amazon", "keyword_research", ["A03", "A06"],
-       "Search Query Performance (Brand Analytics, Brand Registry chahiye) har query par tumhara impression/click/cart/purchase "
-       "SHARE deta hai. Funnel ki jis seedhi par share girta hai, wahi problem hai.",
+       "Search Query Performance (Brand Analytics, needs Brand Registry) gives your impression/click/cart/purchase SHARE "
+       "for every query. The funnel step where your share drops is the problem.",
        "MULTI_SOURCE", 0.85, ["sqp_merchantspring", "sqp_intentwise", "sqp_perpetua"]),
     _k("AMZ-Q-02", "Amazon", "keyword_research", ["A03", "A04"],
-       "Impression share kam = relevance/dikhne ki kami (keyword title/backend me nahi ya ads band). Impression theek par "
-       "click share kam = search-tile ki kami (main image, title, price, reviews, badge). Click theek par purchase share kam = "
-       "offer/page ki kami (price, A+, reviews, delivery).",
+       "Low impression share = relevance/visibility gap (keyword missing from title/backend, or ads off). Good impressions but "
+       "low click share = search-tile gap (main image, title, price, reviews, badge). Good clicks but low purchase share = "
+       "offer/page gap (price, A+, reviews, delivery).",
        "MULTI_SOURCE", 0.8, ["sqp_intentwise", "sqp_merchantspring", "sqp_perpetua"]),
     _k("AMZ-Q-03", "Amazon", "keyword_research", ["A03", "A06"],
-       "Purchase share > impression share aur impression share abhi chhota (<5%) = product convert karta hai par dikhta nahi — "
-       "yahi scale karne layak query hai (ads/bid badhao, title/backend me pakka karo). Pehle margin parkho.",
+       "Purchase share > impression share while impression share is still small (<5%) = the product converts but is not seen — "
+       "this is the query worth scaling (raise ads/bids, lock it into title/backend). Check margin first.",
        "MULTI_SOURCE", 0.75, ["sqp_merchantspring", "sqp_perpetua"], value={"low_impr_share": 0.05}),
     # ---------------- FLIPKART ----------------
     _k("FK-T-01", "Flipkart", "title", ["A04"],
-       "Flipkart par bhi title sabse bhaari text field hai; shabd dohraane se listing block ho sakti hai. "
-       "Brand + product + variant + weight, saaf aur seedha.",
+       "On Flipkart too the title is the most heavily weighted text field; repeating words can get a listing blocked. "
+       "Brand + product + variant + weight, clean and simple.",
        "MULTI_SOURCE", 0.7, ["fk_42signals", "fk_ecomva", "fk_base"]),
     _k("FK-I-01", "Flipkart", "images", ["A05"],
-       "Kam se kam 2, zyada se zyada 8 images; 1000x1000px se chhoti images mobile par theek nahi khulti.",
+       "At least 2 and at most 8 images; images smaller than 1000x1000px do not open properly on mobile.",
        "SINGLE_SOURCE", 0.6, ["fk_42signals"], value={"min_count": 2, "max_count": 8, "min_px": 1000}),
     _k("FK-R-01", "Flipkart", "ranking", ["A04", "A07"],
-       "Flipkart ranking product-data ki quality + asal kharidaar vyavhaar (conversion, reviews, seller performance) par "
-       "chalti hai; suppressed listing ki koi rank nahi. Formula publish nahi hai.",
+       "Flipkart ranking runs on product-data quality + real shopper behaviour (conversion, reviews, seller performance); "
+       "a suppressed listing has no rank. The formula is not published.",
        "MULTI_SOURCE", 0.65, ["fk_42signals", "fk_ecomva", "fk_base"]),
-    # ---------------- FSSAI (India, sab platforms) ----------------
+    # ---------------- FSSAI (India, all platforms) ----------------
     _k("FS-C-01", "ALL", "compliance", ["A04", "A09"],
-       "FSSAI Advertising & Claims Regulations 2018 (1 Jul 2019 se laagu): bimari rokne/theek karne ke dawe mana; e-commerce "
-       "platform bhi 'marketer' ke roop me zimmedar; deceptive claim FSS Act ki dhara 53 ke tahat dandneeya.",
+       "FSSAI Advertising & Claims Regulations 2018 (in force from 1 Jul 2019): claims to prevent/cure disease are banned; e-commerce "
+       "platforms are also liable as 'marketers'; deceptive claims are punishable under Section 53 of the FSS Act.",
        "OFFICIAL", 0.95, ["fssai_claims_2018", "fssai_misleading", "fssai_digest"]),
     _k("FS-C-02", "ALL", "compliance", ["A04", "A09"],
-       "'Natural', 'fresh', 'original', 'traditional', 'authentic' jaise shabd sharton ke saath hi chalte hain "
-       "(jaise 'natural food' nahi, 'made from natural ingredients' composite food ke liye). Bina shart poori kiye mat likho.",
+       "Words like 'natural', 'fresh', 'original', 'traditional', 'authentic' are only allowed under conditions "
+       "(e.g. not 'natural food', but 'made from natural ingredients' for composite foods). Do not use them unless the conditions are met.",
        "OFFICIAL", 0.85, ["fssai_natural_fresh", "fssai_digest"],
        value={"conditional_words": ["natural", "fresh", "original", "traditional", "authentic", "pure", "genuine", "real"]}),
     # ---------------- AMAZON: ADS (V24) ----------------
     _k("AMZ-A-01", "Amazon", "ads", ["A06"],
-       "Campaign ka ek hi KAAM ho: Auto (khoj), Broad/Phrase (khoj), Exact (kamai), Product targeting (competitor ASIN), Brand-defense. "
-       "Exact, phrase, broad aur auto ek hi campaign/budget me hon to tay nahi kar sakte ki paisa kis par jaaye.",
+       "Give each campaign ONE job: Auto (discovery), Broad/Phrase (discovery), Exact (earning), Product targeting (competitor ASINs), Brand defense. "
+       "If exact, phrase, broad and auto share one campaign/budget you cannot control where the money goes.",
        "MULTI_SOURCE", 0.8, ["ppc_jobs", "ppc_sellersprite", "ppc_channable"],
-       action="Har SKU ke liye alag Auto + Exact campaign; jeetne wale terms Exact me, wahi term Auto/Broad me negative"),
+       action="A separate Auto + Exact campaign per SKU; winning terms go to Exact, and the same term becomes negative in Auto/Broad"),
     _k("AMZ-A-02", "Amazon", "ads", ["A06", "A03"],
-       "Harvest chakra: Auto 2-4 hafte chalao → jo search term orders de (2+), use Exact campaign me daalo aur Auto me "
-       "negative exact karo (dono jagah apni hi bid se ladai na ho).",
+       "Harvest cycle: run Auto for 2-4 weeks → move search terms with orders (2+) into an Exact campaign and add them as "
+       "negative exact in Auto (so you do not bid against yourself).",
        "MULTI_SOURCE", 0.8, ["ppc_novadata", "ppc_sellersprite", "ppc_channable"], value={"discovery_weeks": [2, 4], "harvest_min_orders": 2}),
     _k("AMZ-A-03", "Amazon", "ads", ["A06"],
-       "Search Term Report har hafte dekho; kharch ho raha hai par bikri nahi aur irada galat hai to turant negative. "
-       "Shuruaat me manual campaign me 5-10 hi bahut relevant keywords.",
+       "Review the Search Term Report weekly; if a term spends without sales and has the wrong intent, negate it right away. "
+       "Start manual campaigns with only 5-10 highly relevant keywords.",
        "MULTI_SOURCE", 0.8, ["ppc_novadata", "ppc_channable", "ppc_sellersprite"], value={"review_cadence_days": 7, "seed_keywords": [5, 10]}),
     _k("AMZ-A-04", "Amazon", "ads", ["A06", "A07"],
-       "Break-even ACOS = ads se pehle ka munafa ÷ selling price. ACOS isse upar = har ad-bikri par ghaata. "
-       "Target ACOS = break-even − chaha gaya net margin. Grocery me margin patla hai, isliye break-even ACOS neeche hota hai.",
+       "Break-even ACOS = profit before ads ÷ selling price. ACOS above it = a loss on every ad sale. "
+       "Target ACOS = break-even − desired net margin. Grocery margins are thin, so break-even ACOS is low.",
        "MULTI_SOURCE", 0.9, ["acos_sellerboard", "acos_evanik", "acos_eightx", "acos_cm"],
-       action="Har SKU ka break-even ACOS cost + fee se nikalo; bid wahi se tay karo, category ausat se nahi"),
+       action="Calculate break-even ACOS per SKU from cost + fees; set bids from that, not from category averages"),
     _k("AMZ-A-05", "Amazon", "ads", ["A06", "A01"],
-       "Launch par rank/hissa jeetne ke liye ACOS kuch samay break-even se upar chal sakta hai — par TACOS (kul ad kharch ÷ kul bikri) "
-       "par nazar rakho; TACOS girna = organic bikri badh rahi hai (flywheel chal raha hai).",
+       "At launch, ACOS can run above break-even for a while to win rank/share — but watch TACOS (total ad spend ÷ total sales); "
+       "falling TACOS = organic sales are growing (the flywheel is working).",
        "MULTI_SOURCE", 0.75, ["acos_eightx", "acos_sellerboard", "acos_evanik"]),
     _k("AMZ-A-06", "Amazon", "ads", ["A06"],
-       "Top-of-search placement par bid +50-100% aam shuruaat hai — par yeh ek hi source ki salah hai; apne placement report se "
-       "ACOS dekh kar hi badhao.", "SINGLE_SOURCE", 0.5, ["ppc_novadata"], value={"tos_bid_adj_pct": [50, 100]}),
+       "+50-100% bid on top-of-search placement is a common starting point — but it comes from a single source; only raise it "
+       "after checking ACOS in your own placement report.", "SINGLE_SOURCE", 0.5, ["ppc_novadata"], value={"tos_bid_adj_pct": [50, 100]}),
     # ---------------- AMAZON: REVIEWS / CONTENT (V24) ----------------
     _k("AMZ-R-01", "Amazon", "reviews", ["A08"],
-       "Amazon Vine: Brand Registry + Professional account, product par 30 se kam reviews, FBA offer — tab Vine reviewers se "
-       "shuruaati reviews. Fees/India me uplabdhta Seller Central par khud dekho (sources me matbhed).",
+       "Amazon Vine: needs Brand Registry + a Professional account, fewer than 30 reviews on the product and an FBA offer — then Vine "
+       "reviewers provide early reviews. Check fees/availability in India in Seller Central yourself (sources disagree).",
        "MULTI_SOURCE", 0.7, ["vine_myamazonguy", "vine_sellerlabs", "vine_shulex"], value={"max_reviews": 30}),
     _k("AMZ-R-02", "Amazon", "reviews", ["A08", "A09"],
-       "Review ke badle muft product/paisa/discount, sirf khush grahak se review maangna, ya rating ke hisaab se follow-up — "
-       "Amazon policy ke khilaf (account suspend ho sakta hai). 'Request a Review' button aur Vine hi surakshit raaste hain.",
-       "HEURISTIC", 0.85, [], action="Review agent sirf Request-a-Review aur Vine ki salah dega; incentive wali koi yojana kabhi nahi"),
+       "Free product/money/discounts in exchange for reviews, asking only happy customers for reviews, or rating-based follow-ups — "
+       "are against Amazon policy (the account can be suspended). The 'Request a Review' button and Vine are the only safe routes.",
+       "HEURISTIC", 0.85, [], action="The review agent only recommends Request-a-Review and Vine; never any incentive scheme"),
     _k("AMZ-C-01", "Amazon", "a_plus", ["A04", "A05"],
-       "A+ Content (Brand Registry): Amazon ke hawale se Basic A+ se 'up to 8%' aur Premium A+ se 'up to 20%' bikri-badhat batai "
-       "jaati hai (blogs se, Amazon ka mool page nahi mila). Comparison chart (apne pack-sizes/variants) sabse kaam ka module mana jaata hai.",
+       "A+ Content (Brand Registry): blogs citing Amazon report 'up to 8%' sales lift from Basic A+ and 'up to 20%' from Premium A+ "
+       "(Amazon's original page was not found). The comparison chart (your own pack sizes/variants) is considered the most useful module.",
        "MULTI_SOURCE", 0.65, ["aplus_neato", "aplus_estore", "aplus_premium"], value={"basic_lift_pct": 8, "premium_lift_pct": 20},
-       action="A+ me: grade/size ka close-up, origin, nutrition table, pack-size comparison chart, storage tips — dawe sirf saboot wale"),
+       action="In A+: grade/size close-up, origin, nutrition table, pack-size comparison chart, storage tips — only evidence-backed claims"),
     # ---------------- INDIA: SALE EVENTS (V24) ----------------
     _k("IN-E-01", "Amazon", "events", ["A01", "A06", "A07"],
-       "Bade sale (Great Indian Festival) ke liye Amazon khud kehta hai: stock taiyaar, seller coupons, Sale Event Planner se deal "
-       "opt-in. Agencies: FBA stock sale se 15-20 din pehle pahunche; listing/coupon/ads ~7 din pehle taiyaar.",
+       "For big sales (Great Indian Festival) Amazon itself says: have stock ready, seller coupons, and opt in to deals via the Sale Event "
+       "Planner. Agencies: FBA stock should arrive 15-20 days before the sale; listings/coupons/ads ready ~7 days before.",
        "MULTI_SOURCE", 0.8, ["gif_official", "gif_forum", "gif_fibre2fashion", "gif_gonukkad"],
        value={"fba_lead_days": [15, 20], "ready_lead_days": 7}),
     _k("IN-E-02", "Amazon", "events", ["A07", "A06"],
-       "Deal ke prakar: roz ke liye green coupon; Lightning Deal jaldi zyada units (100+) nikaalne ke liye; sale ke baad bacha stock "
-       "clearance/removal. Deal ka discount margin ke andar hi — break-even ACOS ke saath milakar dekho.",
+       "Deal types: green coupons for everyday; Lightning Deals to move many units (100+) fast; leftover stock after the sale goes to "
+       "clearance/removal. Keep deal discounts within margin — check them together with break-even ACOS.",
        "SINGLE_SOURCE", 0.6, ["gif_gonukkad", "gif_official"]),
     # ---------------- INDIA: MARKET (V24) ----------------
     _k("IN-M-01", "ALL", "market", ["A01"],
-       "India dry fruits bazaar ~USD 2.2 billion (2025), anumaan 6-10% saalana badhat (research firms me matbhed); online "
-       "(Amazon/Flipkart) ka hissa tezi se badh raha hai; gifting alag bada segment hai.",
+       "India dry fruits market ~USD 2.2 billion (2025), estimated 6-10% annual growth (research firms disagree); the online "
+       "share (Amazon/Flipkart) is growing fast; gifting is a separate large segment.",
        "MULTI_SOURCE", 0.6, ["mkt_credence", "mkt_bonafide", "mkt_gifting"], value={"size_usd_bn_2025": 2.23}),
     _k("IN-Q-01", "ALL", "channels", ["A01", "A07"],
-       "Quick commerce (Blinkit, Zepto, Instamart) kai FMCG companies ki online bikri ka sabse bada channel ban gaya hai "
-       "(kuch ke liye 58-75%); festive season me dry fruits top bikne wali shreniyon me. Amazon ke saath yeh channel bhi parkho.",
+       "Quick commerce (Blinkit, Zepto, Instamart) has become the largest online sales channel for many FMCG companies "
+       "(58-75% for some); dry fruits are among the top festive-season categories. Evaluate this channel alongside Amazon.",
        "MULTI_SOURCE", 0.65, ["qc_afaqs", "qc_thirdeyesight", "qc_fynd"],
-       action="Q-commerce ke liye chhote pack (100-250g) aur gift box; daam Amazon se takraaye nahi (channel conflict)"),
+       action="Small packs (100-250g) and gift boxes for q-commerce; keep prices from clashing with Amazon (channel conflict)"),
     # ---------------- FLIPKART ADS (V24) ----------------
     _k("FK-A-01", "Flipkart", "ads", ["A06"],
-       "Flipkart PLA (Product Listing Ads) CPC par chalte hain; PLA me sirf KUL budget hota hai (daily nahi) — kharch ki raftaar "
-       "khud dekhni padti hai. Shuruaat PLA se, phir Brand Ads.",
+       "Flipkart PLA (Product Listing Ads) run on CPC; PLA has only a TOTAL budget (no daily cap) — you must watch the spend pace "
+       "yourself. Start with PLA, then Brand Ads.",
        "MULTI_SOURCE", 0.7, ["fk_ads_paxcom", "fk_ads_gonukkad", "fk_ads_swc"]),
     _k("FK-A-02", "Flipkart", "ads", ["A06", "A04"],
-       "Flipkart khud kehta hai ads tabhi achhe chalte hain jab listing (images, price, stock) theek ho; keyword targeting sirf "
-       "search page par. Na chalne wale keywords hatao; 'Smart ROI' campaign target ROAS par khud bid karta hai.",
+       "Flipkart itself says ads work best when the listing (images, price, stock) is in order; keyword targeting only works "
+       "on the search page. Remove non-performing keywords; 'Smart ROI' campaigns bid automatically to a target ROAS.",
        "MULTI_SOURCE", 0.65, ["fk_ads_gonukkad", "fk_ads_paxcom", "fk_ads_swc"]),
-    # ---------------- HAMARA TAJURBA (HEURISTIC — data se pakka hoga) ----------------
+    # ---------------- OUR EXPERIENCE (HEURISTIC — to be confirmed by data) ----------------
     _k("NS-P-01", "ALL", "compliance", ["A04", "A09"],
-       "Listing ka har saboot-maangne wala tathya (nitrogen flush, organic, FSSAI licence, origin, grade, lab-tested, no added sugar) "
-       "tabhi copy me jaaye jab uska saboot fact registry me darj ho — warna approve/publish ruk jaata hai.",
-       "HEURISTIC", 0.95, [], action="Pehle saboot darj karo (certificate/lab report/invoice), phir copy me dawa likho"),
+       "Every claim that needs proof (nitrogen flush, organic, FSSAI licence, origin, grade, lab-tested, no added sugar) "
+       "may only go into copy once its evidence is recorded in the fact registry — otherwise approve/publish is blocked.",
+       "HEURISTIC", 0.95, [], action="Record the evidence first (certificate/lab report/invoice), then write the claim into the copy"),
     _k("NS-H-01", "Amazon", "keyword_research", ["A03"],
-       "Dry fruits me kharidaar Hinglish/Hindi (badam, kaju, kishmish) aur English dono me khojte hain — ek roop title me, "
-       "doosra backend me.", "HEURISTIC", 0.6, []),
+       "Dry-fruit shoppers search in both Hinglish/Hindi (badam, kaju, kishmish) and English — one form in the title, "
+       "the other in the backend.", "HEURISTIC", 0.6, []),
     _k("NS-H-02", "Amazon", "keyword_research", ["A03", "A07"],
-       "Pack-size wali queries (500g, 1kg) ka kharidne ka irada zyada hota hai; grade (W240, W320, Mamra) premium kharidaar "
-       "ko alag karta hai.", "HEURISTIC", 0.55, []),
+       "Pack-size queries (500g, 1kg) show stronger buying intent; grade terms (W240, W320, Mamra) separate out premium shoppers.", "HEURISTIC", 0.55, []),
     _k("NS-H-03", "Amazon", "seasonality", ["A01", "A06"],
-       "Diwali/shaadi ke mausam me 'gift box', 'dry fruits gift' queries uchhalti hain — season se 3-4 hafte pehle listing/ads taiyaar.",
+       "In the Diwali/wedding season 'gift box' and 'dry fruits gift' queries spike — have listings/ads ready 3-4 weeks before the season.",
        "HEURISTIC", 0.6, []),
 ]
 
-# ---------------- Dry-fruit shabdkosh (keyword universe ke beej) ----------------
-# Search volume yahan JAAN-BUJH KAR nahi hai — woh sirf licensed provider ya Brand Analytics se aayega.
+# ---------------- Dry-fruit vocabulary (seeds for the keyword universe) ----------------
+# Search volume is DELIBERATELY absent here — it only comes from a licensed provider or Brand Analytics.
 NUT_VOCAB = {
     "almond":    {"hinglish": ["badam", "badaam"], "hindi": ["बादाम"], "grades": ["california", "mamra", "gurbandi", "jumbo"]},
     "cashew":    {"hinglish": ["kaju"], "hindi": ["काजू"], "grades": ["w180", "w210", "w240", "w320", "w400", "splits"]},
@@ -302,19 +301,25 @@ def rule(rid: str) -> dict:
     raise KeyError(rid)
 
 def stale_rules(max_age_days: int = 90, today=None) -> list:
-    """Jo niyam 90 din se dobara nahi parkhe gaye — inhe phir se research karo (marketplace niyam badalte rehte hain)."""
+    """Rules not re-checked for 90 days — research them again (marketplace rules keep changing)."""
     t = today or datetime.date.today()
     return [r["id"] for r in KNOWLEDGE
             if (t - datetime.date.fromisoformat(r["checked_on"])).days > max_age_days]
 
 def seed_knowledge(store) -> dict:
-    """Knowledge table me niyam bharo — dobara chalane par dohraav nahi (lesson+agent par pehchan)."""
-    added = 0
+    """Load rules into the knowledge table — re-running never duplicates (identified by rule id + agent).
+    Existing rows get their text refreshed, so wording changes (e.g. translation) reach existing databases."""
+    added = refreshed = 0
     for r in KNOWLEDGE:
         for a in r["agents"]:
             lesson = f"[{r['id']}] {r['rule']}"
-            if store.db.execute("SELECT 1 FROM knowledge WHERE agent=? AND lesson LIKE ?", (a, f"[{r['id']}]%")).fetchone():
-                continue
             src = r["sources"][0] if r["sources"] else "NutriScale heuristic"
+            ex = store.db.execute("SELECT id, lesson FROM knowledge WHERE agent=? AND lesson LIKE ?", (a, f"[{r['id']}]%")).fetchone()
+            if ex:
+                if ex["lesson"] != lesson:
+                    store.db.execute("UPDATE knowledge SET lesson=?, source=?, reliability=? WHERE id=?",
+                                     (lesson, f"{r['status']} | {src}", r["reliability"], ex["id"])); refreshed += 1
+                continue
             store.add_knowledge(lesson, f"{r['status']} | {src}", r["reliability"], a); added += 1
-    return {"added": added, "total_rules": len(KNOWLEDGE)}
+    store.db.commit()
+    return {"added": added, "refreshed": refreshed, "total_rules": len(KNOWLEDGE)}

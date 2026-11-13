@@ -1,6 +1,6 @@
-"""V12 Platform Core — canonical schema (DAT-01), control state (SEC-02), jobs (JOB-01) ki neev.
-Purani tables ko chheda nahi gaya; ye V12 ki nayi tables ensure karta hai.
-Har table me platform + seller_account — tenant galti se data mix na ho.
+"""V12 Platform Core — canonical schema (DAT-01), control state (SEC-02), jobs (JOB-01) — the foundation.
+Old tables are left untouched; this ensures the new V12 tables exist.
+Every table carries platform + seller_account — so tenant data never mixes by mistake.
 """
 import sqlite3, hashlib, json, datetime
 
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS experiments(
 
 def ensure_v12(db) -> None:
     db.executescript(V12_SCHEMA); db.commit()
-    # V12.2: search_terms par dedup ke liye batch/period columns (purani tables par bhi)
+    # V12.2: batch/period columns on search_terms for dedup (old tables too)
     try:
         cols = [c[1] for c in db.execute("PRAGMA table_info(search_terms)")]
         for col in ("batch_id", "period_start", "period_end"):
@@ -112,15 +112,15 @@ def ensure_v12(db) -> None:
         db.commit()
     except Exception:
         pass
-    # V19: order_fees par refund column (gross/refund alag-alag milaan ke liye)
+    # V19: refund column on order_fees (for separate gross/refund matching)
     try:
         fcols = [c[1] for c in db.execute("PRAGMA table_info(order_fees)")]
         if fcols and "refund" not in fcols:
             db.execute("ALTER TABLE order_fees ADD COLUMN refund REAL DEFAULT 0"); db.commit()
     except Exception:
         pass
-    # V20: order_fees ki key me seller_account — bina iske do khaaton ke ek-jaise order-id mix ho jate the.
-    # SQLite me PK badalna table dobara banane se hi hota hai; purana data 'default' khaate me surakshit rakha.
+    # V20: seller_account in the order_fees key — without it identical order ids from two accounts got mixed.
+    # Changing a PK in SQLite needs a table rebuild; old data is kept safe under the 'default' account.
     try:
         fcols = [c[1] for c in db.execute("PRAGMA table_info(order_fees)")]
         if fcols and "seller_account" not in fcols:
@@ -135,7 +135,7 @@ def ensure_v12(db) -> None:
             """); db.commit()
     except Exception:
         pass
-    # V20: inventory par sellable/unsellable alag ginati (channel hisaab sirf bikne-yogya stock par hoga)
+    # V20: separate sellable/unsellable counts on inventory (channel math only uses sellable stock)
     try:
         icols = [c[1] for c in db.execute("PRAGMA table_info(inventory)")]
         if icols:
@@ -145,14 +145,14 @@ def ensure_v12(db) -> None:
             db.commit()
     except Exception:
         pass
-    # V13: action baseline (execute ke samay ki tasveer — outcome maap ka aadhaar)
+    # V13: action baseline (snapshot at execution time — the basis for outcome measurement)
     try:
         acols = [c[1] for c in db.execute("PRAGMA table_info(action_v12)")]
         if acols and "baseline" not in acols:
             db.execute("ALTER TABLE action_v12 ADD COLUMN baseline TEXT"); db.commit()
     except Exception:
         pass
-    # V13: outcomes superset — experiments (purana roop) aur outcome_engine (naya) ek hi table
+    # V13: outcomes superset — experiments (old form) and outcome_engine (new) share one table
     try:
         ocols = [c[1] for c in db.execute("PRAGMA table_info(outcomes)")]
         if ocols:

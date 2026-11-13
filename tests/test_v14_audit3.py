@@ -1,14 +1,14 @@
-"""V14 AUDIT-3 TESTS — khidki-maap, overlap niyam, platform pehchan, scheduled sync jod, publish endpoint."""
+"""V14 AUDIT-3 TESTS — windowed measurement, overlap rules, platform identity, scheduled sync additions, publish endpoint."""
 import os, sys, datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from db_store import Store
 
 def test_platform_identity():
     st = Store(":memory:")
-    st.upsert_product("SKU-DUAL", "Amazon wala", "Amazon", 300)
-    st.upsert_product("SKU-DUAL", "Flipkart wala", "Flipkart", 280)
+    st.upsert_product("SKU-DUAL", "Amazon item", "Amazon", 300)
+    st.upsert_product("SKU-DUAL", "Flipkart item", "Flipkart", 280)
     rows = st.db.execute("SELECT platform, price FROM products WHERE sku='SKU-DUAL' ORDER BY platform").fetchall()
-    assert len(rows) == 2 and rows[0]["price"] == 300 and rows[1]["price"] == 280, "ek SKU dono bazaaro par alag rahega"
+    assert len(rows) == 2 and rows[0]["price"] == 300 and rows[1]["price"] == 280, "one SKU stays separate on both marketplaces"
     st.upsert_campaign("Fest", "Amazon", 100, 500); st.upsert_campaign("Fest", "Flipkart", 50, 200)
     assert st.db.execute("SELECT COUNT(*) c FROM campaigns WHERE name='Fest'").fetchone()["c"] == 2
     st.close()
@@ -17,16 +17,16 @@ def test_velocity_span():
     import analytics as AN
     from platform_core import ensure_v12
     st = Store(":memory:"); ensure_v12(st.db)
-    # 10 units, pehli-aakhri bikri 10 din ke antar par — sirf 2 selling-days ginne se 5/din galat aata tha
-    # Dates aaj se relative — velocity khidki 'aaj' se bandhi hai, hardcoded dates kuch hafto me khidki se bahar gir jaati thi
+    # 10 units, first and last sale 10 days apart — counting only the 2 selling days wrongly gave 5/day
+    # Dates relative to today — the velocity window is anchored to 'today'; hardcoded dates fell out of the window within weeks
     _t = datetime.date.today()
     for i, d in enumerate([(_t - datetime.timedelta(days=12)).isoformat(), (_t - datetime.timedelta(days=3)).isoformat()]):
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',500,'INR')", (f"V{i}", d))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?, 'SKU-V','B0',5,500,0)", (f"V{i}", f"L{i}"))
     st.db.commit()
     v = AN.sku_velocity_per_day(st.db, "SKU-V")
-    # V21: mukhya velocity = units / POORA window (10/30); span-wala 1.0 ab sirf run_rate (jaankari)
-    assert abs(v - 10 / 30) < 0.01, f"poora-window velocity 10/30 honi chahiye, mili {v}"
+    # V21: main velocity = units / the FULL window (10/30); the span-based 1.0 is now only run_rate (informational)
+    assert abs(v - 10 / 30) < 0.01, f"full-window velocity should be 10/30, got {v}"
     assert abs(AN.sku_velocity_report(st.db, "SKU-V")["run_rate_per_day"] - 1.0) < 0.01
     st.close()
 
@@ -37,19 +37,19 @@ def test_period_overlap_rules():
     r1 = apply_period_rows(st.db, "SRC", "2026-10-01", "2026-10-07",
                            lambda: (st.add_search_term("kaju", "C", 100, 200, 5, 1, source="SRC", period_start="2026-10-01", period_end="2026-10-07"), 1)[1])
     assert r1["status"] == "INSERTED"
-    # chhota period bade ke andar — skip (dohra hisaab nahi)
+    # a small period inside a bigger one — skip (no double counting)
     r2 = apply_period_rows(st.db, "SRC", "2026-10-02", "2026-10-03", ins(1))
     assert r2["status"] == "SKIPPED_CONTAINED"
-    # aadha takraav — block
+    # partial overlap — block
     r3 = apply_period_rows(st.db, "SRC", "2026-10-05", "2026-10-12", ins(1))
     assert r3["status"] == "BLOCKED_PARTIAL_OVERLAP"
-    # bada period purane ko supersede karega
+    # a bigger period supersedes the old one
     def ins_big():
         st.add_search_term("kaju", "C", 300, 600, 9, 2, source="SRC", period_start="2026-10-01", period_end="2026-10-14"); return 1
     r4 = apply_period_rows(st.db, "SRC", "2026-10-01", "2026-10-14", ins_big)
     assert r4["status"] == "INSERTED" and len(r4["replaced_periods"]) == 1
     tot = st.db.execute("SELECT SUM(spend) s FROM search_terms WHERE source='SRC'").fetchone()["s"]
-    assert tot == 300, f"supersede ke baad sirf nayi khidki ginegi, mila {tot}"
+    assert tot == 300, f"after supersede only the new window counts, got {tot}"
     st.close()
 
 def test_outcome_windowed():
@@ -64,9 +64,9 @@ def test_outcome_windowed():
         d = (today - datetime.timedelta(days=days_ago)).isoformat()
         st.db.execute("INSERT INTO order_headers VALUES ('Amazon','default',?,?,'Shipped',?,'INR')", (oid, d, gross))
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-W','B0',1,?,0)", (oid, oid + "L", gross))
-    order("B1", 10, 1000)   # lagne se pehle ki khidki
+    order("B1", 10, 1000)   # the window before applying
     order("B2", 11, 500)
-    order("A1", 3, 3000)    # lagne ke baad ki khidki
+    order("A1", 3, 3000)    # the window after applying
     order("A2", 4, 500)
     st.db.commit()
     p = create_proposal(st.db, "PRICE_TEST", "Amazon", "acc", {"sku": "SKU-W"}, "ONE_TAP", "t", "ow-1")
@@ -77,7 +77,7 @@ def test_outcome_windowed():
     applied = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8)).isoformat()
     st.db.execute("UPDATE action_events SET at=? WHERE action_id=? AND to_state='APPLIED_VERIFIED'", (applied, p["id"])); st.db.commit()
     out = OE.measure_due(st.db, windows=(7,))
-    assert out["measured"] == 1, f"khidki-maap hona chahiye: {out}"
+    assert out["measured"] == 1, f"windowed measurement expected: {out}"
     row = st.db.execute("SELECT * FROM outcomes WHERE action_id=?", (p["id"],)).fetchone()
     assert row["metric"] == "sku_revenue_window" and row["before_val"] == 1500 and row["after_val"] == 3500 and row["success"] == 1
     st.close()
@@ -96,7 +96,7 @@ def test_fees_in_data_sync_and_publish_endpoint():
     app = open(os.path.join(os.path.dirname(__file__), "..", "backend", "app.py")).read()
     assert "/api/v1/listings/publish" in app
     comp = open(os.path.join(os.path.dirname(__file__), "..", "docker-compose.yml")).read()
-    assert "127.0.0.1:8765" in comp, "backend port sirf localhost par khulega"
+    assert "127.0.0.1:8765" in comp, "the backend port only opens on localhost"
     st.close()
 
 if __name__ == "__main__":

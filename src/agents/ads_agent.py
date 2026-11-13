@@ -1,5 +1,5 @@
-"""A06 Ads Agent — DB ke asal search terms par Ads Engine chalata hai aur proposals file karta hai.
-Data nahi hai to proposals NAHI banata — saaf bolta hai data chahiye.
+"""A06 Ads Agent — runs the Ads Engine on real search terms from the DB and files proposals.
+Without data it creates NO proposals — it says plainly that data is needed.
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -17,7 +17,7 @@ class AdsAgent(BaseAgent):
         rows = [dict(r) for r in self.store.db.execute("SELECT * FROM search_terms")]
         if not rows:
             return {"proposals": [], "summary": None,
-                    "note": "Search-term data nahi hai — pehle Ads report import karo ya Ads API jodo. Bina data ke koi proposal nahi banega."}
+                    "note": "No search-term data — upload an Ads report or connect the Ads API first. No proposals without data."}
         proposals, counts = [], {}
         total_spend = sum(r["spend"] for r in rows); total_sales = sum(r["sales"] for r in rows)
         for r in rows:
@@ -25,7 +25,7 @@ class AdsAgent(BaseAgent):
                        self.target_roas, self.target_cpa)
             counts[d["action"]] = counts.get(d["action"], 0) + 1
             if d["action"] == "KILL_ADD_NEGATIVE":
-                proposals.append(self.file_proposal("ADD_NEGATIVE", f"'{r['term']}' ko negative lagao — {d['reason']}"))
+                proposals.append(self.file_proposal("ADD_NEGATIVE", f"Add '{r['term']}' as negative — {d['reason']}"))
             elif d["action"] == "SCALE_BID_UP_20":
                 proposals.append(self.file_proposal("BID_CHANGE", f"'{r['term']}' par bid +20% — {d['reason']}", change_pct=20))
             elif d["action"] == "BID_DOWN_20":
@@ -37,4 +37,4 @@ class AdsAgent(BaseAgent):
                             "total_sales": round(total_sales, 2),
                             "blended_paid_roas": round(total_sales / total_spend, 2) if total_spend else 0,
                             "action_counts": counts},
-                "note": "Negative wale Tier-0 me khud lagu ho gaye (EXECUTED_AUTO); bid wale tumhare approval ke intezaar me hain."}
+                "note": "Negatives were applied automatically at Tier 0 (EXECUTED_AUTO); bid changes are waiting for your approval."}

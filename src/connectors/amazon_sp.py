@@ -1,7 +1,7 @@
 """Amazon SP-API Connector — V12/INT-01 modernized.
-Amazon ke naye niyam: naye apps ke liye AWS SigV4 signing NAHI chahiye — sirf LWA access token.
-Orders API: pagination (nextToken) ke saath poori list; version config se (GOS_SP_ORDERS_VERSION,
-default 'v0' jo aaj ka verified path hai; naya version aate hi config se badlega, code nahi).
+Amazon's new rules: new apps do NOT need AWS SigV4 signing — only an LWA access token.
+Orders API: the full list via pagination (nextToken); version comes from config (GOS_SP_ORDERS_VERSION,
+default 'v0', today's verified path; a new version changes config, not code).
 Docs: https://developer-docs.amazon.com/sp-api/docs/orders-api
 """
 import os
@@ -39,9 +39,9 @@ class AmazonSP:
         return request_json("POST", ENDPOINT + path, headers=self._headers(),
                             json_body=body, transport=self.transport)
 
-    # --- asal endpoints ---
+    # --- real endpoints ---
     def get_orders(self, created_after_iso: str, max_pages: int = 20) -> list:
-        """Saare pages jodkar — adhoori list par hisaab galat hota hai (INT-01 acceptance)."""
+        """All pages combined — calculations on a partial list are wrong (INT-01 acceptance)."""
         orders, token = [], None
         for _ in range(max_pages):
             params = {"MarketplaceIds": self.cfg["marketplace_id"], "CreatedAfter": created_after_iso}
@@ -58,12 +58,12 @@ class AmazonSP:
         return r.get("payload", {}).get("OrderItems", [])
 
     def get_order_financials(self, order_id: str) -> list:
-        """Finances API: order ki asal fees SKU tak (V13 — SKU-exact fees ka rasta).
-        V20: har financial EVENT apni alag row hai (event_id + type + posted date ke saath) —
-        ek hi order+SKU ke kai shipment events ab ek dusre ko overwrite NAHI karenge;
-        refund bhi shipment row me ghusne ke bajaye apna REFUND event banega.
-        Finances v0 stable event-id nahi deta, isiliye event_id content se nirmit (deterministic)
-        hai — wahi event dobara sync ho to pehchan wahi rahegi, dohari ginati nahi hogi."""
+        """Finances API: real order fees down to SKU level (V13 — the path to SKU-exact fees).
+        V20: every financial EVENT is its own row (with event_id + type + posted date) —
+        several shipment events for the same order+SKU no longer overwrite each other;
+        a refund gets its own REFUND event instead of being squeezed into the shipment row.
+        Finances v0 has no stable event id, so event_id is derived from the content (deterministic)
+        — the same event synced again keeps the same identity, so it is never double-counted."""
         import hashlib
         r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
         events = (r.get("payload") or {}).get("FinancialEvents", {})
@@ -90,10 +90,10 @@ class AmazonSP:
                 if not amt: continue
                 raw.append({"order_id": order_id, "sku": it.get("SellerSKU", ""), "event_type": "REFUND",
                             "posted_at": posted, "gross": 0.0, "fees": 0.0, "refund": abs(amt)})
-        # V21: event-id ab RESPONSE KE ORDER par nirbhar NAHI — pehle rows ek pakke kram me
-        # sajengi, phir har BILKUL-IDENTICAL samuh ke andar hi ginati lagegi. API events ko
-        # dusre kram me bheje to bhi ids wahi rahengi; naya alag event judne se purane ids
-        # nahi badlenge (partial/reordered responses par duplicate/miss ka regression test hai).
+        # V21: event ids NO LONGER depend on the RESPONSE ORDER — rows are first sorted into a fixed order,
+        # then counting happens only within each group of FULLY IDENTICAL rows. If the API sends events
+        # in a different order the ids stay the same; adding a new distinct event never changes old ids
+        # (regression tests cover partial/reordered responses for duplicates/misses).
         raw.sort(key=lambda x: (x["event_type"], x["posted_at"], x["sku"], x["gross"], x["fees"], x["refund"]))
         seen = {}
         for row in raw:
@@ -105,10 +105,10 @@ class AmazonSP:
         return raw
 
     def get_order_refunds(self, order_id: str) -> list:
-        """Finances RefundEventList: kis SKU/line par kitna refund gaya (V15 — reconciliation).
-        V21: har refund-adjustment apni EVENT row hai (stable event_id + posted date) —
-        record_refunds inhe ledger me jodta hai; partial refunds ab ek dusre ko mitayenge nahi.
-        Refund charges rinatmak Principal ke roop me aate hain; hum sakaratmak rakam lautate hain."""
+        """Finances RefundEventList: how much was refunded on which SKU/line (V15 — reconciliation).
+        V21: every refund adjustment is its own EVENT row (stable event_id + posted date) —
+        record_refunds adds them into the ledger; partial refunds no longer erase each other.
+        Refund charges arrive as negative Principal amounts; we return positive amounts."""
         import hashlib
         r = self._get(f"/finances/v0/orders/{order_id}/financialEvents")
         events = (r.get("payload") or {}).get("FinancialEvents", {})
@@ -134,11 +134,11 @@ class AmazonSP:
         return out
 
     def put_listing(self, sku: str, product_type: str, attributes: dict, mode: str = "VALIDATION_PREVIEW") -> dict:
-        """Listings Items API (2021-08-01): listing publish/update. Sirf certified capability par chalega.
-        mode=VALIDATION_PREVIEW par Amazon sirf parkhega, live nahi karega — pilot ke liye surakshit pehla kadam."""
+        """Listings Items API (2021-08-01): listing publish/update. Only runs with a certified capability.
+        With mode=VALIDATION_PREVIEW Amazon only validates and does not publish — a safe first step for a pilot."""
         seller = self.cfg.get("seller_id")
         if not seller:
-            raise ValueError("amazon_sp config me seller_id baki hai — bina iske Listings API nahi chalegi")
+            raise ValueError("seller_id is missing in the amazon_sp config — the Listings API cannot run without it")
         body = {"productType": product_type, "mode": mode, "attributes": attributes}
         url = ENDPOINT + f"/listings/2021-08-01/items/{seller}/{sku}"
         return request_json("PUT", url + f"?marketplaceIds={self.cfg['marketplace_id']}",

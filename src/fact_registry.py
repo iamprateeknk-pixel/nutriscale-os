@@ -1,12 +1,12 @@
-"""POL-01 Verified Fact Registry — listing copy ke har 'tathya' ka saboot pehle.
-Template se bane dawe (nitrogen flush, organic, no added sugar, diabetic-friendly, origin)
-bina registry me verified fact ke copy me NAHI jayenge — NEEDS_EVIDENCE lagega.
+"""POL-01 Verified Fact Registry — evidence first for every 'fact' in listing copy.
+Template-generated claims (nitrogen flush, organic, no added sugar, diabetic-friendly, origin)
+never go into copy without a verified fact in the registry — they get NEEDS_EVIDENCE.
 """
 import os, sys, re
 sys.path.insert(0, os.path.dirname(__file__))
 from platform_core import ensure_v12, now_utc
 
-# kin shabdon ke liye saboot chahiye: (pattern, fact_type)
+# words that need evidence: (pattern, fact_type)
 PROOF_CLAIMS = [
     (r"nitrogen", "PROCESSING_NITROGEN"),
     (r"organic|jaivik", "CERT_ORGANIC"),
@@ -22,7 +22,7 @@ PROOF_CLAIMS = [
 
 def add_fact(db, sku: str, fact_type: str, fact_value: str, evidence_ref: str, verified_by: str) -> dict:
     ensure_v12(db)
-    if not evidence_ref: return {"ok": False, "error": "Saboot (evidence_ref) bina fact darj nahi hoga"}
+    if not evidence_ref: return {"ok": False, "error": "A fact cannot be recorded without evidence (evidence_ref)"}
     db.execute("INSERT INTO fact_registry(sku,fact_type,fact_value,evidence_ref,verified_by,verified_at) VALUES (?,?,?,?,?,?)",
                (sku, fact_type, fact_value, evidence_ref, verified_by, now_utc())); db.commit()
     return {"ok": True, "sku": sku, "fact_type": fact_type}
@@ -32,7 +32,7 @@ def facts_for(db, sku: str) -> list:
     return [dict(r) for r in db.execute("SELECT * FROM fact_registry WHERE sku=?", (sku,))]
 
 def check_copy(db, sku: str, text: str) -> dict:
-    """Copy me jo dawe hain, unke saboot registry me hain ya nahi."""
+    """Whether the claims in the copy have evidence in the registry."""
     have = {f["fact_type"] for f in facts_for(db, sku)}
     missing, found = [], []
     low = text.lower()
@@ -42,4 +42,4 @@ def check_copy(db, sku: str, text: str) -> dict:
     return {"sku": sku, "can_publish": not missing, "verified_claims": sorted(set(found)),
             "needs_evidence": sorted(set(missing)),
             "status": "OK" if not missing else "NEEDS_EVIDENCE",
-            "note": "Saboot bina ye dawe copy se hatao ya pehle saboot darj karo" if missing else "Saare dawon ke saboot maujud hain"}
+            "note": "Remove these claims from the copy or record evidence first" if missing else "Evidence exists for all claims"}

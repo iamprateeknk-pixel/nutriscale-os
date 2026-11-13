@@ -1,6 +1,6 @@
 """DAT-02 Metric reconciliation — matched-period gating.
-Niyam: alag-alag samay-khidkiyo ke numbers ko mila kar confident number NAHI dikhayenge.
-Windows ka overlap kam ho to derived metrics (TACOS/organic share) = NOT_COMPARABLE.
+Rule: numbers from different time windows are NEVER combined into a confident number.
+If the windows overlap too little, derived metrics (TACOS/organic share) = NOT_COMPARABLE.
 """
 import datetime
 
@@ -14,14 +14,14 @@ def compare_windows(orders_period: tuple, ads_period: tuple, min_overlap: float 
     ratio = overlap_days / span
     return {"comparable": ratio >= min_overlap, "overlap_ratio": round(ratio, 2),
             "overlap_days": overlap_days,
-            "reason": "Samay-khidkiyaan mail khati hain" if ratio >= min_overlap else
-                      f"Samay-khidkiyaan sirf {int(ratio*100)}% milti hain — TACOS/organic share dikhana gumrah karega"}
+            "reason": "The time windows match" if ratio >= min_overlap else
+                      f"The time windows only overlap {int(ratio*100)}% — showing TACOS/organic share would mislead"}
 
 def tacos(ad_spend: float, total_sales: float, orders_period: tuple, ads_period: tuple) -> dict:
     cmp = compare_windows(orders_period, ads_period)
     if not cmp["comparable"]:
         return {"value": None, "status": "NOT_COMPARABLE", **cmp,
-                "note": "Doosri khidki ka data lao ya khidkiyaan ek karo — tabhi TACOS banege"}
+                "note": "Bring data for the other window or align the windows — only then can TACOS be calculated"}
     if not total_sales: return {"value": None, "status": "NO_SALES", **cmp}
     return {"value": round(ad_spend / total_sales * 100, 1), "status": "OK", **cmp,
             "formula": "ad_spend / total_sales (matched period)"}
@@ -29,4 +29,4 @@ def tacos(ad_spend: float, total_sales: float, orders_period: tuple, ads_period:
 def coverage(imported_days: int, window_days: int) -> dict:
     pct = round(imported_days / window_days * 100, 1) if window_days else 0.0
     return {"coverage_pct": pct, "status": "FULL" if pct >= 95 else "PARTIAL" if pct >= 50 else "LOW",
-            "note": "Coverage kam ho to KPI par bharosa bhi kam — UI me ye dikhega"}
+            "note": "Low coverage means low confidence in the KPI — the UI shows this"}

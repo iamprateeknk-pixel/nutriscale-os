@@ -1,7 +1,7 @@
-"""NutriScale OS Backend — V12: Auth + RBAC ke saath (SEC-01).
-Bina login ke koi business data nahi dikhega (sirf /health aur login khule hain).
-Pehla Owner banana:  NUTRISCALE_OWNER_USER=... NUTRISCALE_OWNER_PASSWORD=... python3 backend/app.py
-ya:  python3 -c "import sys; sys.path.insert(0,'src'); from db_store import Store; import auth; s=Store(); print(auth.create_user(s.db,'owner','lamba-password','Owner')); s.close()"
+"""NutriScale OS Backend — V12: with Auth + RBAC (SEC-01).
+No business data is shown without login (only /health and login are open).
+Create the first Owner:  NUTRISCALE_OWNER_USER=... NUTRISCALE_OWNER_PASSWORD=... python3 backend/app.py
+or:  python3 -c "import sys; sys.path.insert(0,'src'); from db_store import Store; import auth; s=Store(); print(auth.create_user(s.db,'owner','a-long-password','Owner')); s.close()"
 API v1 envelope: {data, meta:{request_id, computed_at}, errors:[]}
 Chalana: python3 backend/app.py  (port 8765)
 """
@@ -28,7 +28,7 @@ def _bootstrap_owner():
         try:
             from platform_core import ensure_v12; ensure_v12(s.db)
             if not s.db.execute("SELECT 1 FROM users WHERE username=?", (u,)).fetchone():
-                print("Owner user bana:", auth_mod.create_user(s.db, u, p, "Owner"))
+                print("Owner user created:", auth_mod.create_user(s.db, u, p, "Owner"))
         finally: s.close()
 
 class H(BaseHTTPRequestHandler):
@@ -38,7 +38,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
     def _env(self, code, data):
         return self._send(code, {"data": data, "meta": {"request_id": uuid.uuid4().hex[:12], "computed_at": now_utc()}, "errors": []})
-    MAX_BODY = 32 * 1024 * 1024   # V26: 20MB file ka base64 + thoda — isse badi request padhi hi nahi jaati
+    MAX_BODY = 32 * 1024 * 1024   # V26: base64 of a 20MB file plus headroom — larger requests are never read
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length", 0) or 0)
@@ -55,7 +55,7 @@ class H(BaseHTTPRequestHandler):
         base = os.path.join(os.path.dirname(__file__), "..", "dashboard")
         path = os.path.normpath(os.path.join(base, rel))
         if not path.startswith(os.path.normpath(base)) or not os.path.isfile(path):
-            return self._send(404, {"error": "file nahi mili"})
+            return self._send(404, {"error": "file not found"})
         body = open(path, "rb").read()
         ct = "text/html; charset=utf-8" if path.endswith(".html") else "text/plain; charset=utf-8"
         self.send_response(200); self.send_header("Content-Type", ct)
@@ -64,7 +64,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         if p == "/health": return self._send(200, {"status": "ok", "service": "NutriScale OS", "version": "V13"})
-        # Same-origin serving (V12.1): dashboard isi backend se — CORS ki zaroorat hi nahi, token bhi ek hi origin par
+        # Same-origin serving (V12.1): the dashboard is served by this backend — no CORS needed, the token stays on one origin
         if p in ("/", "/dashboard", "/dashboard/"): return self._serve_dashboard("index.html")
         if p.startswith("/dashboard/"): return self._serve_dashboard(p[len("/dashboard/"):])
         s, user, err = self._auth("read")
@@ -107,7 +107,7 @@ class H(BaseHTTPRequestHandler):
                     d = dict(r)
                     try: pl = json.loads(d.pop("payload") or "{}")
                     except Exception: pl = {}
-                    # V25: inbox me seedha 'kya aur kyun' — payload kholne ki zaroorat nahi
+                    # V25: 'what and why' straight in the inbox — no need to open the payload
                     what = pl.get("term") or pl.get("query") or pl.get("title") or pl.get("campaign") or ""
                     d["summary"] = (f"{what} — {pl['why']}" if pl.get("why") else what)[:180]
                     d["rule_ids"] = pl.get("rule_ids", [])
@@ -116,7 +116,7 @@ class H(BaseHTTPRequestHandler):
             if p.startswith("/api/v1/actions/"):
                 aid = int(p.split("/")[-1])
                 a = s.db.execute("SELECT * FROM action_v12 WHERE id=?", (aid,)).fetchone()
-                if not a: return self._send(404, {"error": "action nahi mila"})
+                if not a: return self._send(404, {"error": "action not found"})
                 return self._env(200, {"action": dict(a), "timeline": act.action_timeline(s.db, aid)})
             if p == "/api/v1/campaigns":
                 rows = [dict(r) for r in s.db.execute("SELECT * FROM campaigns ORDER BY spend DESC LIMIT 200")]
@@ -125,8 +125,8 @@ class H(BaseHTTPRequestHandler):
                 rows = [dict(r) for r in s.db.execute("""SELECT term, SUM(clicks) clicks, SUM(purchases) purchases, SUM(spend) spend, SUM(sales) sales
                                                          FROM search_terms GROUP BY term ORDER BY spend DESC LIMIT 200""")]
                 return self._env(200, {"keywords": rows, "search_volume": None,
-                                        "note": "Search volume koi licensed provider nahi — 'unknown' hai, andaaz nahi dikhaya jayega"})
-            # V24: aaj ka kaam + growth playbook (research niyam tumhare data par)
+                                        "note": "No licensed search-volume provider — volume is 'unknown'; no estimate is shown"})
+            # V24: today's tasks + growth playbook (research rules applied to your data)
             if p == "/api/v1/today":
                 import growth_playbook as GP
                 return self._env(200, GP.today(s))
@@ -152,7 +152,7 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/v1/products":
                 rows = [dict(r) for r in s.db.execute("SELECT sku, name, platform, price, rating, reviews FROM products ORDER BY sku LIMIT 500")]
                 return self._env(200, {"products": rows})
-            # V23: seekhne wala dimaag + marketplace niyam + keyword plan
+            # V23: learning brain + marketplace rules + keyword plan
             if p == "/api/v1/knowledge":
                 import marketplace_knowledge as MK
                 return self._env(200, {"rules": MK.rules_for(_q.get("agent"), _q.get("platform"), _q.get("topic")),
@@ -169,7 +169,7 @@ class H(BaseHTTPRequestHandler):
                 return self._env(200, KI.sqp_funnel(s.db, _q.get("platform") or "Amazon"))
             if p == "/api/v1/keywords/matrix":
                 from keyword_lab import opportunity_matrix
-                return self._env(200, {"matrix": opportunity_matrix(s), "evidence": "Observed (apne search terms); volume sirf licensed provider se"})
+                return self._env(200, {"matrix": opportunity_matrix(s), "evidence": "Observed (your own search terms); volume only from a licensed provider"})
             if p == "/api/v1/ads/health":
                 import ads_studio as AS
                 return self._env(200, {"campaigns": AS.campaign_health(s), "alerts": AS.pacing_alerts(s, 1000),
@@ -182,13 +182,13 @@ class H(BaseHTTPRequestHandler):
                     d["latest_snapshot"] = dict(snap) if snap else None
                     d["changes"] = []
                     peers.append(d)
-                return self._env(200, {"peers": peers, "note": "Snapshots sirf dated observation par — na mile to unknown, zero nahi"})
+                return self._env(200, {"peers": peers, "note": "Snapshots only from dated observations — if missing they are unknown, not zero"})
             if p == "/api/v1/finance/reconciliation":
                 import ops_finance as OF
                 return self._env(200, OF.reconciliation(s))
             if p == "/api/v1/costs":
                 rows = [dict(r) for r in s.db.execute("SELECT sku, effective_from, cogs, packaging, other_variable, source FROM cost_versions ORDER BY sku, effective_from DESC")]
-                return self._env(200, {"costs": rows, "note": "Cost na ho to us SKU par scale band hai (FIN-01)"})
+                return self._env(200, {"costs": rows, "note": "Scaling is blocked for SKUs without a cost (FIN-01)"})
             if p == "/api/v1/agency/scorecard":
                 import agency as AG
                 return self._env(200, AG.scorecard(s.db))
@@ -224,7 +224,7 @@ class H(BaseHTTPRequestHandler):
                     return self._env(200, main_image_brief(q.get("product", "Dry Fruits"), q.get("grade", "Premium"), q.get("weight", "200g")))
                 import competitor_lab as CL
                 prod = s.db.execute("SELECT * FROM products WHERE sku=?", (q.get("sku", ""),)).fetchone()
-                if not prod: return self._send(404, {"error": "Apna product mila nahi — pehle catalog import karo"})
+                if not prod: return self._send(404, {"error": "Your product was not found — import the catalog first"})
                 pd = dict(prod)
                 own = {"sku": pd["sku"], "name": pd["name"], "price": pd["price"],
                        "nut_type": q.get("nut", ""), "grade": q.get("grade", ""), "pack_g": float(q.get("pack_g", 200))}
@@ -238,19 +238,19 @@ class H(BaseHTTPRequestHandler):
             b = self._body(); s = Store()
             try:
                 r = auth_mod.verify_login(s.db, b.get("username", ""), b.get("password", ""), b.get("totp"))
-                if not r: return self._send(401, {"error": "LOGIN_FAIL", "message": "Username/password galat hai"})
+                if not r: return self._send(401, {"error": "LOGIN_FAIL", "message": "Wrong username/password"})
                 if r.get("locked"): return self._send(429, {"error": "RATE_LIMITED", "message": r["message"]})
                 if r.get("mfa_required"): return self._send(401, {"error": "MFA_REQUIRED", "message": r["message"]})
                 return self._env(200, r)
             finally: s.close()
-        # legacy approvals (purane agents ki table) — execute perm chahiye
+        # legacy approvals (old agents table) — needs execute permission
         if len(parts) == 4 and parts[:2] == ["api", "approvals"] and parts[3] in ("approve", "reject"):
             s, user, err = self._auth("execute")
             if err: s.close(); return
             try:
                 aid = int(parts[2]); new_status = "APPROVED_EXECUTING" if parts[3] == "approve" else "REJECTED"
                 cur = s.db.execute("UPDATE actions SET status=? WHERE id=? AND status LIKE 'WAITING%'", (new_status, aid)); s.db.commit()
-                if cur.rowcount == 0: return self._send(404, {"error": "approval nahi mila ya faisla ho chuka"})
+                if cur.rowcount == 0: return self._send(404, {"error": "approval not found or already decided"})
                 return self._env(200, {"id": aid, "status": new_status})
             finally: s.close()
         if p == "/api/cycle/run":
@@ -349,17 +349,17 @@ class H(BaseHTTPRequestHandler):
                 if p.startswith("/api/v1/imports/"):
                     import import_wizard as IW
                     if b.get("_too_large"):
-                        return self._send(413, {"error": "TOO_LARGE", "message": "File bahut badi hai (seema 20MB)"})
+                        return self._send(413, {"error": "TOO_LARGE", "message": "File is too large (limit 20MB)"})
                     if p == "/api/v1/imports/upload":
                         up = IW.save_upload(s.path, b.get("filename", ""), b.get("content_b64", ""))
                         if not up["ok"]: return self._send(400, {"error": "BAD_UPLOAD", "message": up["error"]})
                         pv = IW.preview_import(s.db, up["path"], b.get("platform", "Amazon"))
                         return self._env(200, {"upload": up["upload"], "bytes": up["bytes"], "preview": pv})
-                    # V26: sirf upload ka naam ya data/ ke andar ka path — koi bhi server file nahi
+                    # V26: only an upload name or a path inside data/ — never an arbitrary server file
                     path = IW.resolve_upload(s.path, b["upload"]) if b.get("upload") else b.get("path")
                     if not path or not IW.allowed_path(s.path, path):
                         return self._send(400, {"error": "PATH_NOT_ALLOWED",
-                                                "message": "Sirf dashboard se upload ki gayi ya data/ folder ke andar ki CSV import hoti hai"})
+                                                "message": "Only CSVs uploaded via the dashboard or inside the data/ folder can be imported"})
                     if p == "/api/v1/imports/preview":
                         return self._env(200, IW.preview_import(s.db, path, b.get("platform", "Amazon")))
                     return self._env(200, IW.commit_import(s, path, b.get("kind"), b.get("platform", "Amazon"),

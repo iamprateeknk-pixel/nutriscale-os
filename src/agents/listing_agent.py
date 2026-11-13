@@ -1,5 +1,5 @@
-"""A04 Listing Agent — asal title/bullets BANATA hai (template + keyword + claim-safe).
-Har generated text pehle Claim Checker se guzarta hai; block ho to text live nahi jayega.
+"""A04 Listing Agent — BUILDS real titles/bullets (template + keywords + claim-safe).
+All generated text passes the Claim Checker first; blocked text never goes live.
 """
 import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -11,25 +11,25 @@ SAFE_USES = ["daily snacking", "gifting", "baking", "trail mix", "morning routin
 
 def generate_title(product: str, grade: str, weight: str, keywords: list, use_case: str = "daily snacking",
                    brand: str = "") -> str:
-    """V23: Amazon ka 27-Jul-2026 niyam (AMZ-T-01) — title <=75 akshar, koi shabd 2 se zyada nahi (AMZ-T-03).
-    Pehle 200-akshar ka 'Fresh & Premium...' template tha — ab woh Amazon ka AI khud kaat deta, aur 'fresh'
-    FSSAI ka shart-wala shabd hai (FS-C-02). Use-case ab Item Highlights me jaata hai (build_item_highlights)."""
+    """V23: Amazon's 27-Jul-2026 rule (AMZ-T-01) — title <=75 characters, no word more than twice (AMZ-T-03).
+    The old 200-character 'Fresh & Premium...' template would now be cut by Amazon's AI, and 'fresh' is an
+    FSSAI conditional word (FS-C-02). Use cases now go into Item Highlights (build_item_highlights)."""
     from listing_rules import build_title_amazon
     hero = " ".join(keywords[:2]) if keywords else ""
     return build_title_amazon(brand, product, grade, weight, hero)["title"]
 
 def generate_bullets(facts: dict) -> list:
     """facts: origin, grade_detail, nutrition_line, pack_line, uses(list), fssai(optional licence no.).
-    Koi bimari-cure wala dawa jaan-bujh kar nahi — checker iski pushti karega.
-    V24: default text me koi saboot-maangne wala dawa NAHI (pehle 'nitrogen flush', 'FSSAI licensed' aur
-    'return/replacement niti' khud jud jaate the — bina saboot ke). Aise tathya sirf tab jab facts me diye jaayen."""
+    Deliberately no disease/cure claims — the checker confirms this.
+    V24: default text contains NO claims that need evidence (previously 'nitrogen flush', 'FSSAI licensed' and
+    'return/replacement policy' were added automatically — without evidence). Such facts only appear when given in facts."""
     b = [
-        f"Premium {facts.get('grade_detail') or 'quality'} — {facts.get('origin') or 'chuni hui upaj'} se, saaf aur chhaanta hua.",
-        f"Poshak tattvon se bharpur: {facts.get('nutrition_line') or 'protein, fiber aur healthy fats ka achha srot'} — roz ke khane ke liye upyukt.",
-        f"Packing: {facts.get('pack_line') or 'food-grade hygienic pouch'} — kurkurapan aur swad barkarar rakhne ke liye.",
-        "Upyog: " + ", ".join(facts.get("uses") or SAFE_USES[:3]) + " — poore parivar ke liye.",
-        ("Bharosa: FSSAI lic. " + facts["fssai"] + "; " if facts.get("fssai") else "Bharosa: ")
-        + "har pack par batch, packing date aur expiry saaf chhapi.",
+        f"Premium {facts.get('grade_detail') or 'quality'} — from {facts.get('origin') or 'carefully selected harvests'}, cleaned and sorted.",
+        f"Rich in nutrients: {facts.get('nutrition_line') or 'a good source of protein, fibre and healthy fats'} — suitable for everyday eating.",
+        f"Packing: {facts.get('pack_line') or 'food-grade hygienic pouch'} — keeps the crunch and taste intact.",
+        "Uses: " + ", ".join(facts.get("uses") or SAFE_USES[:3]) + " — for the whole family.",
+        ("Trust: FSSAI lic. " + facts["fssai"] + "; " if facts.get("fssai") else "Trust: ")
+        + "batch, packing date and expiry clearly printed on every pack.",
     ]
     return b
 
@@ -39,8 +39,8 @@ class ListingAgent(BaseAgent):
     def build_listing(self, sku: str, brand: str, product: str, nut: str, grade: str = "", weight: str = "",
                       form: str = "", facts: dict = None, platform: str = "Amazon", competitor_brands=(),
                       images=None) -> dict:
-        """V23 'ultimate' raasta: keyword plan (apna data + SQP + shabdkosh) -> niyam-andar title/highlights/backend
-        -> poora audit (Amazon + FSSAI) -> brain ki salah -> proposal (payload me rule_ids, taaki nateeje se seekh ho)."""
+        """V23 full path: keyword plan (your data + SQP + vocabulary) -> rule-compliant title/highlights/backend
+        -> full audit (Amazon + FSSAI) -> brain advice -> proposal (rule_ids in the payload so outcomes drive learning)."""
         import keyword_intel as KI, listing_rules as LR, agent_brain as AB
         facts = facts or {}
         AB.seed_playbook(self.store.db)
@@ -60,13 +60,13 @@ class ListingAgent(BaseAgent):
         rule_ids = sorted(set(t["rule_ids"] + hl["rule_ids"] + backend["rule_ids"] + kp["rule_ids"]))
         prop = None
         if audit["can_publish"]:
-            # action_v12 me rule_ids ke saath — outcome_engine 7/14 din par maapega, agent_brain un niyamo ka bharosa badlega
+            # into action_v12 with rule_ids — outcome_engine measures at 7/14 days, agent_brain updates confidence in those rules
             import actions as ACT, hashlib
             payload = {"sku": sku, "platform": platform, "title": t["title"], "item_highlights": hl["item_highlights"],
                        "bullets": bullets, "backend_terms": backend["backend_terms"], "rule_ids": rule_ids}
             key = "LST-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
             prop = ACT.create_proposal(self.store.db, "LISTING_PATCH", platform, "default", payload, "ONE_TAP", self.id, key,
-                                       f"Compliance {audit['compliance_score']}/100; asal asar 7/14 din me maapa jayega")
+                                       f"Compliance {audit['compliance_score']}/100; real impact is measured after 7/14 days")
             prop = {k: prop[k] for k in ("id", "state", "duplicate")}
         return {"sku": sku, "title": t["title"], "title_chars": t["chars"], "item_highlights": hl["item_highlights"],
                 "bullets": bullets, "backend_terms": backend["backend_terms"], "backend_bytes": backend["bytes"],
@@ -74,17 +74,17 @@ class ListingAgent(BaseAgent):
                 "proposal": prop, "blocked": not audit["can_publish"]}
     def improve_with_llm(self, current: Listing, product: str, grade: str, weight: str,
                          keywords: list, facts: dict) -> dict:
-        """LLM key ho to copy LLM se, warna rule-templates par fallback. Dono raaste claim-check se guzarte hain."""
+        """With an LLM key the copy comes from the LLM, otherwise it falls back to rule templates. Both paths pass the claim check."""
         if not self.llm.available:
-            r = self.improve(current, product, grade, weight, keywords, facts); r["source"] = "RULES (LLM key nahi)"
+            r = self.improve(current, product, grade, weight, keywords, facts); r["source"] = "RULES (no LLM key)"
             return r
         import json as _json
-        prompt = (f"Amazon India listing ke liye JSON banao: {{\"title\": \"...\", \"bullets\": [\"...\" x5]}}\n"
+        prompt = (f"Create JSON for an Amazon India listing: {{\"title\": \"...\", \"bullets\": [\"...\" x5]}}\n"
                   f"Product: Dry Fruit Farm Premium {product} {grade} {weight}. Keywords: {', '.join(keywords)}.\n"
-                  f"Tathya: {facts.get('grade_detail','')}; {facts.get('origin','')}; {facts.get('nutrition_line','')}; {facts.get('pack_line','')}.\n"
-                  f"Niyam: title 200 akshar se kam, koi bimari-ilaaj ka dawa NAHI (FSSAI), Hinglish chalegi.")
+                  f"Facts: {facts.get('grade_detail','')}; {facts.get('origin','')}; {facts.get('nutrition_line','')}; {facts.get('pack_line','')}.\n"
+                  f"Rules: title of at most 75 characters, NO disease/cure claims (FSSAI), English copy.")
         try:
-            raw = self.llm.generate(prompt, system="Tum ek tajurbe-kaar Amazon India listing visheshagya ho.")
+            raw = self.llm.generate(prompt, system="You are an experienced Amazon India listing specialist.")
             data = _json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
             title, bullets = str(data["title"])[:200], [str(b) for b in data["bullets"]][:5]
         except Exception:
@@ -114,8 +114,8 @@ class ListingAgent(BaseAgent):
         claims = check_listing_text(full_text)
         if not claims["can_go_live"]:
             return {"blocked": True, "reasons": claims["blocked_reasons"],
-                    "note": "Generated text claim-check me fail — live nahi jayega, pehle sudhar hoga"}
-        # Expected after: title keywords pure, bullets 5, backend bhara hua (baaki cheezein waisi hi)
+                    "note": "Generated text failed the claim check — it will not go live until fixed"}
+        # Expected after: full title keywords, 5 bullets, backend filled (everything else unchanged)
         after_listing = Listing(title=title, bullets=5, image_count=current.image_count,
                                 has_video=current.has_video, has_a_plus=current.has_a_plus,
                                 rating=current.rating, review_count=current.review_count,
@@ -124,7 +124,7 @@ class ListingAgent(BaseAgent):
                                 backend_terms_filled=True, main_keywords_in_title=min(5, len(keywords) or 5))
         after = score_listing(after_listing)
         prop = self.file_proposal("LISTING_PATCH",
-                                  f"{product} {weight} ki listing upgrade — naya title + 5 bullets + backend terms",
-                                  predicted=f"Score {before['score']} -> {after['score']} (andaaz, asal asar 14 din me maapa jayega)")
+                                  f"{product} {weight} listing upgrade — new title + 5 bullets + backend terms",
+                                  predicted=f"Score {before['score']} -> {after['score']} (estimate; real impact measured after 14 days)")
         return {"blocked": False, "title": title, "bullets": bullets, "claims": claims,
                 "score_before": before, "score_after_expected": after, "proposal": prop}

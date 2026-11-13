@@ -1,6 +1,6 @@
-"""Database Layer (G2 fix) — agents ki yaaddasht ab permanent hai.
+"""Database Layer (G2 fix) — the agents' memory is now permanent.
 SQLite file-based store: knowledge, action audit + results, rank-probe history.
-Production me yahi schema Postgres par jayega — interface wahi rahega.
+In production this schema moves to Postgres — the interface stays the same.
 """
 import sqlite3, json, os, time
 
@@ -25,8 +25,8 @@ class Store:
         self._migrate_platform_identity()
 
     def _migrate_platform_identity(self):
-        """V14: ek hi SKU/campaign dono bazaaro par ho sakta hai — pehchan (sku, platform) / (name, platform) hogi.
-        Purani single-key tables ko bina data khove naye roop me badlo."""
+        """V14: one SKU/campaign can exist on both marketplaces — identity is (sku, platform) / (name, platform).
+        Migrates old single-key tables to the new form without losing data."""
         for table, cols, keys in (
             ("products", "sku TEXT, name TEXT, platform TEXT, price REAL, cost REAL, rating REAL, reviews INT, source TEXT", ("sku", "platform")),
             ("campaigns", "name TEXT, platform TEXT, spend REAL, sales REAL, clicks INT, impressions INT, source TEXT", ("name", "platform")),
@@ -41,7 +41,7 @@ class Store:
               SELECT {', '.join(('COALESCE(platform,\'Amazon\')' if c == 'platform' else c) for c in colnames.split(', '))} FROM {table};
             DROP TABLE {table}; ALTER TABLE {table}_new RENAME TO {table};
             """); self.db.commit()
-        # V20: inventory par sellable/unsellable columns (purani DBs par bhi)
+        # V20: sellable/unsellable columns on inventory (old DBs too)
         try:
             icols = [c[1] for c in self.db.execute("PRAGMA table_info(inventory)")]
             for col in ("sellable_qty", "unsellable_qty"):
@@ -51,7 +51,7 @@ class Store:
         except Exception:
             pass
 
-    # ---------- Sync data (connectors/CSV se aaya asal data) ----------
+    # ---------- Sync data (real data from connectors/CSV) ----------
     def upsert_product(self, sku, name, platform, price, cost=0, rating=0, reviews=0, source=""):
         self.db.execute("INSERT OR REPLACE INTO products VALUES (?,?,?,?,?,?,?,?)",
                         (sku, name, platform, price, cost, rating, reviews, source)); self.db.commit()
@@ -73,7 +73,7 @@ class Store:
                             (term, campaign, spend, sales, clicks, purchases, source))
         self.db.commit()
     def set_inventory(self, sku, location, qty, source="", sellable=None, unsellable=None):
-        # V20: sellable/unsellable alag darj ho sakte hain; na diye jayen to sellable=qty mana jayega (NULL = sab bikne-yogya)
+        # V20: sellable/unsellable can be recorded separately; if not given, sellable=qty is assumed (NULL = all sellable)
         try:
             self.db.execute("""INSERT OR REPLACE INTO inventory(sku,location,qty,source,sellable_qty,unsellable_qty)
                                VALUES (?,?,?,?,?,?)""", (sku, location, qty, source, sellable, unsellable))
@@ -99,14 +99,14 @@ class Store:
     def waste_terms(self, min_spend=200): return [dict(r) for r in self.db.execute(
         "SELECT * FROM search_terms WHERE spend>=? AND purchases=0 ORDER BY spend DESC", (min_spend,))]
 
-    # Knowledge (V3 ki seekh, ab hamesha ke liye)
+    # Knowledge (V3 learning, now permanent)
     def add_knowledge(self, lesson, source, reliability, agent):
         self.db.execute("INSERT INTO knowledge (lesson,source,reliability,agent,ts) VALUES (?,?,?,?,?)",
                         (lesson, source, reliability, agent, time.time())); self.db.commit()
     def knowledge_for(self, agent):
         return [dict(r) for r in self.db.execute("SELECT * FROM knowledge WHERE agent=? ORDER BY reliability DESC", (agent,))]
 
-    # Actions — har faisla aur uska asal result (seekhne ka khana)
+    # Actions — every decision and its real result (food for learning)
     def log_action(self, agent, action_type, description, tier, status, predicted=""):
         cur = self.db.execute("INSERT INTO actions (agent,action_type,description,tier,status,predicted,ts) VALUES (?,?,?,?,?,?,?)",
                               (agent, action_type, description, tier, status, predicted, time.time())); self.db.commit()
@@ -118,14 +118,14 @@ class Store:
         if not rows: return None
         return round(sum(1 for r in rows if r["result_pct"] > 0) / len(rows) * 100, 1)
 
-    # Rank Probe history (algorithm ko ulta samajhne ka data)
+    # Rank Probe history (data for reverse-engineering the algorithm)
     def log_rank(self, sku, keyword, rank, ctr, cvr):
         self.db.execute("INSERT INTO rank_history (sku,keyword,rank,ctr,cvr,ts) VALUES (?,?,?,?,?,?)",
                         (sku, keyword, rank, ctr, cvr, time.time())); self.db.commit()
     def rank_series(self, keyword):
         return [dict(r) for r in self.db.execute("SELECT * FROM rank_history WHERE keyword=? ORDER BY ts", (keyword,))]
 
-    # Rule confidence persistence (OutcomeLearner ka saathi)
+    # Rule confidence persistence (the OutcomeLearner's companion)
     def save_rule(self, key, confidence, wins, losses, enabled):
         self.db.execute("INSERT OR REPLACE INTO rule_stats VALUES (?,?,?,?,?)", (key, confidence, wins, losses, int(enabled))); self.db.commit()
     def load_rules(self):

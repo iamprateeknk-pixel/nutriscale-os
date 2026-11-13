@@ -1,6 +1,6 @@
-"""Password badlo — naya password terminal me chupa kar poochha jata hai (screen/chat/history me nahi aata).
-Chalana:  python3 scripts/set_password.py [username]      (default: malik)
-Badalne ke baad us user ke saare purane login band ho jaate hain — dobara login karna hoga.
+"""Change a password — the new password is asked for hidden in the terminal (never shown on screen, in chat or in history).
+Usage:  python3 scripts/set_password.py [username]      (default: malik)
+After the change, all existing logins of that user are signed out — log in again.
 """
 import os, sys, getpass
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -8,8 +8,8 @@ from db_store import Store
 import auth
 
 def _forget_bootstrap_password():
-    """~/.nutriscale_owner me pehli baar ka password likha hota hai — badalne ke baad use mita do,
-    warna file purana (galat) password dikhati rahegi. User ban chuka hai, isliye bootstrap ki zaroorat nahi."""
+    """~/.nutriscale_owner holds the first-run password — remove it after a change,
+    otherwise the file keeps showing the old (wrong) password. The user already exists, so the bootstrap is not needed."""
     f = os.path.expanduser("~/.nutriscale_owner")
     if not os.path.exists(f): return False
     lines = [l for l in open(f).read().splitlines() if not l.startswith("NUTRISCALE_OWNER_PASSWORD=")]
@@ -19,10 +19,10 @@ def _forget_bootstrap_password():
 
 def main():
     user = sys.argv[1] if len(sys.argv) > 1 else "malik"
-    p1 = getpass.getpass(f"'{user}' ka naya password (kam se kam 8 akshar): ")
-    p2 = getpass.getpass("Dobara likho: ")
+    p1 = getpass.getpass(f"New password for '{user}' (at least 8 characters): ")
+    p2 = getpass.getpass("Type it again: ")
     if p1 != p2:
-        print("✘ Dono password alag hain — kuch nahi badla"); sys.exit(1)
+        print("✘ The passwords do not match — nothing changed"); sys.exit(1)
     st = Store()
     try:
         r = auth.change_password(st.db, user, p1)
@@ -30,9 +30,9 @@ def main():
         st.close()
     if not r["ok"]:
         print("✘", r["error"]); sys.exit(1)
-    print(f"✔ '{user}' ka password badal gaya; purane saare login band. Dashboard par naye password se login karo.")
+    print(f"✔ Password for '{user}' changed; all old logins signed out. Log in to the dashboard with the new password.")
     if _forget_bootstrap_password():
-        print("✔ ~/.nutriscale_owner se purana password hata diya")
+        print("✔ Removed the old password from ~/.nutriscale_owner")
 
 if __name__ == "__main__":
     main()

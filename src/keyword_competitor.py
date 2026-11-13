@@ -3,7 +3,7 @@
 def keyword_opportunity(search_volume: int, relevance: float, competition: float,
                         current_rank: int | None = None) -> dict:
     """Opportunity = volume x relevance / competition. relevance/competition 0-1.
-    Rank bonus: agar tum page-2/3 par ho (rank 11-30) to push karne par sabse tez fayda."""
+    Rank bonus: if you are on page 2/3 (rank 11-30), pushing gives the fastest gain."""
     base = (search_volume * relevance) / max(competition, 0.05)
     bonus = 1.3 if current_rank and 11 <= current_rank <= 30 else 1.0
     score = round(base * bonus, 1)
@@ -13,11 +13,11 @@ def keyword_opportunity(search_volume: int, relevance: float, competition: float
 def competitor_gap(your_price_per_kg: float, comp_price_per_kg: float,
                    your_rating: float, comp_rating: float,
                    your_reviews: int, comp_reviews: int) -> dict:
-    """Competitor se kahan haar rahe ho — ek nazar me."""
+    """Where you are losing to a competitor — at a glance."""
     gaps = []
     price_gap_pct = round((your_price_per_kg - comp_price_per_kg) / comp_price_per_kg * 100, 1)
-    if price_gap_pct > 5: gaps.append(f"PRICE: tum {price_gap_pct}% mehange per-kg")
-    if comp_rating - your_rating >= 0.2: gaps.append(f"RATING: competitor {comp_rating} vs tum {your_rating}")
-    if comp_reviews > your_reviews * 3: gaps.append(f"REVIEWS: competitor ke {comp_reviews} vs tumhare {your_reviews} — trust gap bada hai")
+    if price_gap_pct > 5: gaps.append(f"PRICE: you are {price_gap_pct}% pricier per kg")
+    if comp_rating - your_rating >= 0.2: gaps.append(f"RATING: competitor {comp_rating} vs you {your_rating}")
+    if comp_reviews > your_reviews * 3: gaps.append(f"REVIEWS: competitor {comp_reviews} vs your {your_reviews} — a big trust gap")
     return {"price_gap_pct": price_gap_pct, "gaps": gaps,
-            "attack_plan": "Product Targeting ads + price/coupon match + review gap band karo" if gaps else "Tum aage ho — position defend karo (Brand Defence ads)"}
+            "attack_plan": "Product Targeting ads + price/coupon match + close the review gap" if gaps else "You are ahead — defend the position (Brand Defence ads)"}

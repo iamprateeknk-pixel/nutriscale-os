@@ -6,7 +6,7 @@ from warroom_service import warroom_data
 
 def test_db_persistence():
     s = Store(":memory:")
-    s.add_knowledge("Diwali se 30 din pehle coupon", "Helium10 Blog", 0.8, "A10")
+    s.add_knowledge("Coupons 30 days before Diwali", "Helium10 Blog", 0.8, "A10")
     assert len(s.knowledge_for("A10")) == 1
     aid = s.log_action("A06", "BID_CHANGE", "bid +20% kaju", "ONE_TAP", "EXECUTED")
     s.record_result(aid, 12.5)
@@ -22,16 +22,16 @@ def test_db_persistence():
 
 def test_scheduler():
     assert len(DAILY_JOBS) == 13 and len(WEEKLY_JOBS) == 2   # V25: growth_autopilot (07:45) + weekly_report (Sunday 21:00) jude
-    times = [j["time"] for j in DAILY_JOBS]; assert times == sorted(times)   # din ka kram sahi
-    out = run_jobs({"learning_crawl": lambda: "12 nayi seekh mili",
+    times = [j["time"] for j in DAILY_JOBS]; assert times == sorted(times)   # the day's order is correct
+    out = run_jobs({"learning_crawl": lambda: "12 new learnings",
                     "data_sync": lambda: 1 / 0})
     by = {r["job"]: r for r in out}
     assert by["learning_crawl"]["status"] == "DONE"
     assert by["data_sync"]["status"].startswith("FAILED") and by["data_sync"]["escalate"] == "A09 Governance"
-    assert by["war_room_report"]["status"].startswith("SKIPPED")   # handler nahi = jhootha DONE nahi
+    assert by["war_room_report"]["status"].startswith("SKIPPED")   # no handler = no false DONE
 
 def test_warroom_contract():
-    # V7 contract: warroom ab SIRF asal data deta hai — khaali DB = connected False, koi nakli number nahi
+    # V7 contract: the war room now returns ONLY real data — empty DB = connected False, no fake numbers
     s = Store(":memory:")
     d = warroom_data(s)
     assert d["connected"] is False and d["demo_data"] is False and d["kpis"] is None

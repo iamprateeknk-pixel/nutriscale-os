@@ -1,21 +1,21 @@
 """A07 Pricing & Profit Agent — core math.
-Har SKU ka asal profit aur usse nikla hua ads guardrail:
-break-even ROAS, target ACOS, aur max CPC jo afford ho sakta hai.
-Fees approximate hain (Amazon IN grocery ~2026) — asal fee Seller Central se verify karni hai.
+Each SKU's real profit and the ads guardrails derived from it:
+break-even ROAS, target ACOS, and the max affordable CPC.
+Fees are approximate (Amazon IN grocery ~2026) — verify real fees in Seller Central.
 """
 from dataclasses import dataclass
 
 @dataclass
 class SKU:
     name: str
-    selling_price: float      # Rs, customer jo deta hai (GST incl.)
+    selling_price: float      # Rs, what the customer pays (incl. GST)
     product_cost: float       # Rs per pack (dry fruit cost)
     packing_cost: float = 0.0
     weight_grams: int = 500
     referral_pct: float = 0.09      # Amazon IN grocery referral ~9% (verify)
-    closing_fee: float = 25.0       # Rs per unit approx
-    shipping_fee: float = 65.0      # FBA / Easy Ship approx
-    return_loss_pct: float = 0.02   # returns/damage ka expected loss
+    closing_fee: float = 25.0       # Rs per unit, approx
+    shipping_fee: float = 65.0      # FBA / Easy Ship, approx
+    return_loss_pct: float = 0.02   # expected loss from returns/damage
     other_cost: float = 0.0
 
 def contribution(sku: SKU) -> dict:
@@ -24,7 +24,7 @@ def contribution(sku: SKU) -> dict:
     total_cost = sku.product_cost + sku.packing_cost + fees + returns + sku.other_cost
     profit = sku.selling_price - total_cost
     margin_pct = (profit / sku.selling_price * 100) if sku.selling_price else 0.0
-    # Break-even ACOS = margin before ads. Target ACOS = uska 60% (profit bachana hai)
+    # Break-even ACOS = margin before ads. Target ACOS = 60% of that (to keep profit)
     be_acos = max(margin_pct, 0.0)
     target_acos = be_acos * 0.60
     be_roas = (100 / be_acos) if be_acos > 0 else float("inf")
@@ -40,7 +40,7 @@ def contribution(sku: SKU) -> dict:
     }
 
 def max_cpc(selling_price: float, conversion_rate: float, target_acos_pct: float) -> float:
-    """Isse zyada bid = nuksan pakka. CPC = price x CVR x target ACOS"""
+    """A higher bid = a certain loss. CPC = price x CVR x target ACOS"""
     return round(selling_price * conversion_rate * (target_acos_pct / 100), 2)
 
 if __name__ == "__main__":
