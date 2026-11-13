@@ -1,10 +1,10 @@
-"""Keyword Intelligence (V23) — keyword kahan rakhna hai aur kis query par kya theek karna hai.
+"""Keyword Intelligence (V23) — where each keyword belongs and what to fix for each query.
 
-Teen sources, teeno ka saboot alag label ke saath:
-  OBSERVED_ADS  = apni Ads search-term report (clicks/orders/spend — asal)
-  BRAND_ANALYTICS = SQP report (market share funnel — Amazon ka apna data)
-  SEED_VOCAB    = marketplace_knowledge ka shabdkosh (Hinglish/grade/pack) — sirf beej, volume UNKNOWN
-Search volume ka koi andaaz nahi banaya jata (KWD-01 niyam).
+Three sources, each labelled with its evidence:
+  OBSERVED_ADS  = your own Ads search-term report (clicks/orders/spend — real)
+  BRAND_ANALYTICS = SQP report (market-share funnel — Amazon's own data)
+  SEED_VOCAB    = the marketplace_knowledge vocabulary (Hinglish/grade/pack) — seeds only, volume UNKNOWN
+Search volume is never estimated (rule KWD-01).
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,7 +16,7 @@ def _share(brand, total):
     return round(brand / total, 4) if total else None
 
 def sqp_funnel(db, platform: str = "Amazon", min_impressions: float = 50) -> dict:
-    """AMZ-Q-01..03: har query par impression→click→cart→purchase share, aur kis seedhi par girta hai."""
+    """AMZ-Q-01..03: impression→click→cart→purchase share per query, and the step where it drops."""
     ensure_v12(db)
     rows = db.execute("""SELECT query, SUM(search_volume) sv, SUM(impressions) im, SUM(brand_impressions) bim,
                                 SUM(clicks) cl, SUM(brand_clicks) bcl, SUM(cart_adds) ca, SUM(brand_cart_adds) bca,
@@ -26,8 +26,8 @@ def sqp_funnel(db, platform: str = "Amazon", min_impressions: float = 50) -> dic
                          GROUP BY query""", (platform,)).fetchall()
     if not rows:
         return {"available": False, "queries": [],
-                "note": "SQP data nahi — Seller Central > Brand Analytics > Search Query Performance export karke "
-                        "data/brand_analytics_inbox/ me daalo (roz 06:45 khud import hoga)"}
+                "note": "No SQP data — export Seller Central > Brand Analytics > Search Query Performance and upload it "
+                        "(or drop it in data/brand_analytics_inbox/ — auto-imported daily at 06:45)"}
     low_imp = MK.rule("AMZ-Q-03")["value"]["low_impr_share"]
     out = []
     for r in rows:
@@ -38,16 +38,16 @@ def sqp_funnel(db, platform: str = "Amazon", min_impressions: float = 50) -> dic
         imp, clk, pur = s["impression"] or 0, s["click"], s["purchase"]
         if pur is not None and imp and pur > imp and imp < low_imp:
             diag, rid, prio = "SCALE_OPPORTUNITY", "AMZ-Q-03", 1
-            action = "Convert karta hai par dikhta nahi — margin parkh kar is query par ads/bid badhao, title/backend me pakka karo"
+            action = "Converts but is not seen — after checking margin, raise ads/bids on this query and lock it into title/backend"
         elif imp < 0.01:
             diag, rid, prio = "NOT_VISIBLE", "AMZ-Q-02", 2
-            action = "Relevance/dikhne ki kami — keyword title ya backend me daalo, exact-match ad chalao"
+            action = "Relevance/visibility gap — put the keyword in the title or backend, run an exact-match ad"
         elif clk is not None and clk < imp * 0.6:
             diag, rid, prio = "TILE_PROBLEM", "AMZ-Q-02", 1
-            action = "Dikhta hai par click nahi — main image, title ki pehli 40 akshar, price/per-100g, reviews/badge sudharo"
+            action = "Seen but not clicked — improve the main image, first 40 characters of the title, price/per-100g, reviews/badge"
         elif pur is not None and clk and pur < clk * 0.6:
             diag, rid, prio = "OFFER_PROBLEM", "AMZ-Q-02", 1
-            action = "Click aata hai par bikri nahi — price, A+ content, reviews, delivery speed, pack-size options parkho"
+            action = "Clicked but not bought — check price, A+ content, reviews, delivery speed, pack-size options"
         out.append({"query": r["query"], "search_volume": r["sv"], "shares": s, "diagnosis": diag,
                     "action": action, "rule_id": rid, "priority": prio,
                     "period": f"{r['ps']}..{r['pe']}", "evidence": "BRAND_ANALYTICS (Amazon SQP)"})
@@ -55,12 +55,12 @@ def sqp_funnel(db, platform: str = "Amazon", min_impressions: float = 50) -> dic
     counts = {}
     for q in out: counts[q["diagnosis"]] = counts.get(q["diagnosis"], 0) + 1
     return {"available": True, "queries": out, "diagnosis_counts": counts,
-            "note": "Share = tumhara hissa / poore market ka; funnel ki jis seedhi par girta hai wahi theek karo (AMZ-Q-02)"}
+            "note": "Share = your part / the whole market; fix the funnel step where it drops (AMZ-Q-02)"}
 
 def seed_terms(nut: str, grade: str = None, weight: str = None) -> list:
-    """Shabdkosh se beej-shabd — volume UNKNOWN, sirf backend/research ki disha.
-    grade/weight diye hon to SIRF wahi variant — W240 kaju ke backend me W180/W320 ya doosra pack-size daalna
-    galat variant ka shabd hai (kharidaar ko bhatkata hai, Amazon irrelevant terms mana karta hai)."""
+    """Seed words from the vocabulary — volume UNKNOWN, only a direction for backend/research.
+    If grade/weight are given, ONLY that variant — putting W180/W320 or another pack size in a W240 cashew
+    backend would be wrong-variant terms (misleads shoppers; Amazon bans irrelevant terms)."""
     v = MK.NUT_VOCAB.get(nut)
     if not v: return []
     out = [nut, nut + "s"] + v["hinglish"] + v.get("hindi", [])
@@ -73,11 +73,11 @@ def seed_terms(nut: str, grade: str = None, weight: str = None) -> list:
     return out
 
 def keyword_universe(store, nut: str = None, platform: str = "Amazon", grade: str = None, weight: str = None) -> list:
-    """Teeno sources ko ek suchi me — har term ka saboot aur kaam ka score."""
+    """All three sources in one list — each term with its evidence and a usefulness score."""
     db = store.db; ensure_v12(db)
     terms = {}
     def get(t):
-        # Raw term par pehchan — 'badam' aur 'almond' alag shabd hain (backend me dono chahiye), normalized sirf jaankari
+        # Keyed by raw term — 'badam' and 'almond' are different words (both are needed in the backend); normalized is informational only
         k = t.lower().strip()
         return terms.setdefault(k, {"term": k, "normalized": normalize_term(k), "sources": set(), "clicks": 0, "orders": 0,
                                     "spend": 0.0, "sales": 0.0, "sqp": None})
@@ -105,24 +105,24 @@ def keyword_universe(store, nut: str = None, platform: str = "Amazon", grade: st
             sv = e["sqp"]["search_volume"] or 0
             score += min(sv / 500, 20)
             if e["sqp"]["diagnosis"] == "SCALE_OPPORTUNITY": score += 10
-        if e["sources"] == {"SEED_VOCAB"}: score = 1.0  # sirf beej — saboot aane tak neeche
+        if e["sources"] == {"SEED_VOCAB"}: score = 1.0  # seed only — stays low until evidence arrives
         wasted = e["spend"] >= 200 and e["orders"] == 0
         out.append({"term": e["term"], "normalized": e["normalized"], "sources": sorted(e["sources"]),
                     "clicks": e["clicks"], "orders": e["orders"], "cvr_pct": round(cvr * 100, 1) if cvr is not None else None,
                     "spend": round(e["spend"], 2), "sales": round(e["sales"], 2), "sqp": e["sqp"],
                     "excluded": excluded, "wasted_spend": wasted,
                     "score": 0 if excluded else round(score, 1),
-                    "search_volume_status": "BRAND_ANALYTICS" if e["sqp"] else "UNKNOWN (koi andaaz nahi)"})
+                    "search_volume_status": "BRAND_ANALYTICS" if e["sqp"] else "UNKNOWN (no estimate)"})
     return sorted(out, key=lambda x: -x["score"])
 
 def placement_plan(store, nut: str, title_slots: int = 1, highlight_slots: int = 4, platform: str = "Amazon",
                    grade: str = None, weight: str = None) -> dict:
-    """Kaunsa keyword kahan: TITLE (sabse saboot-wala 1) → ITEM_HIGHLIGHTS/BULLETS → BACKEND (variants, Hinglish) → NEGATIVE."""
+    """Which keyword goes where: TITLE (the 1 with most evidence) → ITEM_HIGHLIGHTS/BULLETS → BACKEND (variants, Hinglish) → NEGATIVE."""
     uni = keyword_universe(store, nut, platform, grade, weight)
     plan = {"TITLE": [], "HIGHLIGHTS_BULLETS": [], "BACKEND": [], "NEGATIVE_ADS": [], "RESEARCH_MORE": []}
     for k in uni:
         if k["excluded"] or k["wasted_spend"]:
-            plan["NEGATIVE_ADS"].append({"term": k["term"], "why": "galat irada" if k["excluded"] else f"₹{k['spend']} kharch, 0 order"})
+            plan["NEGATIVE_ADS"].append({"term": k["term"], "why": "wrong intent" if k["excluded"] else f"₹{k['spend']} spent, 0 orders"})
             continue
         proven = k["orders"] >= 3 or (k["sqp"] and (k["sqp"]["search_volume"] or 0) > 0)
         if proven and len(plan["TITLE"]) < title_slots: plan["TITLE"].append(k["term"])
@@ -132,5 +132,5 @@ def placement_plan(store, nut: str, title_slots: int = 1, highlight_slots: int =
     evidence = sum(1 for k in uni if k["sources"] != ["SEED_VOCAB"])
     return {"nut": nut, "plan": plan, "terms_considered": len(uni), "terms_with_evidence": evidence,
             "rule_ids": ["AMZ-T-01", "AMZ-T-02", "AMZ-K-02", "AMZ-K-03", "AMZ-Q-02"],
-            "note": ("Saboot-wale terms kam hain — plan zyadatar shabdkosh par hai; Ads/SQP data aate hi khud sudhrega"
-                     if evidence < 3 else "Plan asal data (Ads + SQP) par bana hai")}
+            "note": ("Few evidence-backed terms — the plan is mostly vocabulary-based; it improves automatically once Ads/SQP data arrives"
+                     if evidence < 3 else "Plan is based on real data (Ads + SQP)")}

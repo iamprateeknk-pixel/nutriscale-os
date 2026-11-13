@@ -64,7 +64,7 @@ def test_fba_days_of_cover():
         st.db.execute("INSERT INTO order_items VALUES ('Amazon','default',?,?,'SKU-SLOW','B0',30,100,0)", (f"O9{i}", f"I9{i}"))
     st.db.commit()
     out = _fba_cover(st)   # 40 units, 2/din ki bikri = 20 din cover < 21
-    assert "CHETAVNI" in out and "SKU-SLOW" in out, f"asal cover par chetavni aayegi, mila: {out}"
+    assert "WARNING" in out and "SKU-SLOW" in out, f"asal cover par chetavni aayegi, mila: {out}"
     st.close()
 
 def test_login_rate_limit_and_mfa_endpoint():

@@ -98,13 +98,13 @@ def test_weekly_report_and_scheduler():
     st = Store(":memory:"); _seed(st)
     rep = GA.weekly_report(st, datetime.date(2026, 11, 15))
     md = rep["markdown"]
-    for part in ("Haftawar Growth Report", "Ads structure", "Agent Brain", "ANUMAAN"):
+    for part in ("Weekly Growth Report", "Ads structure", "Agent Brain", "ESTIMATED"):
         assert part in md, part
     assert rep["saved_to"] is None, "in-memory DB par file nahi"
     assert JH._weekly_report(st, datetime.date(2026, 11, 12)).startswith("SKIP"), "Thursday ko nahi"
-    assert "Haftawar report bani" in JH._weekly_report(st, datetime.date(2026, 11, 15))
+    assert "Weekly report created" in JH._weekly_report(st, datetime.date(2026, 11, 15))
     msg = JH.build_handlers(st)["growth_autopilot"]()
-    assert msg.startswith("Autopilot: 3 naye")
+    assert msg.startswith("Autopilot: 3 new")
     st.close()
     import tempfile
     d = tempfile.mkdtemp(); stf = Store(os.path.join(d, "g.db")); _seed(stf)
@@ -122,7 +122,7 @@ def test_today_mentions_autopilot_and_inbox_summary():
     assert '"/api/v1/autopilot/run"' in app and '"/api/v1/autopilot/preview"' in app and '"/api/v1/reports/weekly"' in app
     assert 'd["summary"]' in app, "inbox me kya-aur-kyun"
     html = open(os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")).read()
-    assert "runAutopilot" in html and "/api/v1/autopilot/preview" in html and "Kya aur kyun" in html
+    assert "runAutopilot" in html and "/api/v1/autopilot/preview" in html and "What & why" in html
 
 if __name__ == "__main__":
     for t in [test_autopilot_creates_safe_proposals, test_converted_term_never_negated_and_cap,

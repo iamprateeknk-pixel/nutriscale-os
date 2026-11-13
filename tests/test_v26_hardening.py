@@ -41,7 +41,7 @@ def test_autopilot_stops_on_stale_ads_data():
     r2 = GA.run(st)
     assert r2["created"] and r2["ads_data_age_days"] == 3
     p = json.loads(st.db.execute("SELECT payload FROM action_v12 LIMIT 1").fetchone()["payload"])
-    assert p["data_freshness"] == "3 din purana", "proposal par data ki umar likhi ho"
+    assert p["data_freshness"] == "3 days old", "proposal par data ki umar likhi ho"
     st.close()
     st2 = Store(":memory:")
     st2.add_search_term("junk", "SP | X | AUTO", 900, 0, 50, 0)

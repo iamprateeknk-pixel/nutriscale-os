@@ -85,7 +85,7 @@ def test_reconciliation_scoped_and_backup_job():
     if os.path.exists(bf): os.remove(bf)
     stf = Store(bf)
     msg = JH.build_handlers(stf)["backup_restore"]()
-    assert "Backup taiyaar" in msg and os.path.exists("/tmp/backups/" + [f for f in os.listdir("/tmp/backups") if f.endswith(".db")][0])
+    assert "Backup ready" in msg and os.path.exists("/tmp/backups/" + [f for f in os.listdir("/tmp/backups") if f.endswith(".db")][0])
     stf.close()
 
 if __name__ == "__main__":

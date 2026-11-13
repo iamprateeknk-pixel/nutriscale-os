@@ -1,12 +1,12 @@
-"""Growth Playbook (V24) — market research ke niyam (marketplace_knowledge) ko TUMHARE data par chalana.
+"""Growth Playbook (V24) — applies the market-research rules (marketplace_knowledge) to YOUR data.
 
-Har function ka nateeja rule_id ke saath hai (source wahin), aur jahan data nahi wahan saaf 'DATA_NEEDED' —
-koi andaaz asli number ban kar nahi dikhta.
-  break_even()        AMZ-A-04  — SKU ka break-even / target ACOS (cost + fee se)
-  ads_structure()     AMZ-A-01..03 — campaign structure ki jaanch: auto/exact alag?, harvest, self-competition
-  event_calendar()    IN-E-01/02 — aane wale sale/tyohaar + taiyaari ki aakhri tareekh
-  review_plan()       AMZ-R-01/02 — Vine-yogya SKUs, kam rating wale SKUs (sirf policy-safe raaste)
-  today()             home screen: aaj ke sabse zaroori kaam, ek jagah
+Every result carries a rule_id (its source lives there), and where data is missing it says 'DATA_NEEDED' plainly —
+no estimate is ever shown as a real number.
+  break_even()        AMZ-A-04  — SKU break-even / target ACOS (from cost + fees)
+  ads_structure()     AMZ-A-01..03 — campaign structure check: auto/exact separated?, harvest, self-competition
+  event_calendar()    IN-E-01/02 — upcoming sales/festivals + preparation deadlines
+  review_plan()       AMZ-R-01/02 — Vine-eligible SKUs, low-rated SKUs (policy-safe routes only)
+  today()             home screen: today's most important tasks in one place
 """
 import os, sys, re, datetime
 sys.path.insert(0, os.path.dirname(__file__))
@@ -20,20 +20,20 @@ def break_even(db, sku: str, price: float = None, platform: str = "Amazon", desi
         r = db.execute("SELECT price FROM products WHERE sku=? AND (platform=? OR ? IS NULL) LIMIT 1", (sku, platform, platform)).fetchone()
         price = r["price"] if r else None
     if not price:
-        return {"sku": sku, "status": "DATA_NEEDED", "rule_id": "AMZ-A-04", "note": "Price nahi mila — product catalog me daalo"}
+        return {"sku": sku, "status": "DATA_NEEDED", "rule_id": "AMZ-A-04", "note": "Price not found — add it to the product catalog"}
     c = F.contribution_v2(db, sku, price, platform)
     if not c.get("known"):
         return {"sku": sku, "status": "DATA_NEEDED", "rule_id": "AMZ-A-04", "price": price,
-                "note": "Cost darj nahi — break-even ACOS cost ke bina banta hi nahi (Profit screen par COGS daalo)"}
+                "note": "No cost recorded — break-even ACOS cannot be calculated without cost (add COGS on the Profit screen)"}
     be = c["contribution"] / price if price else 0
     target = be - desired_net_margin_pct / 100
     return {"sku": sku, "status": "OK", "rule_id": "AMZ-A-04", "price": price, "pre_ad_profit": c["contribution"],
             "break_even_acos_pct": round(be * 100, 1), "target_acos_pct": round(target * 100, 1) if target > 0 else None,
             "break_even_roas": round(1 / be, 2) if be > 0 else None,
             "fee_precision": c.get("fee_precision"), "fee_source": c.get("fee_source"),
-            "note": ("Ads se pehle hi ghaata — pehle price/cost theek karo, ads scale mat karo" if be <= 0 else
-                     f"ACOS {round(be*100,1)}% se upar = har ad-bikri par ghaata; {desired_net_margin_pct:.0f}% munafa chahiye to ACOS "
-                     + (f"{round(target*100,1)}% tak" if target > 0 else "is margin par mumkin nahi")),
+            "note": ("Loss-making even before ads — fix price/cost first, do not scale ads" if be <= 0 else
+                     f"ACOS above {round(be*100,1)}% = a loss on every ad sale; for {desired_net_margin_pct:.0f}% profit keep ACOS "
+                     + (f"at or below {round(target*100,1)}%" if target > 0 else "— not possible at this margin")),
             "launch_note": MK.rule("AMZ-A-05")["rule"]}
 
 # ---------------- Campaign structure ----------------
@@ -53,22 +53,22 @@ def ads_structure(store) -> dict:
     camps |= {r["name"] for r in db.execute("SELECT name FROM campaigns")}
     if not camps:
         return {"status": "DATA_NEEDED", "rule_ids": ["AMZ-A-01"], "findings": [],
-                "note": "Campaign data nahi — Ads Console se Search Term + Campaign report import karo"}
+                "note": "No campaign data — upload the Search Term + Campaign reports from Ads Console"}
     types = {c: _ctype(c) for c in camps}
     counts = {}
     for t in types.values(): counts[t] = counts.get(t, 0) + 1
     findings = []
     if not counts.get("AUTO"):
-        findings.append({"severity": "WARN", "rule_id": "AMZ-A-02", "message": "Koi Auto (khoj) campaign nahi dikha — naye search terms kahan se milenge?",
-                         "action": "Har hero SKU ke liye ek chhota Auto campaign (2-4 hafte), phir harvest"})
+        findings.append({"severity": "WARN", "rule_id": "AMZ-A-02", "code": "NO_AUTO", "message": "No Auto (discovery) campaign found — where will new search terms come from?",
+                         "action": "A small Auto campaign per hero SKU (2-4 weeks), then harvest"})
     if not counts.get("EXACT"):
-        findings.append({"severity": "WARN", "rule_id": "AMZ-A-01", "message": "Koi Exact (kamai) campaign nahi dikha — jeetne wale terms ka kharch kaabu me nahi",
-                         "action": "Jo terms 2+ order de chuke, unka alag Exact campaign"})
+        findings.append({"severity": "WARN", "rule_id": "AMZ-A-01", "code": "NO_EXACT", "message": "No Exact (earning) campaign found — spend on winning terms is not under control",
+                         "action": "A separate Exact campaign for terms with 2+ orders"})
     if counts.get("UNKNOWN", 0) > len(camps) / 2:
         findings.append({"severity": "TIP", "rule_id": "AMZ-A-01",
-                         "message": f"{counts['UNKNOWN']} campaigns ke naam se unka kaam pata nahi chalta",
-                         "action": "Naam me kaam likho: 'SP | Kaju W240 | AUTO', 'SP | Kaju W240 | EXACT' — tabhi system aur tum dono samjhenge"})
-    # Self-competition: ek hi term AUTO/BROAD aur EXACT dono me paisa kha raha hai
+                         "code": "UNCLEAR_NAMES", "message": f"{counts['UNKNOWN']} campaign names do not say what the campaign is for",
+                         "action": "Put the job in the name: 'SP | Kaju W240 | AUTO', 'SP | Kaju W240 | EXACT' — so both you and the system can tell"})
+    # Self-competition: the same term spends in both AUTO/BROAD and EXACT
     rows = db.execute("SELECT term, campaign, SUM(spend) sp, SUM(purchases) pu FROM search_terms GROUP BY term, campaign").fetchall()
     by_term = {}
     for r in rows: by_term.setdefault(r["term"], []).append(dict(r))
@@ -80,32 +80,32 @@ def ads_structure(store) -> dict:
                             "spend_outside_exact": round(sum(x["sp"] or 0 for x in lst if types.get(x["campaign"]) != "EXACT"), 2)})
     if overlap:
         findings.append({"severity": "WARN", "rule_id": "AMZ-A-02",
-                         "message": f"{len(overlap)} terms Exact ke saath Auto/Broad me bhi kharch kar rahe hain (apni hi bid se ladai)",
-                         "action": "Auto/Broad campaign me in terms par negative-exact lagao", "terms": overlap[:15]})
+                         "code": "SELF_COMPETITION", "message": f"{len(overlap)} terms spend in Auto/Broad as well as Exact (bidding against yourself)",
+                         "action": "Add these terms as negative-exact in the Auto/Broad campaigns", "terms": overlap[:15]})
     import ads_studio as AS
     hv = AS.harvest_candidates(store, MK.rule("AMZ-A-02")["value"]["harvest_min_orders"])
     exact_terms = {t for t, lst in by_term.items() if any(types.get(x["campaign"]) == "EXACT" for x in lst)}
     pending = [h for h in hv["harvest"] if h["term"] not in exact_terms and types.get(h["from_campaign"]) != "EXACT"]
     if pending:
-        findings.append({"severity": "TIP", "rule_id": "AMZ-A-02", "message": f"{len(pending)} jeetne wale terms abhi Exact me nahi",
-                         "action": "Exact campaign me harvest karo (approval ke saath)", "terms": pending[:15]})
+        findings.append({"severity": "TIP", "rule_id": "AMZ-A-02", "code": "HARVEST_PENDING", "message": f"{len(pending)} winning terms are not in Exact yet",
+                         "action": "Harvest them into an Exact campaign (with approval)", "terms": pending[:15]})
     waste = round(sum(n["wasted"] for n in hv["negatives"]), 2)
     if waste:
-        findings.append({"severity": "WARN", "rule_id": "AMZ-A-03", "message": f"₹{waste:,.0f} un terms par gaya jo kahin convert nahi hue",
-                         "action": "Negative-exact proposals banao (haftawar Search Term review)", "terms": hv["negatives"][:15]})
+        findings.append({"severity": "WARN", "rule_id": "AMZ-A-03", "code": "WASTED_SPEND", "message": f"₹{waste:,.0f} went on terms that never converted anywhere",
+                         "action": "Create negative-exact proposals (weekly Search Term review)", "terms": hv["negatives"][:15]})
     score = max(0, 100 - 15 * sum(f["severity"] == "WARN" for f in findings) - 5 * sum(f["severity"] == "TIP" for f in findings))
     return {"status": "OK", "structure_score": score, "campaign_types": counts, "campaigns": [{"name": c, "type": t} for c, t in sorted(types.items())],
             "findings": findings, "wasted_spend": waste, "harvest_pending": len(pending),
             "rule_ids": ["AMZ-A-01", "AMZ-A-02", "AMZ-A-03"],
-            "note": "Campaign ka prakar NAAM se pehchana gaya hai — galat pehchan ho to naam me AUTO/EXACT likho"}
+            "note": "Campaign type is detected from the NAME — if it is wrong, put AUTO/EXACT in the name"}
 
 # ---------------- Sale events ----------------
-# Tareekhein har saal badalti hain — ye AANUMANIT khidkiyaan hain (pichhle saalon ka pattern). Official tareekh
-# Seller Central > Sale Event Planner se pakki karo; confirmed=True sirf tab jab tum khud pakki tareekh daalo.
+# Dates change every year — these are ESTIMATED windows (pattern of previous years). Confirm the official date
+# in Seller Central > Sale Event Planner; confirmed=True only when you enter a confirmed date yourself.
 EVENT_WINDOWS = [
     {"name": "Republic Day Sale", "month": 1, "day": 12, "days": 6, "focus": "daily snacking packs, coupons"},
-    {"name": "Valentine / gifting", "month": 2, "day": 7, "days": 8, "focus": "chhote gift box"},
-    {"name": "Holi", "month": 3, "day": 5, "days": 14, "focus": "gift box, mithai-ke-saath dry fruits"},
+    {"name": "Valentine / gifting", "month": 2, "day": 7, "days": 8, "focus": "small gift boxes"},
+    {"name": "Holi", "month": 3, "day": 5, "days": 14, "focus": "gift boxes, dry fruits with sweets"},
     {"name": "Prime Day India", "month": 7, "day": 12, "days": 3, "focus": "Lightning Deals, Prime-only deals"},
     {"name": "Raksha Bandhan", "month": 8, "day": 1, "days": 14, "focus": "rakhi gift box/hamper"},
     {"name": "Great Indian Festival / Diwali", "month": 9, "day": 25, "days": 40, "focus": "gift hamper, 1kg packs, corporate gifting"},
@@ -127,31 +127,31 @@ def event_calendar(today=None, horizon_days: int = 120, confirmed: dict = None) 
             fba = start - datetime.timedelta(days=v["fba_lead_days"][1])
             ready = start - datetime.timedelta(days=v["ready_lead_days"])
             days_to = (start - t).days
-            phase = ("CHAL RAHA HAI" if start <= t <= end else
-                     "FBA STOCK BHEJO" if t <= fba + datetime.timedelta(days=5) and t >= fba - datetime.timedelta(days=10) else
-                     "LISTING/COUPON/ADS TAIYAAR KARO" if fba < t <= ready else
-                     "AAKHRI HAFTA" if ready < t < start else "YOJANA BANAO")
+            phase = ("LIVE NOW" if start <= t <= end else
+                     "SHIP FBA STOCK" if t <= fba + datetime.timedelta(days=5) and t >= fba - datetime.timedelta(days=10) else
+                     "PREPARE LISTINGS/COUPONS/ADS" if fba < t <= ready else
+                     "FINAL WEEK" if ready < t < start else "PLAN")
             out.append({"event": e["name"], "start": start.isoformat(), "end": end.isoformat(), "days_to_start": days_to,
                         "fba_stock_by": fba.isoformat(), "ready_by": ready.isoformat(), "phase": phase, "focus": e["focus"],
                         "confirmed": bool(confirmed and e["name"] in confirmed)})
             break
     out.sort(key=lambda x: x["start"])
     return {"today": t.isoformat(), "events": out, "rule_ids": ["IN-E-01", "IN-E-02"],
-            "note": "Tareekhein ANUMAAN hain (pichhle saalon ka pattern) — Sale Event Planner se pakki karo"}
+            "note": "Dates are ESTIMATES (pattern of previous years) — confirm them in the Sale Event Planner"}
 
 # ---------------- Reviews ----------------
 def review_plan(db) -> dict:
     rows = [dict(r) for r in db.execute("SELECT sku, name, platform, rating, reviews FROM products")]
-    if not rows: return {"status": "DATA_NEEDED", "items": [], "note": "Product catalog khaali"}
+    if not rows: return {"status": "DATA_NEEDED", "items": [], "note": "Product catalog is empty"}
     mx = MK.rule("AMZ-R-01")["value"]["max_reviews"]
     items = []
     for p in rows:
         if p["platform"] == "Amazon" and (p["reviews"] or 0) < mx:
             items.append({"sku": p["sku"], "name": p["name"], "reviews": p["reviews"] or 0, "rating": p["rating"],
-                          "action": "Vine-yogya (30 se kam reviews) — Brand Registry ho to Vine me daalo", "rule_id": "AMZ-R-01"})
+                          "action": "Vine-eligible (fewer than 30 reviews) — enrol in Vine if you have Brand Registry", "rule_id": "AMZ-R-01"})
         if p["rating"] and p["rating"] < 4.0:
             items.append({"sku": p["sku"], "name": p["name"], "reviews": p["reviews"] or 0, "rating": p["rating"],
-                          "action": "Rating 4 se kam — shikayatein padho (product/pack/taazgi), pehle product theek karo", "rule_id": "AMZ-R-01"})
+                          "action": "Rating below 4 — read the complaints (product/pack/freshness) and fix the product first", "rule_id": "AMZ-R-01"})
     return {"status": "OK", "items": items, "rule_ids": ["AMZ-R-01", "AMZ-R-02"],
             "policy": MK.rule("AMZ-R-02")["rule"]}
 
@@ -170,39 +170,39 @@ def today(store) -> dict:
     from connectors import config as cfg
     connected = [k for k, v in cfg.status_all().items() if v["configured"]]
     checklist = [
-        {"step": "Search Term report import", "done": n_terms > 0, "why": "Keyword plan, negatives, harvest — sab isi se"},
-        {"step": "Orders import", "done": n_orders > 0, "why": "Bikri, raftaar, stock cover, nateeje ka maap"},
+        {"step": "Search Term report import", "done": n_terms > 0, "why": "Keyword plan, negatives, harvest — all come from this"},
+        {"step": "Orders import", "done": n_orders > 0, "why": "Sales, velocity, stock cover, outcome measurement"},
         {"step": "Product catalog (SKU, price, rating)", "done": n_products > 0, "why": "Listing builder, review plan, break-even"},
-        {"step": "SKU cost (COGS) darj", "done": n_costs > 0, "why": "Break-even ACOS aur munafa — iske bina scale band"},
-        {"step": "Brand Analytics SQP file", "done": n_sqp > 0, "why": "Market share funnel — sabse keemti keyword data"},
-        {"step": "API connector (SP-API/Ads)", "done": bool(connected), "why": "Roz ka data khud aaye, CSV ki zaroorat khatam"},
+        {"step": "SKU cost (COGS) recorded", "done": n_costs > 0, "why": "Break-even ACOS and profit — scaling is blocked without it"},
+        {"step": "Brand Analytics SQP file", "done": n_sqp > 0, "why": "Market-share funnel — the most valuable keyword data"},
+        {"step": "API connector (SP-API/Ads)", "done": bool(connected), "why": "Daily data arrives automatically, no more CSVs"},
     ]
     tasks = []
-    if pending: tasks.append({"priority": 1, "area": "approvals", "title": f"{pending} faisle tumhari approval ka intezaar kar rahe hain", "screen": "approvals"})
+    if pending: tasks.append({"priority": 1, "area": "approvals", "title": f"{pending} decisions are waiting for your approval", "screen": "approvals"})
     st = ads_structure(store)
     if st["status"] == "OK":
-        if st["wasted_spend"]: tasks.append({"priority": 1, "area": "ads", "title": f"₹{st['wasted_spend']:,.0f} bina-bikri wale terms par gaya — negatives lagao", "screen": "ads", "rule_id": "AMZ-A-03"})
-        if st["harvest_pending"]: tasks.append({"priority": 2, "area": "ads", "title": f"{st['harvest_pending']} jeetne wale terms Exact me daalo", "screen": "ads", "rule_id": "AMZ-A-02"})
+        if st["wasted_spend"]: tasks.append({"priority": 1, "area": "ads", "title": f"₹{st['wasted_spend']:,.0f} went on terms with no sales — add negatives", "screen": "ads", "rule_id": "AMZ-A-03"})
+        if st["harvest_pending"]: tasks.append({"priority": 2, "area": "ads", "title": f"Move {st['harvest_pending']} winning terms into Exact", "screen": "ads", "rule_id": "AMZ-A-02"})
     sq = KI.sqp_funnel(db)
     if sq["available"]:
         c = sq["diagnosis_counts"]
-        if c.get("SCALE_OPPORTUNITY"): tasks.append({"priority": 1, "area": "keywords", "title": f"{c['SCALE_OPPORTUNITY']} queries convert karti hain par dikhti nahi — scale karo", "screen": "sqp", "rule_id": "AMZ-Q-03"})
-        if c.get("TILE_PROBLEM"): tasks.append({"priority": 2, "area": "listings", "title": f"{c['TILE_PROBLEM']} queries par click nahi milta — main image/title/price sudharo", "screen": "sqp", "rule_id": "AMZ-Q-02"})
+        if c.get("SCALE_OPPORTUNITY"): tasks.append({"priority": 1, "area": "keywords", "title": f"{c['SCALE_OPPORTUNITY']} queries convert but are not seen — scale them", "screen": "sqp", "rule_id": "AMZ-Q-03"})
+        if c.get("TILE_PROBLEM"): tasks.append({"priority": 2, "area": "listings", "title": f"{c['TILE_PROBLEM']} queries get no clicks — improve main image/title/price", "screen": "sqp", "rule_id": "AMZ-Q-02"})
     ev = event_calendar()
     nxt = ev["events"][0] if ev["events"] else None
     if nxt and nxt["days_to_start"] <= 45:
         tasks.append({"priority": 2 if nxt["days_to_start"] > 14 else 1, "area": "events",
-                      "title": f"{nxt['event']}: {nxt['phase']} — FBA stock {nxt['fba_stock_by']} tak, taiyaari {nxt['ready_by']} tak",
+                      "title": f"{nxt['event']}: {nxt['phase']} — FBA stock by {nxt['fba_stock_by']}, ready by {nxt['ready_by']}",
                       "screen": "growth", "rule_id": "IN-E-01"})
     try:
         import growth_autopilot as GA
         age = GA.ads_data_age(db)
         if age is not None and age > GA.STALE_ADS_DAYS:
-            tasks.append({"priority": 1, "area": "data", "title": f"Ads data {age} din purana — autopilot ruka hua hai; taaza Search Term report upload karo",
+            tasks.append({"priority": 1, "area": "data", "title": f"Ads data is {age} days old — the autopilot is paused; upload a fresh Search Term report",
                           "screen": "integrations"})
         ap = GA.run(store, dry_run=True)
         if ap["created"]:
-            tasks.append({"priority": 2, "area": "autopilot", "title": f"Autopilot ke paas {len(ap['created'])} naye proposals taiyaar — Growth screen se banao, phir approve",
+            tasks.append({"priority": 2, "area": "autopilot", "title": f"The autopilot has {len(ap['created'])} new proposals ready — create them on the Growth screen, then approve",
                           "screen": "growth"})
     except Exception:
         pass

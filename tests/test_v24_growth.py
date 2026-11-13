@@ -26,7 +26,7 @@ def test_break_even_acos():
     assert abs(b["break_even_roas"] - 100 / b["break_even_acos_pct"]) < 0.05
     F.set_cost(st.db, "SKU-L", 700, 0, 0, "test", approved_by="o")
     loss = GP.break_even(st.db, "SKU-L", price=500)
-    assert loss["break_even_acos_pct"] < 0 and "ghaata" in loss["note"]
+    assert loss["break_even_acos_pct"] < 0 and "Loss-making" in loss["note"]
     st.close()
 
 def test_ads_structure_findings():
@@ -41,7 +41,7 @@ def test_ads_structure_findings():
     a = GP.ads_structure(st)
     assert a["campaign_types"] == {"AUTO": 1, "EXACT": 1}
     msgs = " | ".join(f["message"] for f in a["findings"])
-    assert "apni hi bid se ladai" in msgs, "Exact + Auto dono me ek term = self-competition"
+    assert "bidding against yourself" in msgs, "Exact + Auto dono me ek term = self-competition"
     assert a["harvest_pending"] == 1, "cashew 1kg (3 orders, sirf Auto me) harvest-yogya; kaju w240 pehle se Exact me"
     assert a["wasted_spend"] == 300
     assert 0 <= a["structure_score"] < 100
@@ -60,7 +60,7 @@ def test_event_calendar():
     assert all(e["days_to_start"] <= 120 for e in c["events"])
     w = c["events"][0]
     assert w["fba_stock_by"] < w["ready_by"] < w["start"], "FBA stock pehle, phir taiyaari, phir sale"
-    assert "ANUMAAN" in c["note"], "tareekhein anumaan hain — saaf likha ho"
+    assert "ESTIMATES" in c["note"], "tareekhein anumaan hain — saaf likha ho"
     conf = GP.event_calendar("2026-11-11", confirmed={"Republic Day Sale": "2027-01-15"})
     rd = [e for e in conf["events"] if e["event"] == "Republic Day Sale"][0]
     assert rd["start"] == "2027-01-15" and rd["confirmed"] is True

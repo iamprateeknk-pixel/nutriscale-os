@@ -156,7 +156,7 @@ def test_brain_learns_from_own_data_and_job():
                                  ("dry fruits cheap", 90, 0, 800, 0)]:
         st.add_search_term(term, "C", sp, sa, cl, pu)
     msg = JH.build_handlers(st)["learning_crawl"]()
-    assert "Playbook" in msg and "sabak" in msg, msg
+    assert "Playbook" in msg and "lessons" in msg, msg
     w = AB.advise(st.db, agent="A03", topic="keyword_research")
     own = [a for a in w if a["rule_id"] == "OWN-KW-WINNERS"]
     assert own and "kaju w240" in own[0]["statement"]
