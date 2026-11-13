@@ -24,7 +24,12 @@ def seed_capabilities(db):
     # V19: old name edit_listing -> write_listings (the publish gate checks this — keep one name)
     db.execute("UPDATE capabilities SET capability='write_listings' WHERE capability='edit_listing'"); db.commit()
     for p, c, s, r in DEFAULT_CAPS:
-        db.execute("INSERT OR IGNORE INTO capabilities VALUES (?,?,?,?,?)", (p, c, s, r, "")); db.commit()
+        db.execute("INSERT OR IGNORE INTO capabilities VALUES (?,?,?,?,?)", (p, c, s, r, ""))
+        # V27: refresh the default note text (e.g. after a language change) only on rows nobody has
+        # changed — same default status and never certified via set_capability.
+        db.execute("""UPDATE capabilities SET reason=? WHERE platform=? AND capability=? AND status=?
+                      AND COALESCE(certified_at,'')=''""", (r, p, c, s))
+    db.commit()
 
 def set_capability(db, platform, capability, status, reason=""):
     ensure_v12(db)

@@ -104,8 +104,21 @@ def test_dashboard_upload_widget():
     assert "Server par file ka poora path" not in html, "the old path-based form (former Hinglish label) is gone"
     assert "skipped_stale_data" in html and "'EXPIRED'" in html
 
+def test_capability_notes_refresh_after_language_change():
+    import capabilities as CAP
+    st = Store(":memory:"); CAP.seed_capabilities(st.db)
+    # an old database: default row with old-language text, and one row an operator certified
+    st.db.execute("UPDATE capabilities SET reason='purana text' WHERE capability='read_orders' AND platform='Amazon'")
+    CAP.set_capability(st.db, "Amazon", "write_ads", "certified", "pilot signed off")
+    CAP.seed_capabilities(st.db)
+    r = CAP.capability(st.db, "Amazon", "read_orders")
+    assert r["reason"].startswith("SP-API code is ready"), "default note text is refreshed"
+    w = CAP.capability(st.db, "Amazon", "write_ads")
+    assert w["status"] == "certified" and w["reason"] == "pilot signed off", "an operator's change is never overwritten"
+
 if __name__ == "__main__":
     for t in [test_upload_and_path_safety, test_autopilot_stops_on_stale_ads_data, test_proposal_expiry,
-              test_v26_http_upload_flow, test_dashboard_upload_widget]:
+              test_v26_http_upload_flow, test_dashboard_upload_widget,
+              test_capability_notes_refresh_after_language_change]:
         t(); print(f"PASS {t.__name__}")
     print("ALL V26 TESTS PASS")
