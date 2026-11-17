@@ -1,5 +1,13 @@
 # NutriScale OS — STATUS (the honest log)
-_Updated: 13 Nov 2026 (V27 — the whole system is now in English; 31 suites pass)_
+_Updated: 17 Nov 2026 (V28 — report age from the report's own dates, cost-sheet upload; 32 suites pass)_
+
+## 📅 V28 — Real report age + cost sheet in one upload (17 Nov 2026)
+(evidence: test_v27_data.py — 5 tests incl. real HTTP; **32 suites pass**; upload preview, cost sheet and template download exercised in a browser)
+- **The V26 limitation is closed**: an uploaded report's period is read from its own date columns (Date / Start Date / End Date / purchase-date …; ISO, DD/MM, MM/DD, "Nov 01, 2026", "01-Nov-2026"). A two-month-old report uploaded today now counts as two months old, and the autopilot will not act on it. The upload preview shows the dates covered and the age. Ambiguous numeric dates are read as DD/MM (the Amazon.in default) and the preview says so. A report with no dates still counts from the upload day.
+- **Overlapping periods are explained**: a dated Search Term report that partly overlaps one already loaded is refused with the reason, instead of silently importing 0 rows.
+- **Cost sheet upload**: a CSV with sku, cogs, packaging, shipping, other, effective_from sets the cost of every SKU in one go. Each row is validated (₹ and thousands separators understood; an empty, zero or non-numeric product cost is an error, never zero); bad rows are listed by row number. Only Owner/GrowthLead may set costs — an Operations user can upload reports but gets 403 for a cost sheet. The Profit screen has a **template download** pre-filled with your SKUs, and the single-cost form gained a Shipping/other field.
+- Also: one leftover Hinglish phrase in the campaign import receipt is now English.
+
 
 ## 🌐 V27 — Everything in English (13 Nov 2026)
 - Dashboard (all 23 screens, toasts, dialogs, empty states), API messages, agent/engine output, job outputs, CLI
@@ -21,7 +29,7 @@ _Updated: 13 Nov 2026 (V27 — the whole system is now in English; 31 suites pas
 - **Report upload from the dashboard**: choose or drag a file on Integrations → the type is detected (Search Term, Campaign, Orders, Inventory, Brand Analytics, Catalog/BSR) → preview → "Import". If not recognised, the type can be chosen. No terminal needed — the biggest obstacle to real data is gone.
 - **No decisions on stale data**: if ads data is older than 21 days the autopilot creates no negative/harvest proposals, and the Today screen shows a red task "upload a fresh report". Every proposal records `data_freshness` (`AGE_UNKNOWN` for undated CLI imports).
 - **Proposal expiry**: no decision within 7 days → `EXPIRED` (new state) — a proposal built on old data cannot be approved by mistake, the inbox stays clean, history is kept. The autopilot cleans up on every run.
-- **Limitation (honest)**: for CSV uploads the age of search-term data is taken from the import date, not the dates inside the report — a two-month-old report uploaded today counts as "fresh". API sync carries the real report period.
+- **Limitation (honest)**: for CSV uploads the age of search-term data is taken from the import date, not the dates inside the report — a two-month-old report uploaded today counts as "fresh". API sync carries the real report period. _(Closed in V28.)_
 
 ## 🤖 V25 — Growth Autopilot: findings become proposals, the loop is closed (12 Nov 2026)
 (evidence: test_v25_autopilot.py — 7 tests; **30 suites pass**; Autopilot → Approval Inbox flow exercised in a browser)

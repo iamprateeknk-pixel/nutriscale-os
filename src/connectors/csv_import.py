@@ -21,7 +21,7 @@ def _find(row: dict, *names):
     return None
 
 def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
-                            period_start: str = "", period_end: str = "", batch_id: str = "") -> int:
+                            period_start: str = "", period_end: str = "", batch_id: str = "", detail: bool = False):
     """Amazon Ads Console -> Reports -> Search Term Report CSV.
     V12.2 dedup: (1) multiple rows of the same term+campaign WITHIN a file are summed into one;
     (2) with a period, old rows of the same source+period are removed first — re-imports never double the totals."""
@@ -44,9 +44,10 @@ def import_ads_search_terms(path: str, store: Store, platform: str = "Amazon",
         return len(agg)
     if period_start:
         from connectors.periods import apply_period_rows
-        res = apply_period_rows(store.db, src, period_start, period_end, _insert)
-        return res.get("inserted", 0)
-    return _insert()
+        res = apply_period_rows(store.db, src, period_start, period_end or period_start, _insert)
+        return res if detail else res.get("inserted", 0)
+    n = _insert()
+    return {"status": "INSERTED", "inserted": n} if detail else n
 
 def import_campaign_report(path: str, store: Store, platform: str = "Amazon") -> int:
     """Ads Console Campaign Report CSV -> campaigns table.

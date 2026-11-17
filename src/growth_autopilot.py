@@ -32,14 +32,16 @@ def _rule_ok(db, rule_id) -> bool:
     return not r or r["status"] != "DISABLED"
 
 def ads_data_age(db, today=None):
-    """How old the ads data is: the latest search_terms period_end or ads import date — whichever is newer.
+    """How old the ads data is: the latest report end date (search_terms period_end, or the period of an ads import);
+    an import without dates counts from its upload day.
     None if unknown (undated CLI import) — proposals are still created, labelled 'AGE_UNKNOWN'."""
     t = today or datetime.date.today()
     cands = []
     r = db.execute("SELECT MAX(period_end) m FROM search_terms WHERE period_end IS NOT NULL AND period_end<>''").fetchone()
     if r and r["m"]: cands.append(str(r["m"])[:10])
-    r = db.execute("""SELECT MAX(imported_at) m FROM import_batches
-                      WHERE report_type IN ('search_terms','ads_search_terms','campaigns')""").fetchone()
+    # V27: a batch with a known report period counts from its end date, not from when it was uploaded
+    r = db.execute("""SELECT MAX(CASE WHEN period_end IS NOT NULL AND period_end<>'' THEN period_end ELSE imported_at END) m
+                      FROM import_batches WHERE report_type IN ('search_terms','ads_search_terms','campaigns')""").fetchone()
     if r and r["m"]: cands.append(str(r["m"])[:10])
     if not cands: return None
     try: return (t - datetime.date.fromisoformat(max(cands))).days
