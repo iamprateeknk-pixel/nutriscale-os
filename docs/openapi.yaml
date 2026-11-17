@@ -107,13 +107,13 @@ paths:
   /api/v1/imports/preview:
     post: {summary: "Preview {upload} or a {path} inside data/ -> hash/kind/rows/duplicate + period {start, end, age_days} read from the report's own dates (other server paths -> 400)"}
   /api/v1/imports/commit:
-    post: {summary: "Commit {upload | path, kind?} — receipt, duplicates blocked. Kinds: search_terms, campaigns, orders, inventory, brand_analytics, catalog_snapshot, costs (cost sheet: needs the costs permission, else 403; bad rows listed in exceptions). A partly overlapping search-term period -> ok=false with the reason"}
+    post: {summary: "Commit {upload | path, kind?} — receipt, duplicates blocked. Kinds: search_terms, campaigns, orders, inventory, brand_analytics, catalog_snapshot, costs (cost sheet with optional gst_rate column: needs the costs permission, else 403; bad rows listed in exceptions). A partly overlapping search-term period -> ok=false with the reason"}
   /api/v1/stock/channel-map:
     get: {summary: Explicit stock-location -> channel map}
     post: {summary: "Map a location to a channel: {location, channel}"}
   /api/v1/costs:
-    get: {summary: Versioned costs}
-    post: {summary: "Record a new cost: {sku, cogs, packaging}"}
+    get: {summary: "Versioned costs, incl. gst_rate (null = not set)"}
+    post: {summary: "Record a new cost: {sku, cogs, packaging?, other_variable?, gst_rate?} — costs exclude GST when gst_rate is given; gst_rate outside 0-40 -> 400 BAD_GST_RATE"}
   /api/v1/finance/reconciliation:
     get: {summary: Order GMV vs settlement — MATCHED/EXCEPTION}
   /api/v1/listings/versions:

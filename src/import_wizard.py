@@ -72,7 +72,7 @@ def detect_period(rows: list, headers: list, today=None) -> dict:
             "columns": cols, "assumed_day_first": assumed}
 
 def _num_or_none(v):
-    v = str(v if v is not None else "").replace("₹", "").replace(",", "").strip()
+    v = str(v if v is not None else "").replace("₹", "").replace(",", "").replace("%", "").strip()
     if v == "": return None
     try: return float(v)
     except ValueError: return "bad"
@@ -84,7 +84,8 @@ def _pick(row, *names):
     return None
 
 def import_costs(db, rows: list, source: str, approved_by: str) -> dict:
-    """Cost sheet: one row per SKU — sku, cogs (product cost), packaging, shipping, other, effective_from.
+    """Cost sheet: one row per SKU — sku, cogs (product cost), packaging, shipping, other, gst_rate, effective_from.
+    With a gst_rate, costs are meant WITHOUT GST (input credit is claimed back) and the output GST is taken out of the price.
     Every row is validated; bad rows are listed, never guessed. A missing packaging/shipping is 0, a missing
     or non-positive product cost is an error (an unknown cost is never treated as zero)."""
     import finance as F
@@ -101,14 +102,21 @@ def import_costs(db, rows: list, source: str, approved_by: str) -> dict:
             exceptions.append({"row": i, "sku": sku, "error": "Product cost (cogs) must be a number above 0"}); continue
         bad = [k for k, v in extras.items() if v == "bad" or (isinstance(v, float) and v < 0)]
         if bad: exceptions.append({"row": i, "sku": sku, "error": "Not a valid amount: " + ", ".join(bad)}); continue
+        gst_raw = _pick(r, "gst_rate", "gst rate", "gst", "gst %", "gst%", "gst_%", "gst rate %")
+        try:
+            import finance as _F
+            gst = _F.check_gst_rate(gst_raw)
+        except ValueError:
+            exceptions.append({"row": i, "sku": sku, "error": f"GST rate must be a number from 0 to 40 (got {gst_raw})"}); continue
         eff = str(_pick(r, "effective_from", "effective from", "date") or "").strip() or None
         if eff:
             ds, _ = _parse_dates([eff])
             if not ds: exceptions.append({"row": i, "sku": sku, "error": f"Date not understood: {eff}"}); continue
             eff = ds[0].isoformat()
         other = (extras["shipping"] or 0) + (extras["other"] or 0)
-        ok.append(F.set_cost(db, sku, cogs, extras["packaging"] or 0, other, source, approved_by, effective_from=eff))
-    return {"imported": len(ok), "skus": [c["sku"] for c in ok], "exceptions": exceptions}
+        ok.append(F.set_cost(db, sku, cogs, extras["packaging"] or 0, other, source, approved_by, effective_from=eff, gst_rate=gst))
+    return {"imported": len(ok), "skus": [c["sku"] for c in ok], "exceptions": exceptions,
+            "without_gst_rate": [c["sku"] for c in ok if c["gst_rate"] is None]}
 
 def preview_import(db, path: str, platform: str = "Amazon", account: str = "default") -> dict:
     ensure_v12(db)
@@ -149,6 +157,8 @@ def commit_import(store, path: str, kind: str = None, platform: str = "Amazon",
         rows, _ = _sniff(path)
         r = import_costs(db, rows, "cost sheet upload", imported_by)
         n, exceptions, how = r["imported"], r["exceptions"], "cost_versions (versioned costs — FIN-01)"
+        if r["without_gst_rate"]:
+            how += f" · {len(r['without_gst_rate'])} SKU(s) without a GST rate — their margins do not take GST out"
         if not n:
             return {"ok": False, "duplicate": False, "imported": 0, "exceptions": exceptions, "receipt": pv,
                     "note": "No valid cost rows — see the errors per row"}
