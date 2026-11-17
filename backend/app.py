@@ -381,6 +381,9 @@ class H(BaseHTTPRequestHandler):
                                                 "message": "Only CSVs uploaded via the dashboard or inside the data/ folder can be imported"})
                     if p == "/api/v1/imports/preview":
                         return self._env(200, IW.preview_import(s.db, path, b.get("platform", "Amazon")))
+                    kind = b.get("kind") or IW.preview_import(s.db, path, b.get("platform", "Amazon"))["kind"]
+                    if kind == "costs" and not auth_mod.can(user["role"], "costs"):
+                        return self._send(403, {"error": "FORBIDDEN", "message": "Only Owner/GrowthLead can set costs"})
                     return self._env(200, IW.commit_import(s, path, b.get("kind"), b.get("platform", "Amazon"),
                                                            imported_by=user["username"]))
                 if p == "/api/v1/experiments":

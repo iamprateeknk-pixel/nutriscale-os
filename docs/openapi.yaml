@@ -105,9 +105,9 @@ paths:
   /api/v1/imports/upload:
     post: {summary: "Upload a report from the dashboard: {filename, content_b64} (CSV/TSV, max 20MB) -> stored in data/uploads + preview"}
   /api/v1/imports/preview:
-    post: {summary: "Preview {upload} or a {path} inside data/ -> hash/kind/rows/duplicate (other server paths -> 400)"}
+    post: {summary: "Preview {upload} or a {path} inside data/ -> hash/kind/rows/duplicate + period {start, end, age_days} read from the report's own dates (other server paths -> 400)"}
   /api/v1/imports/commit:
-    post: {summary: "Commit {upload | path, kind?} — receipt, duplicates blocked"}
+    post: {summary: "Commit {upload | path, kind?} — receipt, duplicates blocked. Kinds: search_terms, campaigns, orders, inventory, brand_analytics, catalog_snapshot, costs (cost sheet: needs the costs permission, else 403; bad rows listed in exceptions). A partly overlapping search-term period -> ok=false with the reason"}
   /api/v1/stock/channel-map:
     get: {summary: Explicit stock-location -> channel map}
     post: {summary: "Map a location to a channel: {location, channel}"}
