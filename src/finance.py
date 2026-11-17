@@ -8,16 +8,32 @@ from platform_core import ensure_v12, now_utc
 
 STALE_DAYS = 90
 
-def set_cost(db, sku: str, cogs: float, packaging: float, other_variable: float = 0.0,
-             source: str = "", approved_by: str = "", effective_from: str = None) -> dict:
+MAX_GST_RATE = 40.0   # highest GST slab; anything above is a typo, not a rate
+
+def ensure_gst(db):
+    """V29: GST rate per cost version (percent, e.g. 5). NULL = not given (old rows keep working)."""
     ensure_v12(db)
+    if "gst_rate" not in [c[1] for c in db.execute("PRAGMA table_info(cost_versions)")]:
+        db.execute("ALTER TABLE cost_versions ADD COLUMN gst_rate REAL"); db.commit()
+
+def check_gst_rate(rate):
+    """None stays None (not given). Otherwise a number from 0 to 40 — raises ValueError for anything else."""
+    if rate is None or (isinstance(rate, str) and rate.strip() == ""): return None
+    r = float(str(rate).replace("%", "").strip())
+    if not 0 <= r <= MAX_GST_RATE: raise ValueError(f"GST rate must be between 0 and {MAX_GST_RATE:.0f}% (got {rate})")
+    return r
+
+def set_cost(db, sku: str, cogs: float, packaging: float, other_variable: float = 0.0,
+             source: str = "", approved_by: str = "", effective_from: str = None, gst_rate=None) -> dict:
+    ensure_gst(db)
+    gst_rate = check_gst_rate(gst_rate)
     eff = effective_from or datetime.date.today().isoformat()
-    db.execute("INSERT INTO cost_versions(sku,effective_from,cogs,packaging,other_variable,source,approved_by,created_at) VALUES (?,?,?,?,?,?,?,?)",
-               (sku, eff, cogs, packaging, other_variable, source, approved_by, now_utc())); db.commit()
-    return {"sku": sku, "unit_cost": cogs + packaging + other_variable, "effective_from": eff}
+    db.execute("INSERT INTO cost_versions(sku,effective_from,cogs,packaging,other_variable,source,approved_by,created_at,gst_rate) VALUES (?,?,?,?,?,?,?,?,?)",
+               (sku, eff, cogs, packaging, other_variable, source, approved_by, now_utc(), gst_rate)); db.commit()
+    return {"sku": sku, "unit_cost": cogs + packaging + other_variable, "effective_from": eff, "gst_rate": gst_rate}
 
 def get_cost(db, sku: str, on_date: str = None) -> dict:
-    ensure_v12(db)
+    ensure_gst(db)
     d = on_date or datetime.date.today().isoformat()
     r = db.execute("""SELECT * FROM cost_versions WHERE sku=? AND effective_from<=? ORDER BY effective_from DESC, id DESC LIMIT 1""",
                    (sku, d)).fetchone()
@@ -25,7 +41,7 @@ def get_cost(db, sku: str, on_date: str = None) -> dict:
     age = (datetime.date.fromisoformat(d) - datetime.date.fromisoformat(r["effective_from"])).days
     unit = r["cogs"] + r["packaging"] + r["other_variable"]
     return {"known": True, "sku": sku, "unit_cost": unit, "cogs": r["cogs"], "packaging": r["packaging"],
-            "other_variable": r["other_variable"], "effective_from": r["effective_from"],
+            "other_variable": r["other_variable"], "effective_from": r["effective_from"], "gst_rate": r["gst_rate"],
             "stale": age > STALE_DAYS, "age_days": age,
             "reason": "Cost is older than 90 days — enter a new cost; scaling blocked" if age > STALE_DAYS else "Cost is fresh"}
 
@@ -180,11 +196,19 @@ def contribution_v2(db, sku: str, price: float, platform: str = "Amazon", ad_spe
     else:
         fees, fee_precision = est_fees, "LOW"
         fee_source = "ESTIMATE — fee-table estimate (not enough settlement data)"
-    net = price - fees - c["unit_cost"] - ad_spend_per_unit
+    # V29 GST: the selling price includes GST, which goes to the government, not to you. With a rate on the cost,
+    # the output GST in the price is taken out (costs are then entered WITHOUT GST — input credit is claimed back).
+    rate = c.get("gst_rate")
+    gst = round(price * rate / (100 + rate), 2) if rate is not None else 0.0
+    gst_basis = (f"GST {rate:g}% taken out of the price (₹{gst:,.2f} per unit); costs are treated as excluding GST" if rate is not None else
+                 "GST rate not set — GST is NOT taken out of the price, so this margin is too high unless the GST you pay "
+                 "is included in 'other'. Add the GST rate to this SKU's cost.")
+    net = price - gst - fees - c["unit_cost"] - ad_spend_per_unit
     margin_pct = round(net / price * 100, 1) if price else 0.0
     scale_allowed = (not c["stale"]) and margin_pct > 0
     return {"sku": sku, "known": True, "price": price, "platform_fees": round(fees, 2), "fee_source": fee_source, "fee_precision": fee_precision,
             "unit_cost": c["unit_cost"], "ad_per_unit": ad_spend_per_unit,
+            "gst_rate": rate, "gst_per_unit": gst, "gst_basis": gst_basis,
             "contribution": round(net, 2), "margin_pct": margin_pct,
             "break_even_roas": round(price / net, 2) if net > 0 else None,
             "scale_allowed": scale_allowed,

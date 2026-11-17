@@ -31,6 +31,7 @@ def break_even(db, sku: str, price: float = None, platform: str = "Amazon", desi
             "break_even_acos_pct": round(be * 100, 1), "target_acos_pct": round(target * 100, 1) if target > 0 else None,
             "break_even_roas": round(1 / be, 2) if be > 0 else None,
             "fee_precision": c.get("fee_precision"), "fee_source": c.get("fee_source"),
+            "gst_rate": c.get("gst_rate"), "gst_per_unit": c.get("gst_per_unit"), "gst_basis": c.get("gst_basis"),
             "note": ("Loss-making even before ads — fix price/cost first, do not scale ads" if be <= 0 else
                      f"ACOS above {round(be*100,1)}% = a loss on every ad sale; for {desired_net_margin_pct:.0f}% profit keep ACOS "
                      + (f"at or below {round(target*100,1)}%" if target > 0 else "— not possible at this margin")),

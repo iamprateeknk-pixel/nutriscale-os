@@ -1,5 +1,13 @@
 # NutriScale OS — STATUS (the honest log)
-_Updated: 17 Nov 2026 (V28 — report age from the report's own dates, cost-sheet upload; 32 suites pass)_
+_Updated: 17 Nov 2026 (V29 — GST rate per SKU in profit math; 33 suites pass)_
+
+## 🧾 V29 — GST in profit, break-even ACOS and bids (17 Nov 2026)
+(evidence: test_v29_gst.py — 5 tests incl. real HTTP and an old-database migration; **33 suites pass**; cost form, costs table, template and break-even checked in a browser)
+- **Before**: profit was price − marketplace fees − cost, with a GST-inclusive price — GST was never taken out, so every margin, break-even ACOS and safe bid was too high unless GST had been typed into "other".
+- **Now**: each cost version can carry a **GST rate** (0–40%). The output GST inside the selling price (price × rate ÷ (100 + rate)) is taken out in `contribution_v2`, which all profit users share — break-even ACOS, max CPC, SKU 360, competitor packets. Costs with a rate are treated as **excluding GST** (input credit is claimed back).
+- Cost form has a GST % field, the costs table shows the rate ("not set" warning otherwise), the cost-sheet template and import take a `gst_rate` column ("5%" or "5"; anything outside 0–40 is a row error), and the import receipt counts SKUs still without a rate. A bad rate in the form gets a clear 400.
+- Costs without a rate work exactly as before, and every result says plainly that GST was **not** taken out. Old databases get the column automatically.
+- **Not modelled (honest)**: GST on marketplace fees (claimable as input credit) and fee-rate differences between GST slabs; the fee figure is used as it comes.
 
 ## 📅 V28 — Real report age + cost sheet in one upload (17 Nov 2026)
 (evidence: test_v27_data.py — 5 tests incl. real HTTP; **32 suites pass**; upload preview, cost sheet and template download exercised in a browser)

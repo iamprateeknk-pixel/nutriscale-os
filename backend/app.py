@@ -206,7 +206,8 @@ class H(BaseHTTPRequestHandler):
                 import ops_finance as OF
                 return self._env(200, OF.reconciliation(s))
             if p == "/api/v1/costs":
-                rows = [dict(r) for r in s.db.execute("SELECT sku, effective_from, cogs, packaging, other_variable, source FROM cost_versions ORDER BY sku, effective_from DESC")]
+                import finance as F; F.ensure_gst(s.db)
+                rows = [dict(r) for r in s.db.execute("SELECT sku, effective_from, cogs, packaging, other_variable, gst_rate, source FROM cost_versions ORDER BY sku, effective_from DESC")]
                 return self._env(200, {"costs": rows, "note": "Scaling is blocked for SKUs without a cost (FIN-01)"})
             if p == "/api/v1/agency/scorecard":
                 import agency as AG
@@ -340,9 +341,11 @@ class H(BaseHTTPRequestHandler):
                     return self._env(200, {"snapshot_id": sid, "changes": CL.detect_changes(s.db, int(b["peer_id"]))})
                 if p == "/api/v1/costs":
                     import finance as F
+                    try: F.check_gst_rate(b.get("gst_rate"))
+                    except ValueError as e: return self._send(400, {"error": "BAD_GST_RATE", "message": str(e)})
                     return self._env(200, F.set_cost(s.db, b["sku"], float(b["cogs"]), float(b.get("packaging", 0)),
                                                      float(b.get("other_variable", 0)), b.get("source", "manual"),
-                                                     approved_by=user["username"]))
+                                                     approved_by=user["username"], gst_rate=b.get("gst_rate")))
                 if p == "/api/v1/listings/audit":
                     import listing_rules as LR
                     return self._env(200, LR.audit_listing(b.get("platform", "Amazon"), b.get("title", ""), b.get("bullets", []),
